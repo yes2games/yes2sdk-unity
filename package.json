@@ -1,0 +1,35 @@
+{
+    "name": "com.yes2games.yes2sdk",
+    "version": "1.0.0",
+    "displayName": "Yes2SDK",
+    "description": "Yes2SDK Unity wrapper for WebGL games on some H5 platforms",
+    "unity": "2021.3",
+    "unityRelease": "0f1",
+    "documentationUrl": "https://github.com/yes2games/yes2sdk-unity",
+    "changelogUrl": "https://github.com/yes2games/yes2sdk-unity/blob/main/CHANGELOG.md",
+    "licensesUrl": "https://github.com/yes2games/yes2sdk-unity/blob/main/LICENSE",
+    "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.1"
+    },
+    "keywords": [
+        "sdk",
+        "webgl",
+        "poki",
+        "crazygames",
+        "ads",
+        "analytics",
+        "monetization"
+    ],
+    "author": {
+        "name": "Yes2Games",
+        "email": "info@yes2games.com",
+        "url": "https://yes2games.com"
+    },
+    "samples": [
+        {
+            "displayName": "Basic Integration",
+            "description": "Sample showing basic Yes2SDK integration for WebGL games",
+            "path": "Samples~/BasicIntegration"
+        }
+    ]
+}

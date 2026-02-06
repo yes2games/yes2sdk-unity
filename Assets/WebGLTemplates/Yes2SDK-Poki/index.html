@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>{{{ PRODUCT_NAME }}} - Poki</title>
+    <!--
+        NOTE: This HTML is for LOCAL TESTING ONLY.
+        On Poki.com, the HTML is auto-generated from index.json.
+        Yes2SDK wrapper is inlined (no external CDN) to comply with Poki's CSP.
+    -->
+    <style>
+        * { margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+        #unity-container { width: 100%; height: 100%; position: absolute; }
+        #unity-canvas { width: 100%; height: 100%; background: #231F20; }
+    </style>
+</head>
+<body>
+    <div id="unity-container">
+        <canvas id="unity-canvas" tabindex="-1"></canvas>
+    </div>
+
+    <!-- Mock PokiSDK for local testing (on Poki.com this is injected automatically) -->
+    <script>
+        if (typeof PokiSDK === 'undefined') {
+            console.log('[Yes2SDK] Local testing mode - using mock PokiSDK');
+            window.PokiSDK = {
+                init: function() {
+                    console.log('[PokiSDK Mock] init');
+                    return Promise.resolve();
+                },
+                gameLoadingStart: function() { console.log('[PokiSDK Mock] gameLoadingStart'); },
+                gameLoadingFinished: function() { console.log('[PokiSDK Mock] gameLoadingFinished'); },
+                gameplayStart: function() { console.log('[PokiSDK Mock] gameplayStart'); },
+                gameplayStop: function() { console.log('[PokiSDK Mock] gameplayStop'); },
+                commercialBreak: function() {
+                    console.log('[PokiSDK Mock] commercialBreak');
+                    return Promise.resolve();
+                },
+                rewardedBreak: function() {
+                    console.log('[PokiSDK Mock] rewardedBreak');
+                    return Promise.resolve(true);
+                },
+                isAdBlocked: function() { return false; },
+                getLanguage: function() { return 'en'; }
+            };
+        }
+    </script>
+
+    <!-- Yes2SDK Poki Wrapper (same as inlined in index.json for production) -->
+    <script>
+        window.Yes2SDK = {
+            _initialized: false,
+            _platform: 'poki',
+
+            initializeAsync: function() {
+                var self = this;
+                return PokiSDK.init().then(function() {
+                    self._initialized = true;
+                    PokiSDK.gameLoadingStart();
+                    console.log('[Yes2SDK] Initialized for Poki');
+                    return Promise.resolve();
+                });
+            },
+
+            startGameAsync: function() {
+                PokiSDK.gameLoadingFinished();
+                console.log('[Yes2SDK] Game started');
+                return Promise.resolve();
+            },
+
+            setLoadingProgress: function(progress) {
+                // Poki doesn't have a loading progress API
+            },
+
+            performHapticFeedback: function() {
+                // Poki doesn't support haptic feedback
+            },
+
+            getPlatform: function() {
+                return this._platform;
+            },
+
+            get isInitialized() {
+                return this._initialized;
+            }
+        };
+    </script>
+
+    <script>
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
+        var config = {
+            dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+            frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if MEMORY_FILENAME
+            memoryUrl: buildUrl + "/{{{ MEMORY_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+            symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+            codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "{{{ COMPANY_NAME }}}",
+            productName: "{{{ PRODUCT_NAME }}}",
+            productVersion: "{{{ PRODUCT_VERSION }}}"
+        };
+
+        var canvas = document.querySelector("#unity-canvas");
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = function() {
+            createUnityInstance(canvas, config, function(progress) {
+                // Loading progress
+            }).then(function(unityInstance) {
+                window.unityInstance = unityInstance;
+            }).catch(function(message) {
+                alert(message);
+            });
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
