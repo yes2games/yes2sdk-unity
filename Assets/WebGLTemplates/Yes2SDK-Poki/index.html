@@ -85,6 +85,51 @@
 
             get isInitialized() {
                 return this._initialized;
+            },
+
+            // Ads module - wraps PokiSDK ad methods
+            ads: {
+                showInterstitial: function(placement, description, callbacks) {
+                    if (callbacks.beforeAd) callbacks.beforeAd();
+                    return PokiSDK.commercialBreak().then(function() {
+                        if (callbacks.afterAd) callbacks.afterAd();
+                    });
+                },
+
+                showRewarded: function(placement, description, callbacks) {
+                    if (callbacks.beforeAd) callbacks.beforeAd();
+                    return PokiSDK.rewardedBreak().then(function(success) {
+                        if (callbacks.afterAd) callbacks.afterAd();
+                        if (success && callbacks.adViewed) callbacks.adViewed();
+                        if (!success && callbacks.adDismissed) callbacks.adDismissed();
+                    });
+                },
+
+                showBanner: function(position, callbacks) {
+                    // Poki doesn't support banners
+                    if (callbacks.onError) {
+                        callbacks.onError({
+                            code: 'NotSupported',
+                            message: 'Banners not supported on Poki',
+                            context: 'ads.showBanner'
+                        });
+                    }
+                },
+
+                hideBanner: function(callbacks) {
+                    // Poki doesn't support banners
+                    if (callbacks.onError) {
+                        callbacks.onError({
+                            code: 'NotSupported',
+                            message: 'Banners not supported on Poki',
+                            context: 'ads.hideBanner'
+                        });
+                    }
+                },
+
+                isAdBlocked: function() {
+                    return PokiSDK.isAdBlocked ? PokiSDK.isAdBlocked() : false;
+                }
             }
         };
     </script>
