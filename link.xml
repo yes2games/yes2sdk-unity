@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<linker>
+    <!-- Preserve Yes2SDK types for IL2CPP -->
+    <assembly fullname="Yes2SDK.Runtime" preserve="all"/>
+
+    <!-- Preserve Newtonsoft.Json for serialization -->
+    <assembly fullname="Newtonsoft.Json" preserve="all">
+        <type fullname="Newtonsoft.Json.JsonConvert" preserve="all"/>
+        <type fullname="Newtonsoft.Json.JsonSerializer" preserve="all"/>
+        <type fullname="Newtonsoft.Json.Linq.*" preserve="all"/>
+    </assembly>
+
+    <!-- Preserve System types used by JSON serialization -->
+    <assembly fullname="mscorlib">
+        <type fullname="System.Collections.Generic.*" preserve="all"/>
+    </assembly>
+
+    <assembly fullname="System.Core">
+        <type fullname="System.Linq.*" preserve="all"/>
+    </assembly>
+</linker>
