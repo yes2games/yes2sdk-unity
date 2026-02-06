@@ -8,7 +8,7 @@
     <!--
         NOTE: This HTML is for LOCAL TESTING ONLY.
         On Poki.com, the HTML is auto-generated from index.json.
-        Yes2SDK Core is loaded via extra_html in index.json for production.
+        Yes2SDK wrapper is inlined (no external CDN) to comply with Poki's CSP.
     -->
     <style>
         * { margin: 0; padding: 0; }
@@ -22,14 +22,10 @@
         <canvas id="unity-canvas" tabindex="-1"></canvas>
     </div>
 
-    <!-- Yes2SDK Core (for local testing) -->
-    <script src="https://cdn.jsdelivr.net/npm/@yes2sdk/core@latest/dist/yes2sdk.umd.js"></script>
-
-    <!-- Poki SDK Loader (for local testing - on Poki.com this is injected automatically) -->
+    <!-- Mock PokiSDK for local testing (on Poki.com this is injected automatically) -->
     <script>
-        // Mock PokiSDK for local testing if not available
         if (typeof PokiSDK === 'undefined') {
-            console.log('[Yes2SDK] Local testing mode - PokiSDK not available');
+            console.log('[Yes2SDK] Local testing mode - using mock PokiSDK');
             window.PokiSDK = {
                 init: function() {
                     console.log('[PokiSDK Mock] init');
@@ -51,6 +47,46 @@
                 getLanguage: function() { return 'en'; }
             };
         }
+    </script>
+
+    <!-- Yes2SDK Poki Wrapper (same as inlined in index.json for production) -->
+    <script>
+        window.Yes2SDK = {
+            _initialized: false,
+            _platform: 'poki',
+
+            initializeAsync: function() {
+                var self = this;
+                return PokiSDK.init().then(function() {
+                    self._initialized = true;
+                    PokiSDK.gameLoadingStart();
+                    console.log('[Yes2SDK] Initialized for Poki');
+                    return Promise.resolve();
+                });
+            },
+
+            startGameAsync: function() {
+                PokiSDK.gameLoadingFinished();
+                console.log('[Yes2SDK] Game started');
+                return Promise.resolve();
+            },
+
+            setLoadingProgress: function(progress) {
+                // Poki doesn't have a loading progress API
+            },
+
+            performHapticFeedback: function() {
+                // Poki doesn't support haptic feedback
+            },
+
+            getPlatform: function() {
+                return this._platform;
+            },
+
+            get isInitialized() {
+                return this._initialized;
+            }
+        };
     </script>
 
     <script>

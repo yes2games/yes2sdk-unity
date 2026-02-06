@@ -65,7 +65,7 @@ namespace Yes2SDK.Editor
 
         /// <summary>
         /// CrazyGames build configuration.
-        /// - Gzip compression
+        /// - Gzip compression (no decompression fallback - CrazyGames requires this)
         /// - Standard template with CrazyGames SDK
         /// </summary>
         public static BuildConfig CrazyGames => new BuildConfig(
@@ -73,10 +73,10 @@ namespace Yes2SDK.Editor
             templateName: "Yes2SDK-CrazyGames",
             displayName: "CrazyGames",
             compression: WebGLCompressionFormat.Gzip,
-            decompressionFallback: true,
+            decompressionFallback: false,
             codeStripping: ManagedStrippingLevel.Low,
             exceptionSupport: WebGLExceptionSupport.None,
-            description: "CrazyGames.com - Gzip compression, standard template"
+            description: "CrazyGames.com - Gzip compression, no decompression fallback"
         );
 
         // Facebook Instant Games - Coming soon (template not yet implemented)
