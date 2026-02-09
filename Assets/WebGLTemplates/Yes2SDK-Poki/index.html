@@ -162,6 +162,120 @@
                 logPurchase: function(productId, price, currency) {
                     console.log('[Yes2SDK] Purchase:', productId, price, currency);
                 }
+            },
+
+            // Session module - locale, device, orientation, traffic source, entry point
+            session: {
+                _data: {},
+
+                getLocale: function() {
+                    if (typeof PokiSDK !== 'undefined' && PokiSDK.getLanguage) {
+                        return PokiSDK.getLanguage() || navigator.language || 'en';
+                    }
+                    return navigator.language || 'en';
+                },
+
+                getCountry: function() {
+                    return ''; // Poki has no country API
+                },
+
+                getDevice: function() {
+                    var ua = navigator.userAgent || '';
+                    if (/tablet|ipad|playbook|silk/i.test(ua)) return 'tablet';
+                    if (/mobile|iphone|ipod|android|blackberry|opera mini|iemobile/i.test(ua)) return 'mobile';
+                    return 'desktop';
+                },
+
+                getOrientation: function() {
+                    return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+                },
+
+                getTrafficSource: function() {
+                    var params = {};
+                    try {
+                        var search = window.location.search.substring(1);
+                        if (search) {
+                            search.split('&').forEach(function(pair) {
+                                var kv = pair.split('=');
+                                params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+                            });
+                        }
+                    } catch(e) {}
+                    return JSON.stringify({ referrer: document.referrer || '', params: params });
+                },
+
+                getEntryPointData: function() {
+                    var params = {};
+                    try {
+                        var search = window.location.search.substring(1);
+                        if (search) {
+                            search.split('&').forEach(function(pair) {
+                                var kv = pair.split('=');
+                                params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+                            });
+                        }
+                    } catch(e) {}
+                    return JSON.stringify(params);
+                },
+
+                setSessionData: function(dataJson) {
+                    try {
+                        this._data = JSON.parse(dataJson);
+                    } catch(e) {
+                        console.warn('[Yes2SDK] Invalid session data JSON:', dataJson);
+                    }
+                },
+
+                getEntryPointAsync: function() {
+                    return Promise.resolve('direct');
+                }
+            },
+
+            // Player module - anonymous on Poki, data operations not supported
+            player: {
+                getPlayerAsync: function() {
+                    return Promise.resolve({ id: 'anonymous', name: null, photo: null });
+                },
+
+                getDataAsync: function(keysJson) {
+                    return Promise.reject({
+                        code: 'FeatureNotSupported',
+                        message: 'Player data is not supported on Poki',
+                        context: 'player.getDataAsync'
+                    });
+                },
+
+                setDataAsync: function(dataJson) {
+                    return Promise.reject({
+                        code: 'FeatureNotSupported',
+                        message: 'Player data is not supported on Poki',
+                        context: 'player.setDataAsync'
+                    });
+                },
+
+                flushDataAsync: function() {
+                    return Promise.reject({
+                        code: 'FeatureNotSupported',
+                        message: 'Player data is not supported on Poki',
+                        context: 'player.flushDataAsync'
+                    });
+                },
+
+                getConnectedPlayersAsync: function() {
+                    return Promise.reject({
+                        code: 'FeatureNotSupported',
+                        message: 'Connected players are not supported on Poki',
+                        context: 'player.getConnectedPlayersAsync'
+                    });
+                },
+
+                getSignedPlayerInfoAsync: function(payload) {
+                    return Promise.reject({
+                        code: 'FeatureNotSupported',
+                        message: 'Signed player info is not supported on Poki',
+                        context: 'player.getSignedPlayerInfoAsync'
+                    });
+                }
             }
         };
     </script>

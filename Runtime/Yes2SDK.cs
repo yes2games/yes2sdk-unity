@@ -95,6 +95,132 @@ namespace Yes2SDK
             }
         }
 
+        private static Yes2SDKSession _session;
+
+        /// <summary>
+        /// Session API for locale, device, orientation, traffic source, and entry point.
+        /// </summary>
+        public static Yes2SDKSession Session
+        {
+            get
+            {
+                _session ??= new Yes2SDKSession();
+                return _session;
+            }
+        }
+
+        private static Yes2SDKPlayer _player;
+
+        /// <summary>
+        /// Player API for player info, data persistence, and connected players.
+        /// </summary>
+        public static Yes2SDKPlayer Player
+        {
+            get
+            {
+                _player ??= new Yes2SDKPlayer();
+                return _player;
+            }
+        }
+
+        private static Yes2SDKLeaderboard _leaderboard;
+
+        /// <summary>
+        /// Leaderboard API. Stub — returns FeatureNotSupported on Poki.
+        /// </summary>
+        public static Yes2SDKLeaderboard Leaderboard
+        {
+            get
+            {
+                _leaderboard ??= new Yes2SDKLeaderboard();
+                return _leaderboard;
+            }
+        }
+
+        private static Yes2SDKIAP _iap;
+
+        /// <summary>
+        /// In-App Purchase API. Stub — returns FeatureNotSupported on Poki.
+        /// </summary>
+        public static Yes2SDKIAP IAP
+        {
+            get
+            {
+                _iap ??= new Yes2SDKIAP();
+                return _iap;
+            }
+        }
+
+        private static Yes2SDKAchievements _achievements;
+
+        /// <summary>
+        /// Achievements API. Stub — returns FeatureNotSupported on Poki.
+        /// </summary>
+        public static Yes2SDKAchievements Achievements
+        {
+            get
+            {
+                _achievements ??= new Yes2SDKAchievements();
+                return _achievements;
+            }
+        }
+
+        private static Yes2SDKContext _context;
+
+        /// <summary>
+        /// Context API. Stub — returns FeatureNotSupported on Poki.
+        /// </summary>
+        public static Yes2SDKContext Context
+        {
+            get
+            {
+                _context ??= new Yes2SDKContext();
+                return _context;
+            }
+        }
+
+        private static Yes2SDKNotifications _notifications;
+
+        /// <summary>
+        /// Notifications API. Stub — returns FeatureNotSupported on Poki.
+        /// </summary>
+        public static Yes2SDKNotifications Notifications
+        {
+            get
+            {
+                _notifications ??= new Yes2SDKNotifications();
+                return _notifications;
+            }
+        }
+
+        private static Yes2SDKTournament _tournament;
+
+        /// <summary>
+        /// Tournament API. Stub — returns FeatureNotSupported on Poki.
+        /// </summary>
+        public static Yes2SDKTournament Tournament
+        {
+            get
+            {
+                _tournament ??= new Yes2SDKTournament();
+                return _tournament;
+            }
+        }
+
+        private static Yes2SDKStats _stats;
+
+        /// <summary>
+        /// Stats API. Stub — returns FeatureNotSupported on Poki.
+        /// </summary>
+        public static Yes2SDKStats Stats
+        {
+            get
+            {
+                _stats ??= new Yes2SDKStats();
+                return _stats;
+            }
+        }
+
         #endregion
 
         #region JavaScript Imports
