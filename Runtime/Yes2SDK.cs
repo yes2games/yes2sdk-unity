@@ -67,6 +67,20 @@ namespace Yes2SDK
         /// </summary>
         public static string Version => "1.0.0";
 
+        private static Yes2SDKAds _ads;
+
+        /// <summary>
+        /// Ads API for showing interstitial, rewarded, and banner ads.
+        /// </summary>
+        public static Yes2SDKAds Ads
+        {
+            get
+            {
+                _ads ??= new Yes2SDKAds();
+                return _ads;
+            }
+        }
+
         #endregion
 
         #region JavaScript Imports

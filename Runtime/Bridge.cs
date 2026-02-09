@@ -112,6 +112,110 @@ namespace Yes2SDK
 
         #endregion
 
+        #region Ads Callbacks
+
+        /// <summary>
+        /// Called from JavaScript before an interstitial ad is shown.
+        /// </summary>
+        public void OnInterstitialBeforeAd(string message)
+        {
+            Yes2SDKAds.InvokeInterstitialBeforeAd();
+        }
+
+        /// <summary>
+        /// Called from JavaScript after an interstitial ad completes.
+        /// </summary>
+        public void OnInterstitialAfterAd(string message)
+        {
+            Yes2SDKAds.InvokeInterstitialAfterAd();
+        }
+
+        /// <summary>
+        /// Called from JavaScript when an interstitial ad fails.
+        /// </summary>
+        public void OnInterstitialError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKAds.InvokeInterstitialError(error);
+        }
+
+        /// <summary>
+        /// Called from JavaScript before a rewarded ad is shown.
+        /// </summary>
+        public void OnRewardedBeforeAd(string message)
+        {
+            Yes2SDKAds.InvokeRewardedBeforeAd();
+        }
+
+        /// <summary>
+        /// Called from JavaScript after a rewarded ad completes.
+        /// </summary>
+        public void OnRewardedAfterAd(string message)
+        {
+            Yes2SDKAds.InvokeRewardedAfterAd();
+        }
+
+        /// <summary>
+        /// Called from JavaScript when a rewarded ad is dismissed without reward.
+        /// </summary>
+        public void OnRewardedAdDismissed(string message)
+        {
+            Yes2SDKAds.InvokeRewardedAdDismissed();
+        }
+
+        /// <summary>
+        /// Called from JavaScript when a rewarded ad is fully viewed.
+        /// </summary>
+        public void OnRewardedAdViewed(string message)
+        {
+            Yes2SDKAds.InvokeRewardedAdViewed();
+        }
+
+        /// <summary>
+        /// Called from JavaScript when a rewarded ad fails.
+        /// </summary>
+        public void OnRewardedError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKAds.InvokeRewardedError(error);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when a banner ad is shown.
+        /// </summary>
+        public void OnBannerShown(string message)
+        {
+            Yes2SDKAds.InvokeBannerShown();
+        }
+
+        /// <summary>
+        /// Called from JavaScript when showing a banner ad fails.
+        /// </summary>
+        public void OnBannerShowError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKAds.InvokeBannerShowError(error);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when a banner ad is hidden.
+        /// </summary>
+        public void OnBannerHidden(string message)
+        {
+            Yes2SDKAds.InvokeBannerHidden();
+        }
+
+        /// <summary>
+        /// Called from JavaScript when hiding a banner ad fails.
+        /// </summary>
+        public void OnBannerHideError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKAds.InvokeBannerHideError(error);
+        }
+
+        #endregion
+
         #region Utility
 
         private Error ParseError(string errorJson)

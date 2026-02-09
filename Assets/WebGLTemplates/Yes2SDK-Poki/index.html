@@ -85,6 +85,56 @@
 
             get isInitialized() {
                 return this._initialized;
+            },
+
+            // Ads module - wraps PokiSDK ad methods
+            // API matches Core SDK: showInterstitial(placement, callbacks), showRewarded(placement, callbacks)
+            ads: {
+                showInterstitial: function(placement, callbacks) {
+                    callbacks = callbacks || {};
+                    if (callbacks.beforeAd) callbacks.beforeAd();
+                    return PokiSDK.commercialBreak().then(function() {
+                        if (callbacks.afterAd) callbacks.afterAd();
+                    }).catch(function(error) {
+                        console.warn('[Yes2SDK] commercialBreak failed:', error);
+                        if (callbacks.noFill) callbacks.noFill();
+                        if (callbacks.afterAd) callbacks.afterAd();
+                    });
+                },
+
+                showRewarded: function(placement, callbacks) {
+                    callbacks = callbacks || {};
+                    if (callbacks.beforeAd) callbacks.beforeAd();
+                    return PokiSDK.rewardedBreak().then(function(success) {
+                        if (success) {
+                            if (callbacks.adViewed) callbacks.adViewed();
+                        } else {
+                            if (callbacks.adDismissed) callbacks.adDismissed();
+                        }
+                        if (callbacks.afterAd) callbacks.afterAd();
+                    }).catch(function(error) {
+                        console.warn('[Yes2SDK] rewardedBreak failed:', error);
+                        if (callbacks.noFill) callbacks.noFill();
+                        if (callbacks.afterAd) callbacks.afterAd();
+                    });
+                },
+
+                showBanner: function(position) {
+                    // Poki doesn't support banners
+                    return Promise.reject({
+                        code: 'NotSupported',
+                        message: 'Banners not supported on Poki',
+                        context: 'ads.showBanner'
+                    });
+                },
+
+                hideBanner: function() {
+                    // Poki doesn't support banners - no-op
+                },
+
+                isAdBlocked: function() {
+                    return PokiSDK.isAdBlocked ? PokiSDK.isAdBlocked() : false;
+                }
             }
         };
     </script>
