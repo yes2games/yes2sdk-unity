@@ -81,6 +81,20 @@ namespace Yes2SDK
             }
         }
 
+        private static Yes2SDKAnalytics _analytics;
+
+        /// <summary>
+        /// Analytics API for tracking events, levels, scores, and more.
+        /// </summary>
+        public static Yes2SDKAnalytics Analytics
+        {
+            get
+            {
+                _analytics ??= new Yes2SDKAnalytics();
+                return _analytics;
+            }
+        }
+
         #endregion
 
         #region JavaScript Imports

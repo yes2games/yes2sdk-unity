@@ -135,6 +135,33 @@
                 isAdBlocked: function() {
                     return PokiSDK.isAdBlocked ? PokiSDK.isAdBlocked() : false;
                 }
+            },
+
+            // Analytics module - maps unified API to Poki SDK calls
+            analytics: {
+                logEvent: function(name, paramsJson) {
+                    console.log('[Yes2SDK] Event:', name, paramsJson);
+                },
+                logLevelStart: function(level) {
+                    console.log('[Yes2SDK] Level start:', level);
+                    PokiSDK.gameplayStart();
+                },
+                logLevelEnd: function(level, score, success) {
+                    console.log('[Yes2SDK] Level end:', level, score, success);
+                    PokiSDK.gameplayStop();
+                },
+                logScore: function(score, level) {
+                    console.log('[Yes2SDK] Score:', score, level);
+                },
+                logTutorialStart: function() {
+                    console.log('[Yes2SDK] Tutorial start');
+                },
+                logTutorialEnd: function() {
+                    console.log('[Yes2SDK] Tutorial end');
+                },
+                logPurchase: function(productId, price, currency) {
+                    console.log('[Yes2SDK] Purchase:', productId, price, currency);
+                }
             }
         };
     </script>
