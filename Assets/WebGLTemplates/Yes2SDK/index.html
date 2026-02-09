@@ -19,8 +19,73 @@
         <div id="unity-warning"></div>
     </div>
 
-    <!-- Yes2SDK Core - Load from jsDelivr CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@yes2sdk/core@latest/dist/yes2sdk.umd.js"></script>
+    <!-- Yes2SDK Debug Wrapper (mock - all operations succeed immediately) -->
+    <script>
+        window.Yes2SDK = {
+            _initialized: false,
+            _platform: 'debug',
+
+            initializeAsync: function() {
+                this._initialized = true;
+                console.log('[Yes2SDK] Initialized (debug mode)');
+                return Promise.resolve();
+            },
+
+            startGameAsync: function() {
+                console.log('[Yes2SDK] Game started (debug mode)');
+                return Promise.resolve();
+            },
+
+            setLoadingProgress: function(progress) {
+                console.log('[Yes2SDK] Loading progress: ' + progress + '%');
+            },
+
+            performHapticFeedback: function() {
+                console.log('[Yes2SDK] Haptic feedback (debug mode)');
+            },
+
+            getPlatform: function() {
+                return this._platform;
+            },
+
+            get isInitialized() {
+                return this._initialized;
+            },
+
+            // Ads module - mock implementation for debug/local testing
+            ads: {
+                showInterstitial: function(placement, callbacks) {
+                    callbacks = callbacks || {};
+                    console.log('[Yes2SDK] Mock interstitial ad: ' + placement);
+                    if (callbacks.beforeAd) callbacks.beforeAd();
+                    if (callbacks.afterAd) callbacks.afterAd();
+                    return Promise.resolve();
+                },
+
+                showRewarded: function(placement, callbacks) {
+                    callbacks = callbacks || {};
+                    console.log('[Yes2SDK] Mock rewarded ad: ' + placement);
+                    if (callbacks.beforeAd) callbacks.beforeAd();
+                    if (callbacks.adViewed) callbacks.adViewed();
+                    if (callbacks.afterAd) callbacks.afterAd();
+                    return Promise.resolve();
+                },
+
+                showBanner: function(position) {
+                    console.log('[Yes2SDK] Mock banner shown at: ' + position);
+                    return Promise.resolve();
+                },
+
+                hideBanner: function() {
+                    console.log('[Yes2SDK] Mock banner hidden');
+                },
+
+                isAdBlocked: function() {
+                    return false;
+                }
+            }
+        };
+    </script>
 
     <script>
         var container = document.querySelector("#unity-container");

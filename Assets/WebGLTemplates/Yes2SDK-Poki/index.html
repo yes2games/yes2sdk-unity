@@ -88,43 +88,48 @@
             },
 
             // Ads module - wraps PokiSDK ad methods
+            // API matches Core SDK: showInterstitial(placement, callbacks), showRewarded(placement, callbacks)
             ads: {
-                showInterstitial: function(placement, description, callbacks) {
+                showInterstitial: function(placement, callbacks) {
+                    callbacks = callbacks || {};
                     if (callbacks.beforeAd) callbacks.beforeAd();
                     return PokiSDK.commercialBreak().then(function() {
                         if (callbacks.afterAd) callbacks.afterAd();
+                    }).catch(function(error) {
+                        console.warn('[Yes2SDK] commercialBreak failed:', error);
+                        if (callbacks.noFill) callbacks.noFill();
+                        if (callbacks.afterAd) callbacks.afterAd();
                     });
                 },
 
-                showRewarded: function(placement, description, callbacks) {
+                showRewarded: function(placement, callbacks) {
+                    callbacks = callbacks || {};
                     if (callbacks.beforeAd) callbacks.beforeAd();
                     return PokiSDK.rewardedBreak().then(function(success) {
+                        if (success) {
+                            if (callbacks.adViewed) callbacks.adViewed();
+                        } else {
+                            if (callbacks.adDismissed) callbacks.adDismissed();
+                        }
                         if (callbacks.afterAd) callbacks.afterAd();
-                        if (success && callbacks.adViewed) callbacks.adViewed();
-                        if (!success && callbacks.adDismissed) callbacks.adDismissed();
+                    }).catch(function(error) {
+                        console.warn('[Yes2SDK] rewardedBreak failed:', error);
+                        if (callbacks.noFill) callbacks.noFill();
+                        if (callbacks.afterAd) callbacks.afterAd();
                     });
                 },
 
-                showBanner: function(position, callbacks) {
+                showBanner: function(position) {
                     // Poki doesn't support banners
-                    if (callbacks.onError) {
-                        callbacks.onError({
-                            code: 'NotSupported',
-                            message: 'Banners not supported on Poki',
-                            context: 'ads.showBanner'
-                        });
-                    }
+                    return Promise.reject({
+                        code: 'NotSupported',
+                        message: 'Banners not supported on Poki',
+                        context: 'ads.showBanner'
+                    });
                 },
 
-                hideBanner: function(callbacks) {
-                    // Poki doesn't support banners
-                    if (callbacks.onError) {
-                        callbacks.onError({
-                            code: 'NotSupported',
-                            message: 'Banners not supported on Poki',
-                            context: 'ads.hideBanner'
-                        });
-                    }
+                hideBanner: function() {
+                    // Poki doesn't support banners - no-op
                 },
 
                 isAdBlocked: function() {

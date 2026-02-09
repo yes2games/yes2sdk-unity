@@ -18,11 +18,152 @@
         </div>
     </div>
 
-    <!-- Yes2SDK Core -->
-    <script src="https://cdn.jsdelivr.net/npm/@yes2sdk/core@latest/dist/yes2sdk.umd.js"></script>
-
     <!-- CrazyGames SDK -->
     <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+
+    <!-- Yes2SDK CrazyGames Wrapper (inline - matches Core SDK API surface) -->
+    <script>
+        window.Yes2SDK = {
+            _initialized: false,
+            _platform: 'crazygames',
+            _sdk: null,
+            _loadingStarted: false,
+
+            initializeAsync: function() {
+                var self = this;
+                if (typeof window.CrazyGames === 'undefined' || !window.CrazyGames.SDK) {
+                    console.error('[Yes2SDK] CrazyGames SDK not found');
+                    return Promise.reject({ code: 'NotInitialized', message: 'CrazyGames SDK not found' });
+                }
+                self._sdk = window.CrazyGames.SDK;
+                return self._sdk.init().then(function() {
+                    self._initialized = true;
+                    console.log('[Yes2SDK] Initialized for CrazyGames');
+                }).catch(function(error) {
+                    console.error('[Yes2SDK] CrazyGames init failed:', error);
+                    return Promise.reject(error);
+                });
+            },
+
+            startGameAsync: function() {
+                if (this._sdk) {
+                    this._sdk.game.loadingStop();
+                }
+                console.log('[Yes2SDK] Game started');
+                return Promise.resolve();
+            },
+
+            setLoadingProgress: function(progress) {
+                if (this._sdk && !this._loadingStarted) {
+                    this._sdk.game.loadingStart();
+                    this._loadingStarted = true;
+                }
+            },
+
+            performHapticFeedback: function() {
+                // CrazyGames doesn't support haptic feedback
+            },
+
+            getPlatform: function() {
+                return this._platform;
+            },
+
+            get isInitialized() {
+                return this._initialized;
+            },
+
+            // Ads module - wraps CrazyGames SDK ad methods
+            // API matches Core SDK: showInterstitial(placement, callbacks), showRewarded(placement, callbacks)
+            ads: {
+                showInterstitial: function(placement, callbacks) {
+                    callbacks = callbacks || {};
+                    var sdk = window.Yes2SDK._sdk;
+                    if (!sdk) {
+                        if (callbacks.noFill) callbacks.noFill();
+                        if (callbacks.afterAd) callbacks.afterAd();
+                        return Promise.resolve();
+                    }
+
+                    if (callbacks.beforeAd) callbacks.beforeAd();
+
+                    return new Promise(function(resolve) {
+                        sdk.ad.requestAd('midgame', {
+                            adStarted: function() {
+                                console.log('[Yes2SDK] Midgame ad started');
+                            },
+                            adFinished: function() {
+                                console.log('[Yes2SDK] Midgame ad finished');
+                                if (callbacks.afterAd) callbacks.afterAd();
+                                resolve();
+                            },
+                            adError: function(error) {
+                                console.warn('[Yes2SDK] Midgame ad error:', error);
+                                if (callbacks.noFill) callbacks.noFill();
+                                if (callbacks.afterAd) callbacks.afterAd();
+                                resolve();
+                            }
+                        });
+                    });
+                },
+
+                showRewarded: function(placement, callbacks) {
+                    callbacks = callbacks || {};
+                    var sdk = window.Yes2SDK._sdk;
+                    if (!sdk) {
+                        if (callbacks.noFill) callbacks.noFill();
+                        if (callbacks.afterAd) callbacks.afterAd();
+                        return Promise.resolve();
+                    }
+
+                    if (callbacks.beforeAd) callbacks.beforeAd();
+
+                    return new Promise(function(resolve) {
+                        sdk.ad.requestAd('rewarded', {
+                            adStarted: function() {
+                                console.log('[Yes2SDK] Rewarded ad started');
+                            },
+                            adFinished: function() {
+                                console.log('[Yes2SDK] Rewarded ad finished');
+                                if (callbacks.adViewed) callbacks.adViewed();
+                                if (callbacks.afterAd) callbacks.afterAd();
+                                resolve();
+                            },
+                            adError: function(error) {
+                                console.warn('[Yes2SDK] Rewarded ad error:', error);
+                                if (error && (error.code === 'unfilled' || error.code === 'adblock')) {
+                                    if (callbacks.noFill) callbacks.noFill();
+                                } else {
+                                    if (callbacks.adDismissed) callbacks.adDismissed();
+                                }
+                                if (callbacks.afterAd) callbacks.afterAd();
+                                resolve();
+                            }
+                        });
+                    });
+                },
+
+                showBanner: function(position) {
+                    var sdk = window.Yes2SDK._sdk;
+                    if (!sdk || !sdk.banner) {
+                        return Promise.reject({ code: 'NotInitialized', message: 'SDK not initialized' });
+                    }
+                    var containerId = 'yes2sdk-banner-' + position;
+                    return sdk.banner.requestBanner({ id: containerId, width: 728, height: 90 });
+                },
+
+                hideBanner: function() {
+                    var sdk = window.Yes2SDK._sdk;
+                    if (sdk && sdk.banner) {
+                        sdk.banner.clearAllBanners();
+                    }
+                },
+
+                isAdBlocked: function() {
+                    return false;
+                }
+            }
+        };
+    </script>
 
     <script>
         var container = document.querySelector("#unity-container");
