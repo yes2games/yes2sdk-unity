@@ -216,6 +216,133 @@ namespace Yes2SDK
 
         #endregion
 
+        #region Session Callbacks
+
+        /// <summary>
+        /// Called from JavaScript when GetEntryPoint succeeds.
+        /// </summary>
+        public void OnGetEntryPointSuccess(string entryPoint)
+        {
+            Yes2SDKSession.InvokeGetEntryPointSuccess(entryPoint);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when GetEntryPoint fails.
+        /// </summary>
+        public void OnGetEntryPointError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKSession.InvokeGetEntryPointError(error);
+        }
+
+        #endregion
+
+        #region Player Callbacks
+
+        /// <summary>
+        /// Called from JavaScript when GetPlayer succeeds.
+        /// </summary>
+        public void OnGetPlayerSuccess(string playerJson)
+        {
+            Yes2SDKPlayer.InvokeGetPlayerSuccess(playerJson);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when GetPlayer fails.
+        /// </summary>
+        public void OnGetPlayerError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKPlayer.InvokeGetPlayerError(error);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when GetData succeeds.
+        /// </summary>
+        public void OnGetDataSuccess(string dataJson)
+        {
+            Yes2SDKPlayer.InvokeGetDataSuccess(dataJson);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when GetData fails.
+        /// </summary>
+        public void OnGetDataError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKPlayer.InvokeGetDataError(error);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when SetData succeeds.
+        /// </summary>
+        public void OnSetDataSuccess(string message)
+        {
+            Yes2SDKPlayer.InvokeSetDataSuccess();
+        }
+
+        /// <summary>
+        /// Called from JavaScript when SetData fails.
+        /// </summary>
+        public void OnSetDataError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKPlayer.InvokeSetDataError(error);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when FlushData succeeds.
+        /// </summary>
+        public void OnFlushDataSuccess(string message)
+        {
+            Yes2SDKPlayer.InvokeFlushDataSuccess();
+        }
+
+        /// <summary>
+        /// Called from JavaScript when FlushData fails.
+        /// </summary>
+        public void OnFlushDataError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKPlayer.InvokeFlushDataError(error);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when GetConnectedPlayers succeeds.
+        /// </summary>
+        public void OnGetConnectedPlayersSuccess(string playersJson)
+        {
+            Yes2SDKPlayer.InvokeGetConnectedPlayersSuccess(playersJson);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when GetConnectedPlayers fails.
+        /// </summary>
+        public void OnGetConnectedPlayersError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKPlayer.InvokeGetConnectedPlayersError(error);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when GetSignedPlayerInfo succeeds.
+        /// </summary>
+        public void OnGetSignedPlayerInfoSuccess(string signatureJson)
+        {
+            Yes2SDKPlayer.InvokeGetSignedPlayerInfoSuccess(signatureJson);
+        }
+
+        /// <summary>
+        /// Called from JavaScript when GetSignedPlayerInfo fails.
+        /// </summary>
+        public void OnGetSignedPlayerInfoError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKPlayer.InvokeGetSignedPlayerInfoError(error);
+        }
+
+        #endregion
+
         #region Utility
 
         private Error ParseError(string errorJson)
