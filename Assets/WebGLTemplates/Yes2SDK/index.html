@@ -83,6 +83,105 @@
                 isAdBlocked: function() {
                     return false;
                 }
+            },
+
+            // Analytics module - debug logging
+            analytics: {
+                logEvent: function(name, paramsJson) { console.log('[Yes2SDK] Event:', name, paramsJson); },
+                logLevelStart: function(level) { console.log('[Yes2SDK] Level start:', level); },
+                logLevelEnd: function(level, score, success) { console.log('[Yes2SDK] Level end:', level, score, success); },
+                logScore: function(score, level) { console.log('[Yes2SDK] Score:', score, level); },
+                logTutorialStart: function() { console.log('[Yes2SDK] Tutorial start'); },
+                logTutorialEnd: function() { console.log('[Yes2SDK] Tutorial end'); },
+                logPurchase: function(productId, price, currency) { console.log('[Yes2SDK] Purchase:', productId, price, currency); }
+            },
+
+            // Session module - debug defaults
+            session: {
+                _data: {},
+                getLocale: function() { return navigator.language || 'en'; },
+                getCountry: function() { return ''; },
+                getDevice: function() { return 'desktop'; },
+                getOrientation: function() { return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'; },
+                getTrafficSource: function() { return JSON.stringify({ referrer: '', params: {} }); },
+                getEntryPointData: function() { return '{}'; },
+                setSessionData: function(d) { try { this._data = JSON.parse(d); } catch(e) {} },
+                getEntryPointAsync: function() { return Promise.resolve('debug'); }
+            },
+
+            // Player module - debug mock
+            player: {
+                getPlayerAsync: function() { return Promise.resolve({ id: 'debug-player', name: 'Debug Player', photo: null }); },
+                getDataAsync: function(k) { return Promise.resolve('{}'); },
+                setDataAsync: function(d) { return Promise.resolve(); },
+                flushDataAsync: function() { return Promise.resolve(); },
+                getConnectedPlayersAsync: function() { return Promise.resolve([]); },
+                getSignedPlayerInfoAsync: function(p) { return Promise.resolve('{}'); }
+            },
+
+            // Data module - localStorage fallback for debug
+            data: {
+                getInt: function(key, defaultValue) {
+                    try { var v = localStorage.getItem('yes2sdk_' + key); if (v === null) return defaultValue; var p = parseInt(v, 10); return isNaN(p) ? defaultValue : p; } catch(e) { return defaultValue; }
+                },
+                setInt: function(key, value) { try { localStorage.setItem('yes2sdk_' + key, value.toString()); } catch(e) {} },
+                getFloat: function(key, defaultValue) {
+                    try { var v = localStorage.getItem('yes2sdk_' + key); if (v === null) return defaultValue; var p = parseFloat(v); return isNaN(p) ? defaultValue : p; } catch(e) { return defaultValue; }
+                },
+                setFloat: function(key, value) { try { localStorage.setItem('yes2sdk_' + key, value.toString()); } catch(e) {} },
+                getString: function(key, defaultValue) {
+                    try { var v = localStorage.getItem('yes2sdk_' + key); return v === null ? defaultValue : v; } catch(e) { return defaultValue; }
+                },
+                setString: function(key, value) { try { localStorage.setItem('yes2sdk_' + key, value); } catch(e) {} },
+                hasKey: function(key) { try { return localStorage.getItem('yes2sdk_' + key) !== null; } catch(e) { return false; } },
+                deleteKey: function(key) { try { localStorage.removeItem('yes2sdk_' + key); } catch(e) {} },
+                deleteAll: function() {
+                    try { var r = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf('yes2sdk_') === 0) r.push(k); } r.forEach(function(k) { localStorage.removeItem(k); }); } catch(e) {}
+                }
+            },
+
+            // Auth module - debug mock
+            auth: {
+                isSupported: function() { return true; },
+                getCurrentUserAsync: function() { return Promise.resolve({ id: 'debug-user', name: 'Debug User', photo: '', isAuthenticated: true }); },
+                signInAsync: function() { return Promise.resolve({ id: 'debug-user', name: 'Debug User', photo: '', isAuthenticated: true }); },
+                getTokenAsync: function() { return Promise.resolve('debug-token-12345'); },
+                showAccountLinkPromptAsync: function() { return Promise.resolve(true); }
+            },
+
+            // Game module - debug mock
+            game: {
+                gameplayStart: function() { console.log('[Yes2SDK] gameplayStart'); },
+                gameplayStop: function() { console.log('[Yes2SDK] gameplayStop'); },
+                happyTime: function() { console.log('[Yes2SDK] happyTime'); },
+                inviteLink: function(paramsJson) { return Promise.resolve('https://debug.example.com/invite?test=1'); },
+                getInviteParam: function(key) { return ''; },
+                showInviteButton: function(paramsJson) { console.log('[Yes2SDK] showInviteButton'); },
+                hideInviteButton: function() { console.log('[Yes2SDK] hideInviteButton'); },
+                getSettings: function() { return JSON.stringify({ disableChat: false, muteAudio: false }); },
+                addSettingsChangeListener: function(callback) {},
+                copyToClipboard: function(text) { if (navigator.clipboard) navigator.clipboard.writeText(text); }
+            },
+
+            // Banners module - debug mock
+            banners: {
+                showBanner: function(id, size, x, y) { console.log('[Yes2SDK] showBanner:', id, size); return Promise.resolve(); },
+                hideBanner: function(id) { console.log('[Yes2SDK] hideBanner:', id); },
+                hideAllBanners: function() { console.log('[Yes2SDK] hideAllBanners'); },
+                refreshBanners: function() { console.log('[Yes2SDK] refreshBanners'); }
+            },
+
+            // Friends module - debug mock
+            friends: {
+                listFriendsAsync: function(page, size) {
+                    return Promise.resolve({ friends: [{ id: 'friend-1', username: 'DebugFriend', profilePictureUrl: '' }], page: page, size: size, hasMore: false, total: 1 });
+                }
+            },
+
+            // Score module - debug mock
+            score: {
+                addScore: function(score) { console.log('[Yes2SDK] addScore:', score); },
+                submitScore: function(encrypted) { console.log('[Yes2SDK] submitScore:', encrypted); }
             }
         };
     </script>

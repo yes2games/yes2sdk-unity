@@ -276,6 +276,113 @@
                         context: 'player.getSignedPlayerInfoAsync'
                     });
                 }
+            },
+
+            // Data module - localStorage fallback on Poki
+            data: {
+                getInt: function(key, defaultValue) {
+                    try {
+                        var val = localStorage.getItem('yes2sdk_' + key);
+                        if (val === null) return defaultValue;
+                        var parsed = parseInt(val, 10);
+                        return isNaN(parsed) ? defaultValue : parsed;
+                    } catch(e) { return defaultValue; }
+                },
+                setInt: function(key, value) {
+                    try { localStorage.setItem('yes2sdk_' + key, value.toString()); } catch(e) {}
+                },
+                getFloat: function(key, defaultValue) {
+                    try {
+                        var val = localStorage.getItem('yes2sdk_' + key);
+                        if (val === null) return defaultValue;
+                        var parsed = parseFloat(val);
+                        return isNaN(parsed) ? defaultValue : parsed;
+                    } catch(e) { return defaultValue; }
+                },
+                setFloat: function(key, value) {
+                    try { localStorage.setItem('yes2sdk_' + key, value.toString()); } catch(e) {}
+                },
+                getString: function(key, defaultValue) {
+                    try {
+                        var val = localStorage.getItem('yes2sdk_' + key);
+                        return val === null ? defaultValue : val;
+                    } catch(e) { return defaultValue; }
+                },
+                setString: function(key, value) {
+                    try { localStorage.setItem('yes2sdk_' + key, value); } catch(e) {}
+                },
+                hasKey: function(key) {
+                    try { return localStorage.getItem('yes2sdk_' + key) !== null; } catch(e) { return false; }
+                },
+                deleteKey: function(key) {
+                    try { localStorage.removeItem('yes2sdk_' + key); } catch(e) {}
+                },
+                deleteAll: function() {
+                    try {
+                        var keysToRemove = [];
+                        for (var i = 0; i < localStorage.length; i++) {
+                            var k = localStorage.key(i);
+                            if (k && k.indexOf('yes2sdk_') === 0) keysToRemove.push(k);
+                        }
+                        keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+                    } catch(e) {}
+                }
+            },
+
+            // Auth module - not supported on Poki
+            auth: {
+                isSupported: function() { return false; },
+                getCurrentUserAsync: function() { return Promise.resolve(null); },
+                signInAsync: function() {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Auth is not supported on Poki', context: 'auth.signInAsync' });
+                },
+                getTokenAsync: function() {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Auth is not supported on Poki', context: 'auth.getTokenAsync' });
+                },
+                showAccountLinkPromptAsync: function() {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Auth is not supported on Poki', context: 'auth.showAccountLinkPromptAsync' });
+                }
+            },
+
+            // Game module - gameplayStart/Stop maps to PokiSDK; rest are stubs
+            game: {
+                gameplayStart: function() { PokiSDK.gameplayStart(); },
+                gameplayStop: function() { PokiSDK.gameplayStop(); },
+                happyTime: function() { console.log('[Yes2SDK] happyTime not supported on Poki'); },
+                inviteLink: function(paramsJson) {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Invite links are not supported on Poki', context: 'game.inviteLink' });
+                },
+                getInviteParam: function(key) { return ''; },
+                showInviteButton: function(paramsJson) { console.log('[Yes2SDK] showInviteButton not supported on Poki'); },
+                hideInviteButton: function() {},
+                getSettings: function() { return JSON.stringify({ disableChat: false, muteAudio: false }); },
+                addSettingsChangeListener: function(callback) {},
+                copyToClipboard: function(text) {
+                    if (navigator.clipboard) { navigator.clipboard.writeText(text); }
+                }
+            },
+
+            // Banners module - not supported on Poki
+            banners: {
+                showBanner: function(id, size, x, y) {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Banners are not supported on Poki', context: 'banners.showBanner' });
+                },
+                hideBanner: function(id) {},
+                hideAllBanners: function() {},
+                refreshBanners: function() {}
+            },
+
+            // Friends module - not supported on Poki
+            friends: {
+                listFriendsAsync: function(page, size) {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Friends are not supported on Poki', context: 'friends.listFriendsAsync' });
+                }
+            },
+
+            // Score module - console.log on Poki (no leaderboard)
+            score: {
+                addScore: function(score) { console.log('[Yes2SDK] Score:', score); },
+                submitScore: function(encrypted) { console.log('[Yes2SDK] SubmitScore:', encrypted); }
             }
         };
     </script>

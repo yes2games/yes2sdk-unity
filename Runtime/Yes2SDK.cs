@@ -221,6 +221,90 @@ namespace Yes2SDK
             }
         }
 
+        private static Yes2SDKData _data;
+
+        /// <summary>
+        /// Data API for PlayerPrefs-style save/load. Uses platform cloud storage on CrazyGames, localStorage on Poki, PlayerPrefs in Editor.
+        /// </summary>
+        public static Yes2SDKData Data
+        {
+            get
+            {
+                _data ??= new Yes2SDKData();
+                return _data;
+            }
+        }
+
+        private static Yes2SDKAuth _auth;
+
+        /// <summary>
+        /// Auth API for user authentication. Fully supported on CrazyGames; stubs on Poki.
+        /// </summary>
+        public static Yes2SDKAuth Auth
+        {
+            get
+            {
+                _auth ??= new Yes2SDKAuth();
+                return _auth;
+            }
+        }
+
+        private static Yes2SDKGame _game;
+
+        /// <summary>
+        /// Game API for gameplay lifecycle, invite links, settings, and clipboard.
+        /// </summary>
+        public static Yes2SDKGame Game
+        {
+            get
+            {
+                _game ??= new Yes2SDKGame();
+                return _game;
+            }
+        }
+
+        private static Yes2SDKBanners _banners;
+
+        /// <summary>
+        /// Banners API for multi-size banner ads. Fully supported on CrazyGames; stubs on Poki.
+        /// </summary>
+        public static Yes2SDKBanners Banners
+        {
+            get
+            {
+                _banners ??= new Yes2SDKBanners();
+                return _banners;
+            }
+        }
+
+        private static Yes2SDKFriends _friends;
+
+        /// <summary>
+        /// Friends API for paginated friends list. Fully supported on CrazyGames; stubs on Poki.
+        /// </summary>
+        public static Yes2SDKFriends Friends
+        {
+            get
+            {
+                _friends ??= new Yes2SDKFriends();
+                return _friends;
+            }
+        }
+
+        private static Yes2SDKScore _score;
+
+        /// <summary>
+        /// Score API for leaderboard score submission. Fully supported on CrazyGames; console.log on Poki.
+        /// </summary>
+        public static Yes2SDKScore Score
+        {
+            get
+            {
+                _score ??= new Yes2SDKScore();
+                return _score;
+            }
+        }
+
         #endregion
 
         #region JavaScript Imports
