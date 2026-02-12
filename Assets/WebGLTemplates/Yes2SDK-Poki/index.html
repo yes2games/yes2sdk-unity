@@ -25,7 +25,7 @@
     <!-- Mock PokiSDK for local testing (on Poki.com this is injected automatically) -->
     <script>
         if (typeof PokiSDK === 'undefined') {
-            console.log('[Yes2SDK] Local testing mode - using mock PokiSDK');
+            __y2.log('Local testing mode - using mock PokiSDK');
             window.PokiSDK = {
                 init: function() {
                     console.log('[PokiSDK Mock] init');
@@ -51,6 +51,19 @@
 
     <!-- Yes2SDK Poki Wrapper (same as inlined in index.json for production) -->
     <script>
+        // Styled console logger — gives [Yes2SDK] a coloured background in browser DevTools
+        (function() {
+            var S = 'background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold';
+            function m(f) {
+                return function() {
+                    var a = [].slice.call(arguments);
+                    a.unshift('%c[Yes2SDK]%c ', S, '');
+                    console[f].apply(console, a);
+                };
+            }
+            window.__y2 = { log: m('log'), warn: m('warn'), error: m('error') };
+        })();
+
         window.Yes2SDK = {
             _initialized: false,
             _platform: 'poki',
@@ -60,14 +73,14 @@
                 return PokiSDK.init().then(function() {
                     self._initialized = true;
                     PokiSDK.gameLoadingStart();
-                    console.log('[Yes2SDK] Initialized for Poki');
+                    __y2.log('Initialized for Poki');
                     return Promise.resolve();
                 });
             },
 
             startGameAsync: function() {
                 PokiSDK.gameLoadingFinished();
-                console.log('[Yes2SDK] Game started');
+                __y2.log('Game started');
                 return Promise.resolve();
             },
 
@@ -96,7 +109,7 @@
                     return PokiSDK.commercialBreak().then(function() {
                         if (callbacks.afterAd) callbacks.afterAd();
                     }).catch(function(error) {
-                        console.warn('[Yes2SDK] commercialBreak failed:', error);
+                        __y2.warn('commercialBreak failed:', error);
                         if (callbacks.noFill) callbacks.noFill();
                         if (callbacks.afterAd) callbacks.afterAd();
                     });
@@ -113,7 +126,7 @@
                         }
                         if (callbacks.afterAd) callbacks.afterAd();
                     }).catch(function(error) {
-                        console.warn('[Yes2SDK] rewardedBreak failed:', error);
+                        __y2.warn('rewardedBreak failed:', error);
                         if (callbacks.noFill) callbacks.noFill();
                         if (callbacks.afterAd) callbacks.afterAd();
                     });
@@ -140,27 +153,27 @@
             // Analytics module - maps unified API to Poki SDK calls
             analytics: {
                 logEvent: function(name, paramsJson) {
-                    console.log('[Yes2SDK] Event:', name, paramsJson);
+                    __y2.log('Event:', name, paramsJson);
                 },
                 logLevelStart: function(level) {
-                    console.log('[Yes2SDK] Level start:', level);
+                    __y2.log('Level start:', level);
                     PokiSDK.gameplayStart();
                 },
                 logLevelEnd: function(level, score, success) {
-                    console.log('[Yes2SDK] Level end:', level, score, success);
+                    __y2.log('Level end:', level, score, success);
                     PokiSDK.gameplayStop();
                 },
                 logScore: function(score, level) {
-                    console.log('[Yes2SDK] Score:', score, level);
+                    __y2.log('Score:', score, level);
                 },
                 logTutorialStart: function() {
-                    console.log('[Yes2SDK] Tutorial start');
+                    __y2.log('Tutorial start');
                 },
                 logTutorialEnd: function() {
-                    console.log('[Yes2SDK] Tutorial end');
+                    __y2.log('Tutorial end');
                 },
                 logPurchase: function(productId, price, currency) {
-                    console.log('[Yes2SDK] Purchase:', productId, price, currency);
+                    __y2.log('Purchase:', productId, price, currency);
                 }
             },
 
@@ -222,7 +235,7 @@
                     try {
                         this._data = JSON.parse(dataJson);
                     } catch(e) {
-                        console.warn('[Yes2SDK] Invalid session data JSON:', dataJson);
+                        __y2.warn('Invalid session data JSON:', dataJson);
                     }
                 },
 
@@ -348,12 +361,12 @@
             game: {
                 gameplayStart: function() { PokiSDK.gameplayStart(); },
                 gameplayStop: function() { PokiSDK.gameplayStop(); },
-                happyTime: function() { console.log('[Yes2SDK] happyTime not supported on Poki'); },
+                happyTime: function() { __y2.log('happyTime not supported on Poki'); },
                 inviteLink: function(paramsJson) {
                     return Promise.reject({ code: 'FeatureNotSupported', message: 'Invite links are not supported on Poki', context: 'game.inviteLink' });
                 },
                 getInviteParam: function(key) { return ''; },
-                showInviteButton: function(paramsJson) { console.log('[Yes2SDK] showInviteButton not supported on Poki'); },
+                showInviteButton: function(paramsJson) { __y2.log('showInviteButton not supported on Poki'); },
                 hideInviteButton: function() {},
                 getSettings: function() { return JSON.stringify({ disableChat: false, muteAudio: false }); },
                 addSettingsChangeListener: function(callback) {},
@@ -381,8 +394,8 @@
 
             // Score module - console.log on Poki (no leaderboard)
             score: {
-                addScore: function(score) { console.log('[Yes2SDK] Score:', score); },
-                submitScore: function(encrypted) { console.log('[Yes2SDK] SubmitScore:', encrypted); }
+                addScore: function(score) { __y2.log('Score:', score); },
+                submitScore: function(encrypted) { __y2.log('SubmitScore:', encrypted); }
             }
         };
     </script>

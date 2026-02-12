@@ -1,5 +1,9 @@
 mergeInto(LibraryManager.library, {
 
+    // Styled console logger — lazy-init in case template hasn't set it up
+    $__y2__postset: '(function(){if(window.__y2)return;var S="background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold";function m(f){return function(){var a=[].slice.call(arguments);a.unshift("%c[Yes2SDK]%c ",S,"");console[f].apply(console,a);};}window.__y2={log:m("log"),warn:m("warn"),error:m("error")};})();',
+    $__y2: {},
+
     // Callback function pointers (set by Yes2SDK_RegisterCallbacksJS)
     $Yes2SDK_Callbacks: {
         onInitializeSuccess: null,
@@ -17,9 +21,10 @@ mergeInto(LibraryManager.library, {
     },
 
     // Initialize the SDK
+    Yes2SDK_InitializeJS__deps: ['$__y2'],
     Yes2SDK_InitializeJS: function() {
         if (typeof window.Yes2SDK === 'undefined') {
-            console.error('[Yes2SDK] Core SDK not loaded. Make sure yes2sdk.umd.js is included in the WebGL template.');
+            window.__y2.error('Core SDK not loaded. Make sure yes2sdk.umd.js is included in the WebGL template.');
             // Send error back to Unity
             var error = JSON.stringify({
                 code: 'NotInitialized',
@@ -45,9 +50,10 @@ mergeInto(LibraryManager.library, {
     },
 
     // Start the game
+    Yes2SDK_StartGameJS__deps: ['$__y2'],
     Yes2SDK_StartGameJS: function() {
         if (typeof window.Yes2SDK === 'undefined') {
-            console.error('[Yes2SDK] Core SDK not loaded.');
+            window.__y2.error('Core SDK not loaded.');
             return;
         }
 

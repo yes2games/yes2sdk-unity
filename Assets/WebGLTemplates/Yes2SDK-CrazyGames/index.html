@@ -23,6 +23,19 @@
 
     <!-- Yes2SDK CrazyGames Wrapper (inline - matches Core SDK API surface) -->
     <script>
+        // Styled console logger — gives [Yes2SDK] a coloured background in browser DevTools
+        (function() {
+            var S = 'background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold';
+            function m(f) {
+                return function() {
+                    var a = [].slice.call(arguments);
+                    a.unshift('%c[Yes2SDK]%c ', S, '');
+                    console[f].apply(console, a);
+                };
+            }
+            window.__y2 = { log: m('log'), warn: m('warn'), error: m('error') };
+        })();
+
         window.Yes2SDK = {
             _initialized: false,
             _platform: 'crazygames',
@@ -33,15 +46,15 @@
             initializeAsync: function() {
                 var self = this;
                 if (typeof window.CrazyGames === 'undefined' || !window.CrazyGames.SDK) {
-                    console.error('[Yes2SDK] CrazyGames SDK not found');
+                    __y2.error('CrazyGames SDK not found');
                     return Promise.reject({ code: 'NotInitialized', message: 'CrazyGames SDK not found' });
                 }
                 self._sdk = window.CrazyGames.SDK;
                 return self._sdk.init().then(function() {
                     self._initialized = true;
-                    console.log('[Yes2SDK] Initialized for CrazyGames');
+                    __y2.log('Initialized for CrazyGames');
                 }).catch(function(error) {
-                    console.error('[Yes2SDK] CrazyGames init failed:', error);
+                    __y2.error('CrazyGames init failed:', error);
                     return Promise.reject(error);
                 });
             },
@@ -50,7 +63,7 @@
                 if (this._sdk) {
                     this._sdk.game.loadingStop();
                 }
-                console.log('[Yes2SDK] Game started');
+                __y2.log('Game started');
                 return Promise.resolve();
             },
 
@@ -89,15 +102,15 @@
                     return new Promise(function(resolve) {
                         sdk.ad.requestAd('midgame', {
                             adStarted: function() {
-                                console.log('[Yes2SDK] Midgame ad started');
+                                __y2.log('Midgame ad started');
                             },
                             adFinished: function() {
-                                console.log('[Yes2SDK] Midgame ad finished');
+                                __y2.log('Midgame ad finished');
                                 if (callbacks.afterAd) callbacks.afterAd();
                                 resolve();
                             },
                             adError: function(error) {
-                                console.warn('[Yes2SDK] Midgame ad error:', error);
+                                __y2.warn('Midgame ad error:', error);
                                 if (callbacks.noFill) callbacks.noFill();
                                 if (callbacks.afterAd) callbacks.afterAd();
                                 resolve();
@@ -120,16 +133,16 @@
                     return new Promise(function(resolve) {
                         sdk.ad.requestAd('rewarded', {
                             adStarted: function() {
-                                console.log('[Yes2SDK] Rewarded ad started');
+                                __y2.log('Rewarded ad started');
                             },
                             adFinished: function() {
-                                console.log('[Yes2SDK] Rewarded ad finished');
+                                __y2.log('Rewarded ad finished');
                                 if (callbacks.adViewed) callbacks.adViewed();
                                 if (callbacks.afterAd) callbacks.afterAd();
                                 resolve();
                             },
                             adError: function(error) {
-                                console.warn('[Yes2SDK] Rewarded ad error:', error);
+                                __y2.warn('Rewarded ad error:', error);
                                 if (error && (error.code === 'unfilled' || error.code === 'adblock')) {
                                     if (callbacks.noFill) callbacks.noFill();
                                 } else {
@@ -166,29 +179,29 @@
             // Analytics module - maps to CrazyGames gameplay events
             analytics: {
                 logEvent: function(name, paramsJson) {
-                    console.log('[Yes2SDK] Event:', name, paramsJson);
+                    __y2.log('Event:', name, paramsJson);
                 },
                 logLevelStart: function(level) {
-                    console.log('[Yes2SDK] Level start:', level);
+                    __y2.log('Level start:', level);
                     var sdk = window.Yes2SDK._sdk;
                     if (sdk && sdk.game) sdk.game.gameplayStart();
                 },
                 logLevelEnd: function(level, score, success) {
-                    console.log('[Yes2SDK] Level end:', level, score, success);
+                    __y2.log('Level end:', level, score, success);
                     var sdk = window.Yes2SDK._sdk;
                     if (sdk && sdk.game) sdk.game.gameplayStop();
                 },
                 logScore: function(score, level) {
-                    console.log('[Yes2SDK] Score:', score, level);
+                    __y2.log('Score:', score, level);
                 },
                 logTutorialStart: function() {
-                    console.log('[Yes2SDK] Tutorial start');
+                    __y2.log('Tutorial start');
                 },
                 logTutorialEnd: function() {
-                    console.log('[Yes2SDK] Tutorial end');
+                    __y2.log('Tutorial end');
                 },
                 logPurchase: function(productId, price, currency) {
-                    console.log('[Yes2SDK] Purchase:', productId, price, currency);
+                    __y2.log('Purchase:', productId, price, currency);
                 }
             },
 
@@ -260,7 +273,7 @@
                     try {
                         this._data = JSON.parse(dataJson);
                     } catch(e) {
-                        console.warn('[Yes2SDK] Invalid session data JSON:', dataJson);
+                        __y2.warn('Invalid session data JSON:', dataJson);
                     }
                 },
 
@@ -627,7 +640,7 @@
                     if (sdk && sdk.user && sdk.user.addScore) {
                         sdk.user.addScore(score);
                     } else {
-                        console.log('[Yes2SDK] Score:', score);
+                        __y2.log('Score:', score);
                     }
                 },
 
@@ -636,7 +649,7 @@
                     if (sdk && sdk.user && sdk.user.submitScore) {
                         sdk.user.submitScore(encryptedScore);
                     } else {
-                        console.log('[Yes2SDK] SubmitScore:', encryptedScore);
+                        __y2.log('SubmitScore:', encryptedScore);
                     }
                 }
             }
