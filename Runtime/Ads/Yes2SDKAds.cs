@@ -85,7 +85,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_ShowInterstitialJS(placement, description);
 #else
-            Debug.Log($"[Yes2SDK] Mock: ShowInterstitial(placement: {placement}, description: {description})");
+            Yes2Log.Log($"Mock: ShowInterstitial(placement: {placement}, description: {description})");
             // Simulate ad flow in Editor
             _interstitialBeforeAdCallback?.Invoke();
             _interstitialAfterAdCallback?.Invoke();
@@ -135,7 +135,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_ShowRewardedJS(placement, description);
 #else
-            Debug.Log($"[Yes2SDK] Mock: ShowRewarded(placement: {placement}, description: {description})");
+            Yes2Log.Log($"Mock: ShowRewarded(placement: {placement}, description: {description})");
             // Simulate ad flow in Editor
             _rewardedBeforeAdCallback?.Invoke();
             _rewardedAfterAdCallback?.Invoke();
@@ -176,7 +176,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_ShowBannerJS((int)position);
 #else
-            Debug.Log($"[Yes2SDK] Mock: ShowBanner(position: {position})");
+            Yes2Log.Log($"Mock: ShowBanner(position: {position})");
             _bannerShownCallback?.Invoke();
 #endif
         }
@@ -202,7 +202,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_HideBannerJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: HideBanner()");
+            Yes2Log.Log("Mock: HideBanner()");
             _bannerHiddenCallback?.Invoke();
 #endif
         }
@@ -225,7 +225,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_IsAdBlockedJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: IsAdBlocked() - returning false");
+            Yes2Log.Log("Mock: IsAdBlocked() - returning false");
             return false;
 #endif
         }

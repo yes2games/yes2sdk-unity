@@ -19,7 +19,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetCatalogAsync(Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetCatalogAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetCatalogAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.IAP.GetCatalogAsync"));
         }
 
@@ -28,7 +28,7 @@ namespace Yes2SDK
         /// </summary>
         public void PurchaseAsync(string productId, Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: PurchaseAsync({productId}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: PurchaseAsync({productId}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.IAP.PurchaseAsync"));
         }
 
@@ -37,7 +37,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetPurchasesAsync(Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetPurchasesAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetPurchasesAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.IAP.GetPurchasesAsync"));
         }
 
@@ -46,7 +46,7 @@ namespace Yes2SDK
         /// </summary>
         public void ConsumePurchaseAsync(string purchaseToken, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: ConsumePurchaseAsync({purchaseToken}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: ConsumePurchaseAsync({purchaseToken}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.IAP.ConsumePurchaseAsync"));
         }
 

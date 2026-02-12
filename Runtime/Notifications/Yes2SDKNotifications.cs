@@ -19,7 +19,7 @@ namespace Yes2SDK
         /// </summary>
         public void ScheduleAsync(string title, string body, int delaySec, string dataJson, Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: ScheduleAsync({title}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: ScheduleAsync({title}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Notifications.ScheduleAsync"));
         }
 
@@ -28,7 +28,7 @@ namespace Yes2SDK
         /// </summary>
         public void CancelAsync(string notificationId, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: CancelAsync({notificationId}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: CancelAsync({notificationId}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Notifications.CancelAsync"));
         }
 
@@ -37,7 +37,7 @@ namespace Yes2SDK
         /// </summary>
         public void CancelAllAsync(Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: CancelAllAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: CancelAllAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Notifications.CancelAllAsync"));
         }
 

@@ -55,7 +55,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_Auth_IsSupportedJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Auth.IsSupported() — returning false");
+            Yes2Log.Log("Mock: Auth.IsSupported() — returning false");
             return false;
 #endif
         }
@@ -71,7 +71,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Auth_GetCurrentUserAsyncJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Auth.GetCurrentUserAsync() — returning null user");
+            Yes2Log.Log("Mock: Auth.GetCurrentUserAsync() — returning null user");
             InvokeGetCurrentUserSuccess("null");
 #endif
         }
@@ -87,7 +87,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Auth_SignInAsyncJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Auth.SignInAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: Auth.SignInAsync() — FeatureNotSupported");
             InvokeSignInError(FeatureNotSupportedError("Yes2SDK.Auth.SignInAsync"));
 #endif
         }
@@ -103,7 +103,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Auth_GetTokenAsyncJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Auth.GetTokenAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: Auth.GetTokenAsync() — FeatureNotSupported");
             InvokeGetTokenError(FeatureNotSupportedError("Yes2SDK.Auth.GetTokenAsync"));
 #endif
         }
@@ -119,7 +119,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Auth_ShowAccountLinkPromptAsyncJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Auth.ShowAccountLinkPromptAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: Auth.ShowAccountLinkPromptAsync() — FeatureNotSupported");
             InvokeAccountLinkError(FeatureNotSupportedError("Yes2SDK.Auth.ShowAccountLinkPromptAsync"));
 #endif
         }
@@ -146,7 +146,7 @@ namespace Yes2SDK
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[Yes2SDK] Failed to parse auth user JSON: {e.Message}");
+                    Yes2Log.Error($"Failed to parse auth user JSON: {e.Message}");
                     _getCurrentUserErrorCallback?.Invoke(new Error
                     {
                         Code = "Unknown",
@@ -177,7 +177,7 @@ namespace Yes2SDK
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[Yes2SDK] Failed to parse sign-in user JSON: {e.Message}");
+                    Yes2Log.Error($"Failed to parse sign-in user JSON: {e.Message}");
                     _signInErrorCallback?.Invoke(new Error
                     {
                         Code = "Unknown",

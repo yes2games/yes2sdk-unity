@@ -67,7 +67,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_GetPlayerAsyncJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetPlayerAsync() — returning anonymous player");
+            Yes2Log.Log("Mock: GetPlayerAsync() — returning anonymous player");
             InvokeGetPlayerSuccess("{\"id\":\"anonymous\",\"name\":null,\"photo\":null}");
 #endif
         }
@@ -86,7 +86,7 @@ namespace Yes2SDK
             var keysJson = JsonConvert.SerializeObject(keys);
             Yes2SDK_GetDataAsyncJS(keysJson);
 #else
-            Debug.Log("[Yes2SDK] Mock: GetDataAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: GetDataAsync() — FeatureNotSupported");
             InvokeGetDataError(FeatureNotSupportedError("Yes2SDK.Player.GetDataAsync"));
 #endif
         }
@@ -104,7 +104,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_SetDataAsyncJS(dataJson);
 #else
-            Debug.Log("[Yes2SDK] Mock: SetDataAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: SetDataAsync() — FeatureNotSupported");
             InvokeSetDataError(FeatureNotSupportedError("Yes2SDK.Player.SetDataAsync"));
 #endif
         }
@@ -121,7 +121,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_FlushDataAsyncJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: FlushDataAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: FlushDataAsync() — FeatureNotSupported");
             InvokeFlushDataError(FeatureNotSupportedError("Yes2SDK.Player.FlushDataAsync"));
 #endif
         }
@@ -138,7 +138,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_GetConnectedPlayersAsyncJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetConnectedPlayersAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: GetConnectedPlayersAsync() — FeatureNotSupported");
             InvokeGetConnectedPlayersError(FeatureNotSupportedError("Yes2SDK.Player.GetConnectedPlayersAsync"));
 #endif
         }
@@ -156,7 +156,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_GetSignedPlayerInfoAsyncJS(payload);
 #else
-            Debug.Log("[Yes2SDK] Mock: GetSignedPlayerInfoAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: GetSignedPlayerInfoAsync() — FeatureNotSupported");
             InvokeGetSignedPlayerInfoError(FeatureNotSupportedError("Yes2SDK.Player.GetSignedPlayerInfoAsync"));
 #endif
         }
@@ -200,7 +200,7 @@ namespace Yes2SDK
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[Yes2SDK] Failed to parse player JSON: {e.Message}");
+                    Yes2Log.Error($"Failed to parse player JSON: {e.Message}");
                     _getPlayerErrorCallback?.Invoke(new Error
                     {
                         Code = "Unknown",

@@ -19,7 +19,7 @@ namespace Yes2SDK
         /// </summary>
         public string GetContext()
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetContext() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetContext() — FeatureNotSupported");
             return null;
         }
 
@@ -28,7 +28,7 @@ namespace Yes2SDK
         /// </summary>
         public void SwitchAsync(string contextId, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: SwitchAsync({contextId}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: SwitchAsync({contextId}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Context.SwitchAsync"));
         }
 
@@ -37,7 +37,7 @@ namespace Yes2SDK
         /// </summary>
         public void ChooseAsync(Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: ChooseAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: ChooseAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Context.ChooseAsync"));
         }
 
@@ -46,7 +46,7 @@ namespace Yes2SDK
         /// </summary>
         public void CreateAsync(string playerId, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: CreateAsync({playerId}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: CreateAsync({playerId}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Context.CreateAsync"));
         }
 
@@ -55,7 +55,7 @@ namespace Yes2SDK
         /// </summary>
         public void ShareAsync(string text, string imageBase64, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: ShareAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: ShareAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Context.ShareAsync"));
         }
 

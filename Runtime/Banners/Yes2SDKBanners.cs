@@ -52,7 +52,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Banners_ShowBannerJS(id, size.ToString(), 0, 0);
 #else
-            Debug.Log($"[Yes2SDK] Mock: Banners.ShowBanner({id}, {size})");
+            Yes2Log.Log($"Mock: Banners.ShowBanner({id}, {size})");
             InvokeBannerRequestSuccess();
 #endif
         }
@@ -65,7 +65,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Banners_HideBannerJS(id);
 #else
-            Debug.Log($"[Yes2SDK] Mock: Banners.HideBanner({id})");
+            Yes2Log.Log($"Mock: Banners.HideBanner({id})");
 #endif
         }
 
@@ -77,7 +77,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Banners_HideAllBannersJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Banners.HideAllBanners()");
+            Yes2Log.Log("Mock: Banners.HideAllBanners()");
 #endif
         }
 
@@ -89,7 +89,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Banners_RefreshBannersJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Banners.RefreshBanners()");
+            Yes2Log.Log("Mock: Banners.RefreshBanners()");
 #endif
         }
 

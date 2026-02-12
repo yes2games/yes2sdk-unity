@@ -347,14 +347,14 @@ namespace Yes2SDK
             Callbacks.InitializeSuccessCallback = () =>
             {
                 CurrentPlatform = GetPlatform();
-                Debug.Log($"[Yes2SDK] Initialized on platform: {CurrentPlatform}");
+                Yes2Log.Log($"Initialized on platform: {CurrentPlatform}");
                 onSuccess?.Invoke();
                 OnInitialized?.Invoke();
             };
 
             Callbacks.InitializeErrorCallback = error =>
             {
-                Debug.LogError($"[Yes2SDK] Initialization failed: {error}");
+                Yes2Log.Error($"Initialization failed: {error}");
                 onError?.Invoke(error);
                 OnError?.Invoke(error);
             };
@@ -362,7 +362,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_InitializeJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: InitializeAsync");
+            Yes2Log.Log("Mock: InitializeAsync");
             // Simulate successful initialization in Editor
             SetInitialized(true);
             Callbacks.InvokeInitializeSuccess();
@@ -379,14 +379,14 @@ namespace Yes2SDK
         {
             Callbacks.StartGameSuccessCallback = () =>
             {
-                Debug.Log("[Yes2SDK] Game started");
+                Yes2Log.Log("Game started");
                 onSuccess?.Invoke();
                 OnGameStarted?.Invoke();
             };
 
             Callbacks.StartGameErrorCallback = error =>
             {
-                Debug.LogError($"[Yes2SDK] Start game failed: {error}");
+                Yes2Log.Error($"Start game failed: {error}");
                 onError?.Invoke(error);
                 OnError?.Invoke(error);
             };
@@ -394,7 +394,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_StartGameJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: StartGameAsync");
+            Yes2Log.Log("Mock: StartGameAsync");
             Callbacks.InvokeStartGameSuccess();
 #endif
         }
@@ -410,7 +410,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_SetLoadingProgressJS(progress);
 #else
-            Debug.Log($"[Yes2SDK] Mock: SetLoadingProgress({progress})");
+            Yes2Log.Log($"Mock: SetLoadingProgress({progress})");
 #endif
         }
 
@@ -422,7 +422,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_PerformHapticFeedbackJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: PerformHapticFeedback");
+            Yes2Log.Log("Mock: PerformHapticFeedback");
 #endif
         }
 
@@ -461,7 +461,7 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokePause()
         {
-            Debug.Log("[Yes2SDK] Game paused by platform");
+            Yes2Log.Log("Game paused by platform");
             OnPause?.Invoke();
         }
 
@@ -470,7 +470,7 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeResume()
         {
-            Debug.Log("[Yes2SDK] Game resumed");
+            Yes2Log.Log("Game resumed");
             OnResume?.Invoke();
         }
 

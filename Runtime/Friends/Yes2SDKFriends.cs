@@ -44,7 +44,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Friends_ListFriendsAsyncJS(page, size);
 #else
-            Debug.Log("[Yes2SDK] Mock: Friends.ListFriendsAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: Friends.ListFriendsAsync() — FeatureNotSupported");
             InvokeListFriendsError(FeatureNotSupportedError("Yes2SDK.Friends.ListFriendsAsync"));
 #endif
         }
@@ -64,7 +64,7 @@ namespace Yes2SDK
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[Yes2SDK] Failed to parse friends page JSON: {e.Message}");
+                    Yes2Log.Error($"Failed to parse friends page JSON: {e.Message}");
                     _listFriendsErrorCallback?.Invoke(new Error
                     {
                         Code = "Unknown",

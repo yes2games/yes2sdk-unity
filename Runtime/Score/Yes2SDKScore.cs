@@ -32,7 +32,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Score_AddScoreJS(score);
 #else
-            Debug.Log($"[Yes2SDK] Mock: Score.AddScore({score})");
+            Yes2Log.Log($"Mock: Score.AddScore({score})");
 #endif
         }
 
@@ -45,7 +45,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Score_SubmitScoreJS(encryptedScore);
 #else
-            Debug.Log($"[Yes2SDK] Mock: Score.SubmitScore({encryptedScore})");
+            Yes2Log.Log($"Mock: Score.SubmitScore({encryptedScore})");
 #endif
         }
 

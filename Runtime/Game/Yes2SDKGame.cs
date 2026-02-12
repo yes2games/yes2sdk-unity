@@ -72,7 +72,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Game_GameplayStartJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Game.GameplayStart()");
+            Yes2Log.Log("Mock: Game.GameplayStart()");
 #endif
         }
 
@@ -84,7 +84,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Game_GameplayStopJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Game.GameplayStop()");
+            Yes2Log.Log("Mock: Game.GameplayStop()");
 #endif
         }
 
@@ -96,7 +96,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Game_HappyTimeJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Game.HappyTime()");
+            Yes2Log.Log("Mock: Game.HappyTime()");
 #endif
         }
 
@@ -112,7 +112,7 @@ namespace Yes2SDK
             var paramsJson = JsonConvert.SerializeObject(parameters ?? new Dictionary<string, string>());
             Yes2SDK_Game_InviteLinkAsyncJS(paramsJson);
 #else
-            Debug.Log("[Yes2SDK] Mock: Game.InviteLinkAsync() — FeatureNotSupported");
+            Yes2Log.Log("Mock: Game.InviteLinkAsync() — FeatureNotSupported");
             InvokeInviteLinkError(FeatureNotSupportedError("Yes2SDK.Game.InviteLinkAsync"));
 #endif
         }
@@ -125,7 +125,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_Game_GetInviteParamJS(key);
 #else
-            Debug.Log($"[Yes2SDK] Mock: Game.GetInviteParam({key}) — returning \"\"");
+            Yes2Log.Log($"Mock: Game.GetInviteParam({key}) — returning \"\"");
             return "";
 #endif
         }
@@ -139,7 +139,7 @@ namespace Yes2SDK
             var paramsJson = JsonConvert.SerializeObject(parameters ?? new Dictionary<string, string>());
             Yes2SDK_Game_ShowInviteButtonJS(paramsJson);
 #else
-            Debug.Log("[Yes2SDK] Mock: Game.ShowInviteButton()");
+            Yes2Log.Log("Mock: Game.ShowInviteButton()");
 #endif
         }
 
@@ -151,7 +151,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Game_HideInviteButtonJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: Game.HideInviteButton()");
+            Yes2Log.Log("Mock: Game.HideInviteButton()");
 #endif
         }
 
@@ -171,7 +171,7 @@ namespace Yes2SDK
                 return default;
             }
 #else
-            Debug.Log("[Yes2SDK] Mock: Game.GetSettings()");
+            Yes2Log.Log("Mock: Game.GetSettings()");
             return default;
 #endif
         }
@@ -184,7 +184,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_Game_CopyToClipboardJS(text);
 #else
-            Debug.Log($"[Yes2SDK] Mock: Game.CopyToClipboard({text})");
+            Yes2Log.Log($"Mock: Game.CopyToClipboard({text})");
             GUIUtility.systemCopyBuffer = text;
 #endif
         }
@@ -216,7 +216,7 @@ namespace Yes2SDK
             }
             catch (Exception e)
             {
-                Debug.LogError($"[Yes2SDK] Failed to parse game settings: {e.Message}");
+                Yes2Log.Error($"Failed to parse game settings: {e.Message}");
             }
         }
 

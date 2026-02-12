@@ -51,7 +51,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_LogEventJS(name, paramsJson);
 #else
-            Debug.Log($"[Yes2SDK] Mock: LogEvent({name}, {paramsJson})");
+            Yes2Log.Log($"Mock: LogEvent({name}, {paramsJson})");
 #endif
         }
 
@@ -64,7 +64,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_LogLevelStartJS(level);
 #else
-            Debug.Log($"[Yes2SDK] Mock: LogLevelStart({level})");
+            Yes2Log.Log($"Mock: LogLevelStart({level})");
 #endif
         }
 
@@ -79,7 +79,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_LogLevelEndJS(level, score, success);
 #else
-            Debug.Log($"[Yes2SDK] Mock: LogLevelEnd({level}, {score}, {success})");
+            Yes2Log.Log($"Mock: LogLevelEnd({level}, {score}, {success})");
 #endif
         }
 
@@ -93,7 +93,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_LogScoreJS(score, level);
 #else
-            Debug.Log($"[Yes2SDK] Mock: LogScore({score}, {level})");
+            Yes2Log.Log($"Mock: LogScore({score}, {level})");
 #endif
         }
 
@@ -105,7 +105,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_LogTutorialStartJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: LogTutorialStart()");
+            Yes2Log.Log("Mock: LogTutorialStart()");
 #endif
         }
 
@@ -117,7 +117,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_LogTutorialEndJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: LogTutorialEnd()");
+            Yes2Log.Log("Mock: LogTutorialEnd()");
 #endif
         }
 
@@ -132,7 +132,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_LogPurchaseJS(productId, price, currency);
 #else
-            Debug.Log($"[Yes2SDK] Mock: LogPurchase({productId}, {price}, {currency})");
+            Yes2Log.Log($"Mock: LogPurchase({productId}, {price}, {currency})");
 #endif
         }
 

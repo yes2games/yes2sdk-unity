@@ -19,7 +19,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetCurrentAsync(Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetCurrentAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetCurrentAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Tournament.GetCurrentAsync"));
         }
 
@@ -28,7 +28,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetAllAsync(Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetAllAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetAllAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Tournament.GetAllAsync"));
         }
 
@@ -37,7 +37,7 @@ namespace Yes2SDK
         /// </summary>
         public void CreateAsync(string configJson, Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: CreateAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: CreateAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Tournament.CreateAsync"));
         }
 
@@ -46,7 +46,7 @@ namespace Yes2SDK
         /// </summary>
         public void PostScoreAsync(int score, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: PostScoreAsync({score}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: PostScoreAsync({score}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Tournament.PostScoreAsync"));
         }
 
@@ -55,7 +55,7 @@ namespace Yes2SDK
         /// </summary>
         public void JoinAsync(string tournamentId, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: JoinAsync({tournamentId}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: JoinAsync({tournamentId}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Tournament.JoinAsync"));
         }
 
