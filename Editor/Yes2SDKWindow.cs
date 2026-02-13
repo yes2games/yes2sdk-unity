@@ -11,7 +11,9 @@ namespace Yes2SDK.Editor
     {
         private TargetPlatform _selectedPlatform = TargetPlatform.Debug;
         private string _buildPath = "Builds";
+        private bool _showDebugLogs = true;
         private bool _showBuildSettings = true;
+        private bool _showSDKSettings = true;
         private bool _showUtilities = true;
         private Vector2 _scrollPosition;
         private bool _isSetupComplete;
@@ -35,6 +37,7 @@ namespace Yes2SDK.Editor
             // Load saved preferences
             _selectedPlatform = (TargetPlatform)EditorPrefs.GetInt("Yes2SDK_SelectedPlatform", (int)TargetPlatform.Debug);
             _buildPath = EditorPrefs.GetString("Yes2SDK_BuildPath", "Builds");
+            _showDebugLogs = EditorPrefs.GetBool("Yes2SDK_ShowDebugLogs", true);
 
             // Check setup status
             RefreshSetupStatus();
@@ -64,6 +67,9 @@ namespace Yes2SDK.Editor
                 DrawSetupSection();
                 EditorGUILayout.Space(10);
             }
+
+            DrawSDKSettingsSection();
+            EditorGUILayout.Space(10);
 
             DrawBuildSection();
             EditorGUILayout.Space(10);
@@ -154,6 +160,32 @@ namespace Yes2SDK.Editor
                     "Setup failed.\n\nCheck the Console for details.",
                     "OK");
             }
+        }
+
+        private void DrawSDKSettingsSection()
+        {
+            _showSDKSettings = EditorGUILayout.BeginFoldoutHeaderGroup(_showSDKSettings, "SDK Settings");
+
+            if (_showSDKSettings)
+            {
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+                EditorGUI.BeginChangeCheck();
+                _showDebugLogs = EditorGUILayout.Toggle("Show Debug Logs", _showDebugLogs);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    EditorPrefs.SetBool("Yes2SDK_ShowDebugLogs", _showDebugLogs);
+                }
+
+                EditorGUILayout.Space(5);
+                EditorGUILayout.HelpBox(
+                    "Enable detailed logging in the Console for debugging purposes.",
+                    MessageType.Info);
+
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
         }
 
         private void DrawBuildSection()
