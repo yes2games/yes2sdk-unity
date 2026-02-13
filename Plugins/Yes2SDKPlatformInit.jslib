@@ -11,12 +11,10 @@ mergeInto(LibraryManager.library, {
     // Guard 1: skip if the template already created it (local testing / Poki / Debug)
     // Guard 2: only create when the CrazyGames SDK is present
     // -----------------------------------------------------------------------
-    $__yes2PlatformInit__postset: '__yes2PlatformInit();',
+    $__yes2PlatformInit__postset: 'window.__yes2PlatformInit = __yes2PlatformInit; __yes2PlatformInit();',
     $__yes2PlatformInit: function() {
         // Guard 1: template already set up the wrapper
         if (typeof window.Yes2SDK !== 'undefined') return;
-        // Guard 2: not on CrazyGames
-        if (typeof window.CrazyGames === 'undefined' || !window.CrazyGames.SDK) return;
 
         // Ensure logger exists (fallback if __y2 postset hasn't run yet)
         if (typeof window.__y2 === 'undefined') {
@@ -31,6 +29,16 @@ mergeInto(LibraryManager.library, {
             window.__y2 = { log: m('log'), warn: m('warn'), error: m('error') };
         }
 
+        // Guard 2: not on CrazyGames — check multiple possible globals
+        var hasCG = (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK);
+        if (!hasCG) {
+            window.__y2.log('PlatformInit: window.CrazyGames.SDK not found, skipping CG wrapper.',
+                'CrazyGames:', typeof window.CrazyGames,
+                'CrazyGamesAds:', typeof window.CrazyGamesAds);
+            return;
+        }
+        window.__y2.log('PlatformInit: CrazyGames SDK detected, creating wrapper via postset/lazy init');
+
         // ===================================================================
         // CrazyGames wrapper — mirrors Yes2SDK-CrazyGames/index.html exactly
         // ===================================================================
@@ -43,18 +51,25 @@ mergeInto(LibraryManager.library, {
 
             initializeAsync: function() {
                 var self = this;
-                __y2.log('initializeAsync called');
+                window.__y2.log('initializeAsync called');
                 if (typeof window.CrazyGames === 'undefined' || !window.CrazyGames.SDK) {
-                    __y2.error('CrazyGames SDK not found');
+                    window.__y2.error('CrazyGames SDK not found');
                     return Promise.reject({ code: 'NotInitialized', message: 'CrazyGames SDK not found' });
                 }
-                __y2.log('CrazyGames SDK found, calling init...');
+                window.__y2.log('CrazyGames SDK found, calling init...');
                 self._sdk = window.CrazyGames.SDK;
-                return self._sdk.init().then(function() {
+                // Pass wrapper info like official CG Unity SDK (crazySDK.jslib)
+                var initOptions = {
+                    wrapper: {
+                        engine: 'unity',
+                        sdkVersion: '1.0.0'
+                    }
+                };
+                return self._sdk.init(initOptions).then(function() {
                     self._initialized = true;
-                    __y2.log('Initialized for CrazyGames');
+                    window.__y2.log('Initialized for CrazyGames');
                 }).catch(function(error) {
-                    __y2.error('CrazyGames init failed:', error);
+                    window.__y2.error('CrazyGames init failed:', error);
                     return Promise.reject(error);
                 });
             },
@@ -63,7 +78,7 @@ mergeInto(LibraryManager.library, {
                 if (this._sdk) {
                     this._sdk.game.loadingStop();
                 }
-                __y2.log('Game started');
+                window.__y2.log('Game started');
                 return Promise.resolve();
             },
 
@@ -102,15 +117,15 @@ mergeInto(LibraryManager.library, {
                     return new Promise(function(resolve) {
                         sdk.ad.requestAd('midgame', {
                             adStarted: function() {
-                                __y2.log('Midgame ad started');
+                                window.__y2.log('Midgame ad started');
                             },
                             adFinished: function() {
-                                __y2.log('Midgame ad finished');
+                                window.__y2.log('Midgame ad finished');
                                 if (callbacks.afterAd) callbacks.afterAd();
                                 resolve();
                             },
                             adError: function(error) {
-                                __y2.warn('Midgame ad error:', error);
+                                window.__y2.warn('Midgame ad error:', error);
                                 if (callbacks.noFill) callbacks.noFill();
                                 if (callbacks.afterAd) callbacks.afterAd();
                                 resolve();
@@ -133,16 +148,16 @@ mergeInto(LibraryManager.library, {
                     return new Promise(function(resolve) {
                         sdk.ad.requestAd('rewarded', {
                             adStarted: function() {
-                                __y2.log('Rewarded ad started');
+                                window.__y2.log('Rewarded ad started');
                             },
                             adFinished: function() {
-                                __y2.log('Rewarded ad finished');
+                                window.__y2.log('Rewarded ad finished');
                                 if (callbacks.adViewed) callbacks.adViewed();
                                 if (callbacks.afterAd) callbacks.afterAd();
                                 resolve();
                             },
                             adError: function(error) {
-                                __y2.warn('Rewarded ad error:', error);
+                                window.__y2.warn('Rewarded ad error:', error);
                                 if (error && (error.code === 'unfilled' || error.code === 'adblock')) {
                                     if (callbacks.noFill) callbacks.noFill();
                                 } else {
@@ -179,29 +194,29 @@ mergeInto(LibraryManager.library, {
             // Analytics module - maps to CrazyGames gameplay events
             analytics: {
                 logEvent: function(name, paramsJson) {
-                    __y2.log('Event:', name, paramsJson);
+                    window.__y2.log('Event:', name, paramsJson);
                 },
                 logLevelStart: function(level) {
-                    __y2.log('Level start:', level);
+                    window.__y2.log('Level start:', level);
                     var sdk = window.Yes2SDK._sdk;
                     if (sdk && sdk.game) sdk.game.gameplayStart();
                 },
                 logLevelEnd: function(level, score, success) {
-                    __y2.log('Level end:', level, score, success);
+                    window.__y2.log('Level end:', level, score, success);
                     var sdk = window.Yes2SDK._sdk;
                     if (sdk && sdk.game) sdk.game.gameplayStop();
                 },
                 logScore: function(score, level) {
-                    __y2.log('Score:', score, level);
+                    window.__y2.log('Score:', score, level);
                 },
                 logTutorialStart: function() {
-                    __y2.log('Tutorial start');
+                    window.__y2.log('Tutorial start');
                 },
                 logTutorialEnd: function() {
-                    __y2.log('Tutorial end');
+                    window.__y2.log('Tutorial end');
                 },
                 logPurchase: function(productId, price, currency) {
-                    __y2.log('Purchase:', productId, price, currency);
+                    window.__y2.log('Purchase:', productId, price, currency);
                 }
             },
 
@@ -273,7 +288,7 @@ mergeInto(LibraryManager.library, {
                     try {
                         this._data = JSON.parse(dataJson);
                     } catch(e) {
-                        __y2.warn('Invalid session data JSON:', dataJson);
+                        window.__y2.warn('Invalid session data JSON:', dataJson);
                     }
                 },
 
@@ -640,7 +655,7 @@ mergeInto(LibraryManager.library, {
                     if (sdk && sdk.user && sdk.user.addScore) {
                         sdk.user.addScore(score);
                     } else {
-                        __y2.log('Score:', score);
+                        window.__y2.log('Score:', score);
                     }
                 },
 
@@ -649,13 +664,13 @@ mergeInto(LibraryManager.library, {
                     if (sdk && sdk.user && sdk.user.submitScore) {
                         sdk.user.submitScore(encryptedScore);
                     } else {
-                        __y2.log('SubmitScore:', encryptedScore);
+                        window.__y2.log('SubmitScore:', encryptedScore);
                     }
                 }
             }
         };
 
-        __y2.log('Yes2SDK wrapper loaded via postset, platform:', window.Yes2SDK._platform);
+        window.__y2.log('Yes2SDK wrapper loaded via postset, platform:', window.Yes2SDK._platform);
     }
 
 });

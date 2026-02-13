@@ -23,30 +23,169 @@ mergeInto(LibraryManager.library, {
     // Initialize the SDK
     Yes2SDK_InitializeJS__deps: ['$__y2', '$__yes2PlatformInit'],
     Yes2SDK_InitializeJS: function() {
-        if (typeof window.Yes2SDK === 'undefined') {
-            window.__y2.error('Core SDK not loaded. Make sure yes2sdk.umd.js is included in the WebGL template.');
-            // Send error back to Unity
-            var error = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Core not loaded',
-                context: 'Yes2SDK.InitializeAsync'
-            });
-            SendMessage('Bridge', 'OnInitializeError', error);
+        window.__y2.log('[Init] Step 1: Yes2SDK_InitializeJS called');
+
+        // Helper: run init once wrapper exists
+        function doInit() {
+            window.__y2.log('[Init] doInit: calling window.Yes2SDK.initializeAsync()');
+            window.Yes2SDK.initializeAsync()
+                .then(function() {
+                    window.__y2.log('[Init] initializeAsync succeeded');
+                    SendMessage('Bridge', 'OnInitializeSuccess', '');
+                })
+                .catch(function(error) {
+                    window.__y2.error('[Init] initializeAsync failed:', error);
+                    var errorJson = JSON.stringify({
+                        code: error.code || 'Unknown',
+                        message: error.message || 'Initialization failed',
+                        context: 'Yes2SDK.InitializeAsync'
+                    });
+                    SendMessage('Bridge', 'OnInitializeError', errorJson);
+                });
+        }
+
+        // Helper: check if CG SDK is available and try to create wrapper
+        function tryCreateWrapper() {
+            if (typeof window.Yes2SDK !== 'undefined') return true;
+            if (typeof window.__yes2PlatformInit === 'function') {
+                window.__yes2PlatformInit();
+            }
+            return (typeof window.Yes2SDK !== 'undefined');
+        }
+
+        // A. Template already created wrapper (Poki, Debug, local CG with HTML)
+        if (typeof window.Yes2SDK !== 'undefined') {
+            window.__y2.log('[Init] Step 2a: window.Yes2SDK exists (from template)');
+            doInit();
             return;
         }
 
-        window.Yes2SDK.initializeAsync()
-            .then(function() {
-                SendMessage('Bridge', 'OnInitializeSuccess', '');
-            })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: error.code || 'Unknown',
-                    message: error.message || 'Initialization failed',
+        // B. Try lazy platform init (CG SDK may have loaded between postset and now)
+        window.__y2.log('[Init] Step 2b: window.Yes2SDK not found, trying lazy init...');
+        if (tryCreateWrapper()) {
+            window.__y2.log('[Init] Step 2b: wrapper created via lazy init');
+            doInit();
+            return;
+        }
+
+        // C. CG SDK not available yet.
+        //    CrazyGames injects their SDK ASYNCHRONOUSLY after framework.js loads.
+        //    We use two strategies in parallel — whichever finds CG SDK first wins:
+        //
+        //    Strategy 1: Poll for platform-injected window.CrazyGames.SDK
+        //                (CG platform injects it into the iframe after page load)
+        //    Strategy 2: Dynamically load from CDN — same as official CG Unity SDK
+        //                (crazySDK.jslib InitSDK lines 50-74)
+        //
+        //    Overall timeout: 10 seconds. If neither works, report error to C#.
+
+        window.__y2.log('[Init] Step 3: CG SDK not available yet.',
+            'Starting parallel detection (poll + CDN)...',
+            'CrazyGames:', typeof window.CrazyGames,
+            'CrazyGamesAds:', typeof window.CrazyGamesAds);
+
+        var resolved = false;
+        var pollTimer = null;
+        var overallTimer = null;
+        var cdnFailed = false;
+        var pollExhausted = false;
+
+        function onSDKAvailable(source) {
+            if (resolved) return;
+            resolved = true;
+            if (pollTimer) clearInterval(pollTimer);
+            if (overallTimer) clearTimeout(overallTimer);
+
+            window.__y2.log('[Init] Step 4: CG SDK detected via', source,
+                'CrazyGames.SDK:', typeof (window.CrazyGames && window.CrazyGames.SDK));
+
+            // Create the Yes2SDK wrapper
+            if (tryCreateWrapper()) {
+                window.__y2.log('[Init] Step 5: wrapper created via', source, '— calling doInit');
+                doInit();
+            } else {
+                window.__y2.error('[Init] Step 5: FAILED — CG SDK found via', source,
+                    'but wrapper creation failed.',
+                    'CrazyGames:', typeof window.CrazyGames,
+                    'CrazyGames.SDK:', window.CrazyGames ? typeof window.CrazyGames.SDK : 'N/A');
+                SendMessage('Bridge', 'OnInitializeError', JSON.stringify({
+                    code: 'NotInitialized',
+                    message: 'CrazyGames SDK found (' + source + ') but wrapper creation failed',
                     context: 'Yes2SDK.InitializeAsync'
-                });
-                SendMessage('Bridge', 'OnInitializeError', errorJson);
-            });
+                }));
+            }
+        }
+
+        function onAllFailed(reason) {
+            if (resolved) return;
+            resolved = true;
+            if (pollTimer) clearInterval(pollTimer);
+            if (overallTimer) clearTimeout(overallTimer);
+
+            window.__y2.error('[Init] FAILED:', reason,
+                'CrazyGames:', typeof window.CrazyGames,
+                'CrazyGamesAds:', typeof window.CrazyGamesAds);
+            SendMessage('Bridge', 'OnInitializeError', JSON.stringify({
+                code: 'NotInitialized',
+                message: reason,
+                context: 'Yes2SDK.InitializeAsync'
+            }));
+        }
+
+        // Strategy 1: Poll for platform-injected CG SDK (100ms intervals, 50 attempts = 5s)
+        var pollAttempts = 0;
+        var maxPollAttempts = 50;
+        pollTimer = setInterval(function() {
+            if (resolved) { clearInterval(pollTimer); return; }
+            pollAttempts++;
+            if (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK) {
+                clearInterval(pollTimer);
+                onSDKAvailable('platform-injection (poll #' + pollAttempts + ')');
+            } else if (pollAttempts >= maxPollAttempts) {
+                clearInterval(pollTimer);
+                pollExhausted = true;
+                window.__y2.warn('[Init] Poll exhausted after', maxPollAttempts, 'attempts (5s).',
+                    'CrazyGames:', typeof window.CrazyGames,
+                    'CrazyGamesAds:', typeof window.CrazyGamesAds);
+                // If CDN also failed, report error
+                if (cdnFailed) {
+                    onAllFailed('Both polling (5s) and CDN load failed. Not on CrazyGames?');
+                }
+            }
+        }, 100);
+
+        // Strategy 2: Dynamic CDN load (same URL as official CG Unity SDK)
+        var script = document.createElement('script');
+        script.src = 'https://sdk.crazygames.com/crazygames-sdk-v3.js';
+        script.addEventListener('load', function() {
+            if (resolved) return;
+            window.__y2.log('[Init] CDN script loaded.',
+                'CrazyGames:', typeof window.CrazyGames,
+                'CrazyGames.SDK:', window.CrazyGames ? typeof window.CrazyGames.SDK : 'N/A');
+            if (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK) {
+                onSDKAvailable('CDN');
+            } else {
+                window.__y2.warn('[Init] CDN loaded but CrazyGames.SDK not found — continuing poll');
+            }
+        });
+        script.addEventListener('error', function() {
+            if (resolved) return;
+            cdnFailed = true;
+            window.__y2.warn('[Init] CDN load failed (CSP or network).',
+                'Continuing to poll for platform injection...');
+            // If polling also exhausted, report error
+            if (pollExhausted) {
+                onAllFailed('CDN load blocked and polling timed out. Not on CrazyGames?');
+            }
+        });
+        document.head.appendChild(script);
+        window.__y2.log('[Init] Step 3: CDN <script> appended + polling started');
+
+        // Overall safety timeout: 10 seconds
+        overallTimer = setTimeout(function() {
+            if (resolved) return;
+            onAllFailed('Overall timeout (10s). CrazyGames SDK never became available.');
+        }, 10000);
     },
 
     // Start the game
