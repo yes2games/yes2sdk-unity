@@ -21,7 +21,7 @@ mergeInto(LibraryManager.library, {
     },
 
     // Initialize the SDK
-    Yes2SDK_InitializeJS__deps: ['$__y2'],
+    Yes2SDK_InitializeJS__deps: ['$__y2', '$__yes2PlatformInit'],
     Yes2SDK_InitializeJS: function() {
         if (typeof window.Yes2SDK === 'undefined') {
             window.__y2.error('Core SDK not loaded. Make sure yes2sdk.umd.js is included in the WebGL template.');
