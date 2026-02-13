@@ -45,10 +45,12 @@
 
             initializeAsync: function() {
                 var self = this;
+                __y2.log('initializeAsync called');
                 if (typeof window.CrazyGames === 'undefined' || !window.CrazyGames.SDK) {
                     __y2.error('CrazyGames SDK not found');
                     return Promise.reject({ code: 'NotInitialized', message: 'CrazyGames SDK not found' });
                 }
+                __y2.log('CrazyGames SDK found, calling init...');
                 self._sdk = window.CrazyGames.SDK;
                 return self._sdk.init().then(function() {
                     self._initialized = true;
@@ -654,6 +656,10 @@
                 }
             }
         };
+
+        // Debug: Verify Yes2SDK is loaded
+        __y2.log('Yes2SDK wrapper loaded, platform:', window.Yes2SDK._platform);
+        __y2.log('Analytics module available:', typeof window.Yes2SDK.analytics);
     </script>
 
     <script>
