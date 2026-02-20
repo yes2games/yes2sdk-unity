@@ -52,7 +52,13 @@
                 }
                 __y2.log('CrazyGames SDK found, calling init...');
                 self._sdk = window.CrazyGames.SDK;
-                return self._sdk.init().then(function() {
+                var initOptions = {
+                    wrapper: {
+                        engine: 'unity',
+                        sdkVersion: '1.0.0'
+                    }
+                };
+                return self._sdk.init(initOptions).then(function() {
                     self._initialized = true;
                     __y2.log('Initialized for CrazyGames');
                 }).catch(function(error) {

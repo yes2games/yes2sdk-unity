@@ -25,7 +25,7 @@
     <!-- Mock PokiSDK for local testing (on Poki.com this is injected automatically) -->
     <script>
         if (typeof PokiSDK === 'undefined') {
-            __y2.log('Local testing mode - using mock PokiSDK');
+            console.log('[Yes2SDK] Local testing mode - using mock PokiSDK');
             window.PokiSDK = {
                 init: function() {
                     console.log('[PokiSDK Mock] init');
