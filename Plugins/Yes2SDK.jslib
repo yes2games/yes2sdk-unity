@@ -70,31 +70,29 @@ mergeInto(LibraryManager.library, {
 
         // C. CG SDK not available yet.
         //    CrazyGames injects their SDK ASYNCHRONOUSLY after framework.js loads.
-        //    We use two strategies in parallel — whichever finds CG SDK first wins:
+        //    The platform also BLOCKS CDN loads (ERR_CONNECTION_RESET), so we
+        //    primarily rely on polling for the platform-injected SDK.
         //
-        //    Strategy 1: Poll for platform-injected window.CrazyGames.SDK
-        //                (CG platform injects it into the iframe after page load)
-        //    Strategy 2: Dynamically load from CDN — same as official CG Unity SDK
-        //                (crazySDK.jslib InitSDK lines 50-74)
-        //
-        //    Overall timeout: 10 seconds. If neither works, report error to C#.
+        //    Strategy: Poll for window.CrazyGames.SDK with auto-retry.
+        //    - Round 1: poll 100ms x 150 = 15 seconds
+        //    - Round 2 (auto-retry): wait 3s, then poll 100ms x 150 = 15 seconds
+        //    - CDN load attempted in parallel (works on some CG environments)
+        //    - Total max wait: ~35 seconds before giving up
 
         window.__y2.log('[Init] Step 3: CG SDK not available yet.',
-            'Starting parallel detection (poll + CDN)...',
+            'Starting detection (poll + CDN)...',
             'CrazyGames:', typeof window.CrazyGames,
             'CrazyGamesAds:', typeof window.CrazyGamesAds);
 
         var resolved = false;
-        var pollTimer = null;
-        var overallTimer = null;
-        var cdnFailed = false;
-        var pollExhausted = false;
+        var currentPollTimer = null;
+        var retryCount = 0;
+        var maxRetries = 1; // 1 auto-retry after first failure
 
         function onSDKAvailable(source) {
             if (resolved) return;
             resolved = true;
-            if (pollTimer) clearInterval(pollTimer);
-            if (overallTimer) clearTimeout(overallTimer);
+            if (currentPollTimer) clearInterval(currentPollTimer);
 
             window.__y2.log('[Init] Step 4: CG SDK detected via', source,
                 'CrazyGames.SDK:', typeof (window.CrazyGames && window.CrazyGames.SDK));
@@ -119,8 +117,7 @@ mergeInto(LibraryManager.library, {
         function onAllFailed(reason) {
             if (resolved) return;
             resolved = true;
-            if (pollTimer) clearInterval(pollTimer);
-            if (overallTimer) clearTimeout(overallTimer);
+            if (currentPollTimer) clearInterval(currentPollTimer);
 
             window.__y2.error('[Init] FAILED:', reason,
                 'CrazyGames:', typeof window.CrazyGames,
@@ -132,29 +129,43 @@ mergeInto(LibraryManager.library, {
             }));
         }
 
-        // Strategy 1: Poll for platform-injected CG SDK (100ms intervals, 50 attempts = 5s)
-        var pollAttempts = 0;
-        var maxPollAttempts = 50;
-        pollTimer = setInterval(function() {
-            if (resolved) { clearInterval(pollTimer); return; }
-            pollAttempts++;
-            if (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK) {
-                clearInterval(pollTimer);
-                onSDKAvailable('platform-injection (poll #' + pollAttempts + ')');
-            } else if (pollAttempts >= maxPollAttempts) {
-                clearInterval(pollTimer);
-                pollExhausted = true;
-                window.__y2.warn('[Init] Poll exhausted after', maxPollAttempts, 'attempts (5s).',
-                    'CrazyGames:', typeof window.CrazyGames,
-                    'CrazyGamesAds:', typeof window.CrazyGamesAds);
-                // If CDN also failed, report error
-                if (cdnFailed) {
-                    onAllFailed('Both polling (5s) and CDN load failed. Not on CrazyGames?');
-                }
-            }
-        }, 100);
+        function startPolling(round) {
+            var pollAttempts = 0;
+            var maxPollAttempts = 150; // 15 seconds at 100ms
+            window.__y2.log('[Init] Poll round', round + 1, 'started (150 attempts, 15s)');
 
-        // Strategy 2: Dynamic CDN load (same URL as official CG Unity SDK)
+            currentPollTimer = setInterval(function() {
+                if (resolved) { clearInterval(currentPollTimer); return; }
+                pollAttempts++;
+                if (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK) {
+                    clearInterval(currentPollTimer);
+                    onSDKAvailable('platform-injection (round ' + (round + 1) + ', poll #' + pollAttempts + ')');
+                } else if (pollAttempts >= maxPollAttempts) {
+                    clearInterval(currentPollTimer);
+                    window.__y2.warn('[Init] Poll round', round + 1, 'exhausted after', maxPollAttempts, 'attempts (15s).',
+                        'CrazyGames:', typeof window.CrazyGames,
+                        'CrazyGamesAds:', typeof window.CrazyGamesAds);
+
+                    if (round < maxRetries) {
+                        // Auto-retry: wait 3s then poll again
+                        retryCount++;
+                        window.__y2.log('[Init] Auto-retry', retryCount, '— waiting 3s before next round...');
+                        setTimeout(function() {
+                            if (resolved) return;
+                            startPolling(round + 1);
+                        }, 3000);
+                    } else {
+                        onAllFailed('CrazyGames SDK not found after ' + (round + 1) + ' poll rounds (~' +
+                            ((round + 1) * 15 + round * 3) + 's). Platform may not have injected SDK.');
+                    }
+                }
+            }, 100);
+        }
+
+        // Start polling (primary strategy)
+        startPolling(0);
+
+        // CDN load (secondary — may be blocked by CG platform, but try anyway)
         var script = document.createElement('script');
         script.src = 'https://sdk.crazygames.com/crazygames-sdk-v3.js';
         script.addEventListener('load', function() {
@@ -170,22 +181,11 @@ mergeInto(LibraryManager.library, {
         });
         script.addEventListener('error', function() {
             if (resolved) return;
-            cdnFailed = true;
-            window.__y2.warn('[Init] CDN load failed (CSP or network).',
-                'Continuing to poll for platform injection...');
-            // If polling also exhausted, report error
-            if (pollExhausted) {
-                onAllFailed('CDN load blocked and polling timed out. Not on CrazyGames?');
-            }
+            window.__y2.warn('[Init] CDN load failed (CG platform blocks external SDK loads).',
+                'Relying on platform injection polling...');
         });
         document.head.appendChild(script);
         window.__y2.log('[Init] Step 3: CDN <script> appended + polling started');
-
-        // Overall safety timeout: 10 seconds
-        overallTimer = setTimeout(function() {
-            if (resolved) return;
-            onAllFailed('Overall timeout (10s). CrazyGames SDK never became available.');
-        }, 10000);
     },
 
     // Start the game
