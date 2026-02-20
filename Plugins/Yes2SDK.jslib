@@ -4,22 +4,6 @@ mergeInto(LibraryManager.library, {
     $__y2__postset: '(function(){if(window.__y2)return;var S="background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold";function m(f){return function(){var a=[].slice.call(arguments);a.unshift("%c[Yes2SDK]%c ",S,"");console[f].apply(console,a);};}window.__y2={log:m("log"),warn:m("warn"),error:m("error")};})();',
     $__y2: {},
 
-    // Callback function pointers (set by Yes2SDK_RegisterCallbacksJS)
-    $Yes2SDK_Callbacks: {
-        onInitializeSuccess: null,
-        onInitializeError: null,
-        onStartGameSuccess: null,
-        onStartGameError: null,
-        onPause: null,
-        onResume: null
-    },
-
-    // Register C# callback function pointers
-    Yes2SDK_RegisterCallbacksJS: function() {
-        // Store callback references for later use
-        // These will be called via SendMessage or dynCall
-    },
-
     // Initialize the SDK
     Yes2SDK_InitializeJS__deps: ['$__y2', '$__yes2PlatformInit'],
     Yes2SDK_InitializeJS: function() {
