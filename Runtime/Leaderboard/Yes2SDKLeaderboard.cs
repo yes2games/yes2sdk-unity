@@ -19,7 +19,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetLeaderboardAsync(string leaderboardId, Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetLeaderboardAsync({leaderboardId}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetLeaderboardAsync({leaderboardId}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Leaderboard.GetLeaderboardAsync"));
         }
 
@@ -28,7 +28,7 @@ namespace Yes2SDK
         /// </summary>
         public void SetScoreAsync(string leaderboardId, int score, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: SetScoreAsync({leaderboardId}, {score}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: SetScoreAsync({leaderboardId}, {score}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Leaderboard.SetScoreAsync"));
         }
 
@@ -37,7 +37,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetEntriesAsync(string leaderboardId, int count, int offset, Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetEntriesAsync({leaderboardId}, {count}, {offset}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetEntriesAsync({leaderboardId}, {count}, {offset}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Leaderboard.GetEntriesAsync"));
         }
 
@@ -46,7 +46,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetPlayerEntryAsync(string leaderboardId, Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetPlayerEntryAsync({leaderboardId}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetPlayerEntryAsync({leaderboardId}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Leaderboard.GetPlayerEntryAsync"));
         }
 

@@ -343,6 +343,104 @@ namespace Yes2SDK
 
         #endregion
 
+        #region Auth Callbacks
+
+        public void OnGetCurrentUserSuccess(string userJson)
+        {
+            Yes2SDKAuth.InvokeGetCurrentUserSuccess(userJson);
+        }
+
+        public void OnGetCurrentUserError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKAuth.InvokeGetCurrentUserError(error);
+        }
+
+        public void OnSignInSuccess(string userJson)
+        {
+            Yes2SDKAuth.InvokeSignInSuccess(userJson);
+        }
+
+        public void OnSignInError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKAuth.InvokeSignInError(error);
+        }
+
+        public void OnGetTokenSuccess(string token)
+        {
+            Yes2SDKAuth.InvokeGetTokenSuccess(token);
+        }
+
+        public void OnGetTokenError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKAuth.InvokeGetTokenError(error);
+        }
+
+        public void OnAccountLinkSuccess(string result)
+        {
+            Yes2SDKAuth.InvokeAccountLinkSuccess(result);
+        }
+
+        public void OnAccountLinkError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKAuth.InvokeAccountLinkError(error);
+        }
+
+        #endregion
+
+        #region Game Callbacks
+
+        public void OnInviteLinkSuccess(string link)
+        {
+            Yes2SDKGame.InvokeInviteLinkSuccess(link);
+        }
+
+        public void OnInviteLinkError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKGame.InvokeInviteLinkError(error);
+        }
+
+        public void OnSettingsChanged(string settingsJson)
+        {
+            Yes2SDKGame.InvokeSettingsChanged(settingsJson);
+        }
+
+        #endregion
+
+        #region Banners Callbacks
+
+        public void OnBannerRequestSuccess(string message)
+        {
+            Yes2SDKBanners.InvokeBannerRequestSuccess();
+        }
+
+        public void OnBannerRequestError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKBanners.InvokeBannerRequestError(error);
+        }
+
+        #endregion
+
+        #region Friends Callbacks
+
+        public void OnListFriendsSuccess(string pageJson)
+        {
+            Yes2SDKFriends.InvokeListFriendsSuccess(pageJson);
+        }
+
+        public void OnListFriendsError(string errorJson)
+        {
+            var error = ParseError(errorJson);
+            Yes2SDKFriends.InvokeListFriendsError(error);
+        }
+
+        #endregion
+
         #region Utility
 
         private Error ParseError(string errorJson)

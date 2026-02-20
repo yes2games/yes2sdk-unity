@@ -21,27 +21,40 @@
 
     <!-- Yes2SDK Debug Wrapper (mock - all operations succeed immediately) -->
     <script>
+        // Styled console logger — gives [Yes2SDK] a coloured background in browser DevTools
+        (function() {
+            var S = 'background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold';
+            function m(f) {
+                return function() {
+                    var a = [].slice.call(arguments);
+                    a.unshift('%c[Yes2SDK]%c ', S, '');
+                    console[f].apply(console, a);
+                };
+            }
+            window.__y2 = { log: m('log'), warn: m('warn'), error: m('error') };
+        })();
+
         window.Yes2SDK = {
             _initialized: false,
             _platform: 'debug',
 
             initializeAsync: function() {
                 this._initialized = true;
-                console.log('[Yes2SDK] Initialized (debug mode)');
+                __y2.log('Initialized (debug mode)');
                 return Promise.resolve();
             },
 
             startGameAsync: function() {
-                console.log('[Yes2SDK] Game started (debug mode)');
+                __y2.log('Game started (debug mode)');
                 return Promise.resolve();
             },
 
             setLoadingProgress: function(progress) {
-                console.log('[Yes2SDK] Loading progress: ' + progress + '%');
+                __y2.log('Loading progress: ' + progress + '%');
             },
 
             performHapticFeedback: function() {
-                console.log('[Yes2SDK] Haptic feedback (debug mode)');
+                __y2.log('Haptic feedback (debug mode)');
             },
 
             getPlatform: function() {
@@ -56,7 +69,7 @@
             ads: {
                 showInterstitial: function(placement, callbacks) {
                     callbacks = callbacks || {};
-                    console.log('[Yes2SDK] Mock interstitial ad: ' + placement);
+                    __y2.log('Mock interstitial ad: ' + placement);
                     if (callbacks.beforeAd) callbacks.beforeAd();
                     if (callbacks.afterAd) callbacks.afterAd();
                     return Promise.resolve();
@@ -64,7 +77,7 @@
 
                 showRewarded: function(placement, callbacks) {
                     callbacks = callbacks || {};
-                    console.log('[Yes2SDK] Mock rewarded ad: ' + placement);
+                    __y2.log('Mock rewarded ad: ' + placement);
                     if (callbacks.beforeAd) callbacks.beforeAd();
                     if (callbacks.adViewed) callbacks.adViewed();
                     if (callbacks.afterAd) callbacks.afterAd();
@@ -72,17 +85,116 @@
                 },
 
                 showBanner: function(position) {
-                    console.log('[Yes2SDK] Mock banner shown at: ' + position);
+                    __y2.log('Mock banner shown at: ' + position);
                     return Promise.resolve();
                 },
 
                 hideBanner: function() {
-                    console.log('[Yes2SDK] Mock banner hidden');
+                    __y2.log('Mock banner hidden');
                 },
 
                 isAdBlocked: function() {
                     return false;
                 }
+            },
+
+            // Analytics module - debug logging
+            analytics: {
+                logEvent: function(name, paramsJson) { __y2.log('Event:', name, paramsJson); },
+                logLevelStart: function(level) { __y2.log('Level start:', level); },
+                logLevelEnd: function(level, score, success) { __y2.log('Level end:', level, score, success); },
+                logScore: function(score, level) { __y2.log('Score:', score, level); },
+                logTutorialStart: function() { __y2.log('Tutorial start'); },
+                logTutorialEnd: function() { __y2.log('Tutorial end'); },
+                logPurchase: function(productId, price, currency) { __y2.log('Purchase:', productId, price, currency); }
+            },
+
+            // Session module - debug defaults
+            session: {
+                _data: {},
+                getLocale: function() { return navigator.language || 'en'; },
+                getCountry: function() { return ''; },
+                getDevice: function() { return 'desktop'; },
+                getOrientation: function() { return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'; },
+                getTrafficSource: function() { return JSON.stringify({ referrer: '', params: {} }); },
+                getEntryPointData: function() { return '{}'; },
+                setSessionData: function(d) { try { this._data = JSON.parse(d); } catch(e) {} },
+                getEntryPointAsync: function() { return Promise.resolve('debug'); }
+            },
+
+            // Player module - debug mock
+            player: {
+                getPlayerAsync: function() { return Promise.resolve({ id: 'debug-player', name: 'Debug Player', photo: null }); },
+                getDataAsync: function(k) { return Promise.resolve('{}'); },
+                setDataAsync: function(d) { return Promise.resolve(); },
+                flushDataAsync: function() { return Promise.resolve(); },
+                getConnectedPlayersAsync: function() { return Promise.resolve([]); },
+                getSignedPlayerInfoAsync: function(p) { return Promise.resolve('{}'); }
+            },
+
+            // Data module - localStorage fallback for debug
+            data: {
+                getInt: function(key, defaultValue) {
+                    try { var v = localStorage.getItem('yes2sdk_' + key); if (v === null) return defaultValue; var p = parseInt(v, 10); return isNaN(p) ? defaultValue : p; } catch(e) { return defaultValue; }
+                },
+                setInt: function(key, value) { try { localStorage.setItem('yes2sdk_' + key, value.toString()); } catch(e) {} },
+                getFloat: function(key, defaultValue) {
+                    try { var v = localStorage.getItem('yes2sdk_' + key); if (v === null) return defaultValue; var p = parseFloat(v); return isNaN(p) ? defaultValue : p; } catch(e) { return defaultValue; }
+                },
+                setFloat: function(key, value) { try { localStorage.setItem('yes2sdk_' + key, value.toString()); } catch(e) {} },
+                getString: function(key, defaultValue) {
+                    try { var v = localStorage.getItem('yes2sdk_' + key); return v === null ? defaultValue : v; } catch(e) { return defaultValue; }
+                },
+                setString: function(key, value) { try { localStorage.setItem('yes2sdk_' + key, value); } catch(e) {} },
+                hasKey: function(key) { try { return localStorage.getItem('yes2sdk_' + key) !== null; } catch(e) { return false; } },
+                deleteKey: function(key) { try { localStorage.removeItem('yes2sdk_' + key); } catch(e) {} },
+                deleteAll: function() {
+                    try { var r = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf('yes2sdk_') === 0) r.push(k); } r.forEach(function(k) { localStorage.removeItem(k); }); } catch(e) {}
+                }
+            },
+
+            // Auth module - debug mock
+            auth: {
+                isSupported: function() { return true; },
+                getCurrentUserAsync: function() { return Promise.resolve({ id: 'debug-user', name: 'Debug User', photo: '', isAuthenticated: true }); },
+                signInAsync: function() { return Promise.resolve({ id: 'debug-user', name: 'Debug User', photo: '', isAuthenticated: true }); },
+                getTokenAsync: function() { return Promise.resolve('debug-token-12345'); },
+                showAccountLinkPromptAsync: function() { return Promise.resolve(true); }
+            },
+
+            // Game module - debug mock
+            game: {
+                gameplayStart: function() { __y2.log('gameplayStart'); },
+                gameplayStop: function() { __y2.log('gameplayStop'); },
+                happyTime: function() { __y2.log('happyTime'); },
+                inviteLink: function(paramsJson) { return Promise.resolve('https://debug.example.com/invite?test=1'); },
+                getInviteParam: function(key) { return ''; },
+                showInviteButton: function(paramsJson) { __y2.log('showInviteButton'); },
+                hideInviteButton: function() { __y2.log('hideInviteButton'); },
+                getSettings: function() { return JSON.stringify({ disableChat: false, muteAudio: false }); },
+                addSettingsChangeListener: function(callback) {},
+                copyToClipboard: function(text) { if (navigator.clipboard) navigator.clipboard.writeText(text); }
+            },
+
+            // Banners module - debug mock
+            banners: {
+                showBanner: function(id, size, x, y) { __y2.log('showBanner:', id, size); return Promise.resolve(); },
+                hideBanner: function(id) { __y2.log('hideBanner:', id); },
+                hideAllBanners: function() { __y2.log('hideAllBanners'); },
+                refreshBanners: function() { __y2.log('refreshBanners'); }
+            },
+
+            // Friends module - debug mock
+            friends: {
+                listFriendsAsync: function(page, size) {
+                    return Promise.resolve({ friends: [{ id: 'friend-1', username: 'DebugFriend', profilePictureUrl: '' }], page: page, size: size, hasMore: false, total: 1 });
+                }
+            },
+
+            // Score module - debug mock
+            score: {
+                addScore: function(score) { __y2.log('addScore:', score); },
+                submitScore: function(encrypted) { __y2.log('submitScore:', encrypted); }
             }
         };
     </script>

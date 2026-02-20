@@ -58,7 +58,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_GetLocaleJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetLocale() — returning \"en\"");
+            Yes2Log.Log("Mock: GetLocale() — returning \"en\"");
             return "en";
 #endif
         }
@@ -72,7 +72,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_GetCountryJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetCountry() — returning \"\"");
+            Yes2Log.Log("Mock: GetCountry() — returning \"\"");
             return "";
 #endif
         }
@@ -85,7 +85,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_GetDeviceJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetDevice() — returning \"desktop\"");
+            Yes2Log.Log("Mock: GetDevice() — returning \"desktop\"");
             return "desktop";
 #endif
         }
@@ -98,7 +98,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_GetOrientationJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetOrientation() — returning \"landscape\"");
+            Yes2Log.Log("Mock: GetOrientation() — returning \"landscape\"");
             return "landscape";
 #endif
         }
@@ -111,7 +111,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_GetTrafficSourceJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetTrafficSource() — returning empty JSON");
+            Yes2Log.Log("Mock: GetTrafficSource() — returning empty JSON");
             return "{\"referrer\":\"\",\"params\":{}}";
 #endif
         }
@@ -124,7 +124,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_GetEntryPointDataJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetEntryPointData() — returning empty JSON");
+            Yes2Log.Log("Mock: GetEntryPointData() — returning empty JSON");
             return "{}";
 #endif
         }
@@ -138,7 +138,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_SetSessionDataJS(dataJson);
 #else
-            Debug.Log($"[Yes2SDK] Mock: SetSessionData({dataJson})");
+            Yes2Log.Log($"Mock: SetSessionData({dataJson})");
 #endif
         }
 
@@ -156,7 +156,7 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_GetEntryPointAsyncJS();
 #else
-            Debug.Log("[Yes2SDK] Mock: GetEntryPointAsync() — returning \"direct\"");
+            Yes2Log.Log("Mock: GetEntryPointAsync() — returning \"direct\"");
             InvokeGetEntryPointSuccess("direct");
 #endif
         }

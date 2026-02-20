@@ -19,7 +19,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetStatsAsync(string[] keys, Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetStatsAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetStatsAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Stats.GetStatsAsync"));
         }
 
@@ -28,7 +28,7 @@ namespace Yes2SDK
         /// </summary>
         public void SetStatsAsync(string statsJson, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: SetStatsAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: SetStatsAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Stats.SetStatsAsync"));
         }
 
@@ -37,7 +37,7 @@ namespace Yes2SDK
         /// </summary>
         public void IncrementStatsAsync(string incrementsJson, Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: IncrementStatsAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: IncrementStatsAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Stats.IncrementStatsAsync"));
         }
 

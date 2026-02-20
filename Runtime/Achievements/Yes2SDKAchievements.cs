@@ -19,7 +19,7 @@ namespace Yes2SDK
         /// </summary>
         public void GetAchievementsAsync(Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: GetAchievementsAsync() — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetAchievementsAsync() — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Achievements.GetAchievementsAsync"));
         }
 
@@ -28,7 +28,7 @@ namespace Yes2SDK
         /// </summary>
         public void UnlockAsync(string achievementId, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: UnlockAsync({achievementId}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: UnlockAsync({achievementId}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Achievements.UnlockAsync"));
         }
 
@@ -37,7 +37,7 @@ namespace Yes2SDK
         /// </summary>
         public void SetProgressAsync(string achievementId, int progress, Action onSuccess = null, Action<Error> onError = null)
         {
-            Debug.Log($"[Yes2SDK] {(IsEditor() ? "Mock" : "Stub")}: SetProgressAsync({achievementId}, {progress}) — FeatureNotSupported");
+            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: SetProgressAsync({achievementId}, {progress}) — FeatureNotSupported");
             onError?.Invoke(NotSupportedError("Yes2SDK.Achievements.SetProgressAsync"));
         }
 

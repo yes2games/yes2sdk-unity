@@ -1,12 +1,13 @@
 mergeInto(LibraryManager.library, {
 
     // Show an interstitial (full-screen) ad
+    Yes2SDK_ShowInterstitialJS__deps: ['$__y2'],
     Yes2SDK_ShowInterstitialJS: function(placementPtr, descriptionPtr) {
         var placement = UTF8ToString(placementPtr);
         // description is passed from C# but not used by the Core SDK API
 
         if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
-            console.error('[Yes2SDK] SDK or Ads module not loaded. Yes2SDK:', typeof window.Yes2SDK, 'ads:', window.Yes2SDK ? typeof window.Yes2SDK.ads : 'N/A');
+            window.__y2.error('SDK or Ads module not loaded. Yes2SDK:', typeof window.Yes2SDK, 'ads:', window.Yes2SDK ? typeof window.Yes2SDK.ads : 'N/A');
             var errorJson = JSON.stringify({
                 code: 'NotInitialized',
                 message: 'Yes2SDK Ads module not loaded',
@@ -42,12 +43,13 @@ mergeInto(LibraryManager.library, {
     },
 
     // Show a rewarded video ad
+    Yes2SDK_ShowRewardedJS__deps: ['$__y2'],
     Yes2SDK_ShowRewardedJS: function(placementPtr, descriptionPtr) {
         var placement = UTF8ToString(placementPtr);
         // description is passed from C# but not used by the Core SDK API
 
         if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
-            console.error('[Yes2SDK] SDK or Ads module not loaded. Yes2SDK:', typeof window.Yes2SDK, 'ads:', window.Yes2SDK ? typeof window.Yes2SDK.ads : 'N/A');
+            window.__y2.error('SDK or Ads module not loaded. Yes2SDK:', typeof window.Yes2SDK, 'ads:', window.Yes2SDK ? typeof window.Yes2SDK.ads : 'N/A');
             var errorJson = JSON.stringify({
                 code: 'NotInitialized',
                 message: 'Yes2SDK Ads module not loaded',
@@ -89,9 +91,10 @@ mergeInto(LibraryManager.library, {
     },
 
     // Show a banner ad at the specified position
+    Yes2SDK_ShowBannerJS__deps: ['$__y2'],
     Yes2SDK_ShowBannerJS: function(position) {
         if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
-            console.error('[Yes2SDK] SDK or Ads module not loaded.');
+            window.__y2.error('SDK or Ads module not loaded.');
             var errorJson = JSON.stringify({
                 code: 'NotInitialized',
                 message: 'Yes2SDK Ads module not loaded',
@@ -120,9 +123,10 @@ mergeInto(LibraryManager.library, {
     },
 
     // Hide the currently displayed banner ad
+    Yes2SDK_HideBannerJS__deps: ['$__y2'],
     Yes2SDK_HideBannerJS: function() {
         if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
-            console.error('[Yes2SDK] SDK or Ads module not loaded.');
+            window.__y2.error('SDK or Ads module not loaded.');
             var errorJson = JSON.stringify({
                 code: 'NotInitialized',
                 message: 'Yes2SDK Ads module not loaded',
@@ -147,9 +151,10 @@ mergeInto(LibraryManager.library, {
     },
 
     // Check if ads are blocked for the current session
+    Yes2SDK_IsAdBlockedJS__deps: ['$__y2'],
     Yes2SDK_IsAdBlockedJS: function() {
         if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
-            console.warn('[Yes2SDK] SDK or Ads module not loaded. Returning false for isAdBlocked.');
+            window.__y2.warn('SDK or Ads module not loaded. Returning false for isAdBlocked.');
             return false;
         }
 
