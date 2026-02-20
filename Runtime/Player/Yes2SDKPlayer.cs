@@ -167,7 +167,7 @@ namespace Yes2SDK
         public bool IsDataSupported()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            return false; // Poki does not support player data
+            return Yes2SDK.CurrentPlatform == Platform.CrazyGames;
 #else
             return false;
 #endif
@@ -179,7 +179,7 @@ namespace Yes2SDK
         public bool IsConnectedPlayersSupported()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            return false; // Poki does not support connected players
+            return Yes2SDK.CurrentPlatform == Platform.CrazyGames;
 #else
             return false;
 #endif
