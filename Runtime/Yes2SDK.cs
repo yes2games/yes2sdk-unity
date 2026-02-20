@@ -450,10 +450,6 @@ namespace Yes2SDK
         internal static void SetInitialized(bool value)
         {
             IsInitialized = value;
-            if (value)
-            {
-                CurrentPlatform = GetPlatform();
-            }
         }
 
         /// <summary>
