@@ -51,6 +51,12 @@ namespace Yes2SDK.Editor
         private List<Yes2SDKTextureSwapTool.SwapCandidate> _swapCandidates;
         private Yes2SDKTextureSwapTool.SwapReport _swapReport;
 
+        // Screenshot tool state
+        private string _screenshotOutputFolder = Yes2SDKScreenshotTool.DefaultOutputPath;
+        private int _screenshotNextIndex = 1;
+        private bool[] _screenshotSlotExists = new bool[Yes2SDKScreenshotTool.MaxScreenshots];
+        private bool _screenshotRebinding;
+
         [MenuItem("Yes2SDK/Settings", false, 0)]
         public static void ShowWindow()
         {
@@ -78,6 +84,11 @@ namespace Yes2SDK.Editor
             _spriteAtlasOutputDir = EditorPrefs.GetString("Yes2SDK_SpriteAtlasOutput", "Assets/SpriteAtlases");
             _ktx2SourceFolder = EditorPrefs.GetString("Yes2SDK_Ktx2Source", "Assets/Textures");
             _ktx2Preset = (Yes2SDKKtx2Tool.Ktx2Preset)EditorPrefs.GetInt("Yes2SDK_Ktx2Preset", 0);
+
+            // Screenshot tool preferences
+            _screenshotOutputFolder = Yes2SDKScreenshotTool.GetOutputFolder();
+            _screenshotNextIndex = Yes2SDKScreenshotTool.GetNextIndex();
+            RefreshScreenshotSlots();
 
             // Check setup status
             RefreshSetupStatus();
@@ -145,6 +156,8 @@ namespace Yes2SDK.Editor
                     DrawKtx2Utility();
                     break;
                 case 2:
+                    DrawScreenshotTool();
+                    EditorGUILayout.Space(10);
                     DrawToolsSection();
                     break;
             }
@@ -371,6 +384,183 @@ namespace Yes2SDK.Editor
             EditorGUILayout.LabelField("Code Stripping", config.CodeStripping.ToString());
             EditorGUILayout.LabelField("Exception Support", config.ExceptionSupport.ToString());
             EditorGUI.indentLevel--;
+
+            EditorGUILayout.EndVertical();
+        }
+
+        // ─── Screenshot Tool ──────────────────────────────────────────
+
+        private void RefreshScreenshotSlots()
+        {
+            for (int i = 0; i < Yes2SDKScreenshotTool.MaxScreenshots; i++)
+            {
+                _screenshotSlotExists[i] = Yes2SDKScreenshotTool.SlotExists(_screenshotOutputFolder, i + 1);
+            }
+        }
+
+        private void DrawScreenshotTool()
+        {
+            // Always sync from disk/EditorPrefs so keyboard shortcut captures are reflected
+            RefreshScreenshotSlots();
+            _screenshotNextIndex = Yes2SDKScreenshotTool.GetNextIndex();
+
+            EditorGUILayout.LabelField("Poki Screenshots", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUILayout.HelpBox(
+                "Capture Game View screenshots for Poki store page.\n" +
+                "Saves two sizes per slot: 800\u00d7480 and 100\u00d756 (JPG).",
+                MessageType.Info);
+
+            EditorGUILayout.Space(5);
+
+            // Output folder
+            EditorGUILayout.BeginHorizontal();
+            EditorGUI.BeginChangeCheck();
+            _screenshotOutputFolder = EditorGUILayout.TextField("Output Folder", _screenshotOutputFolder);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Yes2SDKScreenshotTool.SetOutputFolder(_screenshotOutputFolder);
+                RefreshScreenshotSlots();
+            }
+            if (GUILayout.Button("...", GUILayout.Width(30)))
+            {
+                string path = EditorUtility.SaveFolderPanel("Select Screenshot Output Folder", _screenshotOutputFolder, "");
+                if (!string.IsNullOrEmpty(path))
+                {
+                    string projectPath = Directory.GetParent(Application.dataPath).FullName;
+                    if (path.StartsWith(projectPath))
+                        path = path.Substring(projectPath.Length + 1);
+                    _screenshotOutputFolder = path;
+                    Yes2SDKScreenshotTool.SetOutputFolder(_screenshotOutputFolder);
+                    RefreshScreenshotSlots();
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(5);
+
+            // Slot indicators with preview + delete
+            for (int i = 0; i < Yes2SDKScreenshotTool.MaxScreenshots; i++)
+            {
+                bool exists = _screenshotSlotExists[i];
+                EditorGUILayout.BeginHorizontal();
+
+                // Slot label
+                string status = exists ? "\u2713" : "\u2014";
+                var labelStyle = new GUIStyle(EditorStyles.label)
+                {
+                    fontStyle = exists ? FontStyle.Bold : FontStyle.Normal
+                };
+                if (exists)
+                    labelStyle.normal.textColor = new Color(0.3f, 0.8f, 0.3f);
+                GUILayout.Label($"  {i + 1}.jpg  {status}", labelStyle, GUILayout.Width(80));
+
+                // Preview button
+                EditorGUI.BeginDisabledGroup(!exists);
+                if (GUILayout.Button("Preview", GUILayout.Width(60)))
+                {
+                    string path = Yes2SDKScreenshotTool.GetLargePath(_screenshotOutputFolder, i + 1);
+                    EditorUtility.OpenWithDefaultApp(path);
+                }
+                EditorGUI.EndDisabledGroup();
+
+                // Delete button
+                EditorGUI.BeginDisabledGroup(!exists);
+                if (GUILayout.Button("\u2715", GUILayout.Width(25)))
+                {
+                    Yes2SDKScreenshotTool.DeleteSlot(_screenshotOutputFolder, i + 1);
+                    RefreshScreenshotSlots();
+                }
+                EditorGUI.EndDisabledGroup();
+
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.Space(3);
+
+            // Next index label
+            EditorGUILayout.LabelField("", $"Next: Screenshot {_screenshotNextIndex}", EditorStyles.miniLabel);
+
+            EditorGUILayout.Space(3);
+
+            // Capture button (disabled outside Play Mode)
+            string shortcutLabel = Yes2SDKScreenshotTool.GetShortcutLabel();
+            EditorGUI.BeginDisabledGroup(!EditorApplication.isPlaying);
+            GUI.backgroundColor = new Color(0.4f, 0.8f, 0.4f);
+            if (GUILayout.Button($"Capture Screenshot ({shortcutLabel})", GUILayout.Height(28)))
+            {
+                int captureIndex = Yes2SDKScreenshotTool.GetNextAvailableIndex(_screenshotOutputFolder);
+                Yes2SDKScreenshotTool.CaptureScreenshot(_screenshotOutputFolder, captureIndex);
+                Yes2SDKScreenshotTool.AdvanceNextIndex(captureIndex);
+            }
+            GUI.backgroundColor = Color.white;
+            EditorGUI.EndDisabledGroup();
+
+            if (!EditorApplication.isPlaying)
+            {
+                EditorGUILayout.LabelField("", "Enter Play Mode to capture screenshots.", EditorStyles.miniLabel);
+            }
+
+            // Shortcut rebind
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Shortcut", GUILayout.Width(EditorGUIUtility.labelWidth));
+            if (_screenshotRebinding)
+            {
+                GUILayout.Label("Press any key...", EditorStyles.boldLabel);
+                // Capture the next key event
+                Event e = Event.current;
+                if (e.type == EventType.KeyDown && e.keyCode != KeyCode.None)
+                {
+                    Yes2SDKScreenshotTool.SetShortcutBinding(e.keyCode, e.modifiers);
+                    _screenshotRebinding = false;
+                    e.Use();
+                    Repaint();
+                }
+                if (GUILayout.Button("Cancel", GUILayout.Width(55)))
+                {
+                    _screenshotRebinding = false;
+                }
+            }
+            else
+            {
+                GUILayout.Label(shortcutLabel, GUILayout.Width(100));
+                if (GUILayout.Button("Rebind", GUILayout.Width(55)))
+                {
+                    _screenshotRebinding = true;
+                }
+                if (GUILayout.Button("Clear", GUILayout.Width(45)))
+                {
+                    Yes2SDKScreenshotTool.SetShortcutBinding(KeyCode.None, 0);
+                }
+            }
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(5);
+
+            // Open Folder / Clear All
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Open Folder"))
+            {
+                string resolved = Yes2SDKScreenshotTool.ResolveOutputFolder(_screenshotOutputFolder);
+                if (!Directory.Exists(resolved))
+                    Directory.CreateDirectory(resolved);
+                EditorUtility.RevealInFinder(resolved);
+            }
+            if (GUILayout.Button("Clear All"))
+            {
+                if (EditorUtility.DisplayDialog("Yes2SDK",
+                    "Delete all screenshot files and reset index to 1?",
+                    "Clear", "Cancel"))
+                {
+                    Yes2SDKScreenshotTool.ClearAll(_screenshotOutputFolder);
+                    _screenshotNextIndex = 1;
+                    RefreshScreenshotSlots();
+                }
+            }
+            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.EndVertical();
         }
