@@ -1,6 +1,6 @@
 {
     "name": "com.yes2games.yes2sdk",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "displayName": "Yes2SDK",
     "description": "Yes2SDK Unity wrapper for WebGL games on some H5 platforms",
     "unity": "2021.3",
