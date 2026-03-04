@@ -4,6 +4,36 @@ mergeInto(LibraryManager.library, {
     $__y2__postset: '(function(){if(window.__y2)return;var S="background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold";function m(f){return function(){var a=[].slice.call(arguments);a.unshift("%c[Yes2SDK]%c ",S,"");console[f].apply(console,a);};}window.__y2={log:m("log"),warn:m("warn"),error:m("error")};})();',
     $__y2: {},
 
+    // Shared helpers for jslib bridges — use bare __y2h in jslib (NOT window.__y2h)
+    $__y2h: {
+        // Check if SDK and optional module are loaded
+        has: function(mod) {
+            return typeof window.Yes2SDK !== 'undefined' &&
+                   (!mod || typeof window.Yes2SDK[mod] !== 'undefined');
+        },
+        // Send a structured error to Bridge via SendMessage
+        sendError: function(callback, code, message, context) {
+            SendMessage('Bridge', callback, JSON.stringify({ code: code, message: message, context: context }));
+        },
+        // Return a catch handler that sends error to Bridge
+        handleCatch: function(callback, defaultMessage, context) {
+            return function(error) {
+                SendMessage('Bridge', callback, JSON.stringify({
+                    code: (error && error.code) || 'Unknown',
+                    message: (error && error.message) || defaultMessage,
+                    context: context
+                }));
+            };
+        },
+        // Allocate and return a UTF8 string to C#
+        returnStr: function(str) {
+            var bufferSize = lengthBytesUTF8(str) + 1;
+            var buffer = _malloc(bufferSize);
+            stringToUTF8(str, buffer, bufferSize);
+            return buffer;
+        }
+    },
+
     // Initialize the SDK
     Yes2SDK_InitializeJS__deps: ['$__y2', '$__yes2PlatformInit'],
     Yes2SDK_InitializeJS: function() {
@@ -173,9 +203,9 @@ mergeInto(LibraryManager.library, {
     },
 
     // Start the game
-    Yes2SDK_StartGameJS__deps: ['$__y2'],
+    Yes2SDK_StartGameJS__deps: ['$__y2', '$__y2h'],
     Yes2SDK_StartGameJS: function() {
-        if (typeof window.Yes2SDK === 'undefined') {
+        if (!__y2h.has()) {
             window.__y2.error('Core SDK not loaded.');
             return;
         }
@@ -184,59 +214,33 @@ mergeInto(LibraryManager.library, {
             .then(function() {
                 SendMessage('Bridge', 'OnStartGameSuccess', '');
             })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: error.code || 'Unknown',
-                    message: error.message || 'Start game failed',
-                    context: 'Yes2SDK.StartGameAsync'
-                });
-                SendMessage('Bridge', 'OnStartGameError', errorJson);
-            });
+            .catch(__y2h.handleCatch('OnStartGameError', 'Start game failed', 'Yes2SDK.StartGameAsync'));
     },
 
     // Set loading progress (0-100)
+    Yes2SDK_SetLoadingProgressJS__deps: ['$__y2h'],
     Yes2SDK_SetLoadingProgressJS: function(progress) {
-        if (typeof window.Yes2SDK === 'undefined') {
-            return;
-        }
-
-        window.Yes2SDK.setLoadingProgress(progress);
+        if (__y2h.has()) window.Yes2SDK.setLoadingProgress(progress);
     },
 
     // Trigger haptic feedback
+    Yes2SDK_PerformHapticFeedbackJS__deps: ['$__y2h'],
     Yes2SDK_PerformHapticFeedbackJS: function() {
-        if (typeof window.Yes2SDK === 'undefined') {
-            return;
-        }
-
-        window.Yes2SDK.performHapticFeedback();
+        if (__y2h.has()) window.Yes2SDK.performHapticFeedback();
     },
 
     // Get current platform
+    Yes2SDK_GetPlatformJS__deps: ['$__y2h'],
     Yes2SDK_GetPlatformJS: function() {
-        if (typeof window.Yes2SDK === 'undefined') {
-            var unknownStr = 'unknown';
-            var bufferSize = lengthBytesUTF8(unknownStr) + 1;
-            var buffer = _malloc(bufferSize);
-            stringToUTF8(unknownStr, buffer, bufferSize);
-            return buffer;
-        }
-
+        if (!__y2h.has()) return __y2h.returnStr('unknown');
         var platform = window.Yes2SDK.getPlatform();
-        var platformStr = platform ? platform.toString().toLowerCase() : 'unknown';
-        var bufferSize = lengthBytesUTF8(platformStr) + 1;
-        var buffer = _malloc(bufferSize);
-        stringToUTF8(platformStr, buffer, bufferSize);
-        return buffer;
+        return __y2h.returnStr(platform ? platform.toString().toLowerCase() : 'unknown');
     },
 
     // Check if SDK is initialized
+    Yes2SDK_IsInitializedJS__deps: ['$__y2h'],
     Yes2SDK_IsInitializedJS: function() {
-        if (typeof window.Yes2SDK === 'undefined') {
-            return false;
-        }
-
-        return window.Yes2SDK.isInitialized === true;
+        return __y2h.has() && window.Yes2SDK.isInitialized === true;
     }
 
 });

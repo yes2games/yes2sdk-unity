@@ -1,14 +1,10 @@
 mergeInto(LibraryManager.library, {
 
     // Get player info asynchronously
+    Yes2SDK_GetPlayerAsyncJS__deps: ['$__y2h'],
     Yes2SDK_GetPlayerAsyncJS: function() {
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.player === 'undefined') {
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Player module not loaded',
-                context: 'Yes2SDK.Player.GetPlayerAsync'
-            });
-            SendMessage('Bridge', 'OnGetPlayerError', errorJson);
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetPlayerError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetPlayerAsync');
             return;
         }
 
@@ -16,27 +12,16 @@ mergeInto(LibraryManager.library, {
             .then(function(player) {
                 SendMessage('Bridge', 'OnGetPlayerSuccess', JSON.stringify(player));
             })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: (error && error.code) || 'Unknown',
-                    message: (error && error.message) || 'GetPlayer failed',
-                    context: 'Yes2SDK.Player.GetPlayerAsync'
-                });
-                SendMessage('Bridge', 'OnGetPlayerError', errorJson);
-            });
+            .catch(__y2h.handleCatch('OnGetPlayerError', 'GetPlayer failed', 'Yes2SDK.Player.GetPlayerAsync'));
     },
 
     // Get player data
+    Yes2SDK_GetDataAsyncJS__deps: ['$__y2h'],
     Yes2SDK_GetDataAsyncJS: function(keysJsonPtr) {
         var keysJson = UTF8ToString(keysJsonPtr);
 
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.player === 'undefined') {
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Player module not loaded',
-                context: 'Yes2SDK.Player.GetDataAsync'
-            });
-            SendMessage('Bridge', 'OnGetDataError', errorJson);
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetDataError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetDataAsync');
             return;
         }
 
@@ -44,27 +29,16 @@ mergeInto(LibraryManager.library, {
             .then(function(data) {
                 SendMessage('Bridge', 'OnGetDataSuccess', typeof data === 'string' ? data : JSON.stringify(data));
             })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: (error && error.code) || 'Unknown',
-                    message: (error && error.message) || 'GetData failed',
-                    context: 'Yes2SDK.Player.GetDataAsync'
-                });
-                SendMessage('Bridge', 'OnGetDataError', errorJson);
-            });
+            .catch(__y2h.handleCatch('OnGetDataError', 'GetData failed', 'Yes2SDK.Player.GetDataAsync'));
     },
 
     // Set player data
+    Yes2SDK_SetDataAsyncJS__deps: ['$__y2h'],
     Yes2SDK_SetDataAsyncJS: function(dataJsonPtr) {
         var dataJson = UTF8ToString(dataJsonPtr);
 
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.player === 'undefined') {
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Player module not loaded',
-                context: 'Yes2SDK.Player.SetDataAsync'
-            });
-            SendMessage('Bridge', 'OnSetDataError', errorJson);
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnSetDataError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.SetDataAsync');
             return;
         }
 
@@ -72,25 +46,14 @@ mergeInto(LibraryManager.library, {
             .then(function() {
                 SendMessage('Bridge', 'OnSetDataSuccess', '');
             })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: (error && error.code) || 'Unknown',
-                    message: (error && error.message) || 'SetData failed',
-                    context: 'Yes2SDK.Player.SetDataAsync'
-                });
-                SendMessage('Bridge', 'OnSetDataError', errorJson);
-            });
+            .catch(__y2h.handleCatch('OnSetDataError', 'SetData failed', 'Yes2SDK.Player.SetDataAsync'));
     },
 
     // Flush player data
+    Yes2SDK_FlushDataAsyncJS__deps: ['$__y2h'],
     Yes2SDK_FlushDataAsyncJS: function() {
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.player === 'undefined') {
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Player module not loaded',
-                context: 'Yes2SDK.Player.FlushDataAsync'
-            });
-            SendMessage('Bridge', 'OnFlushDataError', errorJson);
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnFlushDataError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.FlushDataAsync');
             return;
         }
 
@@ -98,25 +61,14 @@ mergeInto(LibraryManager.library, {
             .then(function() {
                 SendMessage('Bridge', 'OnFlushDataSuccess', '');
             })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: (error && error.code) || 'Unknown',
-                    message: (error && error.message) || 'FlushData failed',
-                    context: 'Yes2SDK.Player.FlushDataAsync'
-                });
-                SendMessage('Bridge', 'OnFlushDataError', errorJson);
-            });
+            .catch(__y2h.handleCatch('OnFlushDataError', 'FlushData failed', 'Yes2SDK.Player.FlushDataAsync'));
     },
 
     // Get connected players
+    Yes2SDK_GetConnectedPlayersAsyncJS__deps: ['$__y2h'],
     Yes2SDK_GetConnectedPlayersAsyncJS: function() {
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.player === 'undefined') {
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Player module not loaded',
-                context: 'Yes2SDK.Player.GetConnectedPlayersAsync'
-            });
-            SendMessage('Bridge', 'OnGetConnectedPlayersError', errorJson);
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetConnectedPlayersError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetConnectedPlayersAsync');
             return;
         }
 
@@ -124,27 +76,16 @@ mergeInto(LibraryManager.library, {
             .then(function(players) {
                 SendMessage('Bridge', 'OnGetConnectedPlayersSuccess', JSON.stringify(players));
             })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: (error && error.code) || 'Unknown',
-                    message: (error && error.message) || 'GetConnectedPlayers failed',
-                    context: 'Yes2SDK.Player.GetConnectedPlayersAsync'
-                });
-                SendMessage('Bridge', 'OnGetConnectedPlayersError', errorJson);
-            });
+            .catch(__y2h.handleCatch('OnGetConnectedPlayersError', 'GetConnectedPlayers failed', 'Yes2SDK.Player.GetConnectedPlayersAsync'));
     },
 
     // Get signed player info
+    Yes2SDK_GetSignedPlayerInfoAsyncJS__deps: ['$__y2h'],
     Yes2SDK_GetSignedPlayerInfoAsyncJS: function(payloadPtr) {
         var payload = UTF8ToString(payloadPtr);
 
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.player === 'undefined') {
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Player module not loaded',
-                context: 'Yes2SDK.Player.GetSignedPlayerInfoAsync'
-            });
-            SendMessage('Bridge', 'OnGetSignedPlayerInfoError', errorJson);
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetSignedPlayerInfoError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetSignedPlayerInfoAsync');
             return;
         }
 
@@ -152,14 +93,7 @@ mergeInto(LibraryManager.library, {
             .then(function(info) {
                 SendMessage('Bridge', 'OnGetSignedPlayerInfoSuccess', typeof info === 'string' ? info : JSON.stringify(info));
             })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: (error && error.code) || 'Unknown',
-                    message: (error && error.message) || 'GetSignedPlayerInfo failed',
-                    context: 'Yes2SDK.Player.GetSignedPlayerInfoAsync'
-                });
-                SendMessage('Bridge', 'OnGetSignedPlayerInfoError', errorJson);
-            });
+            .catch(__y2h.handleCatch('OnGetSignedPlayerInfoError', 'GetSignedPlayerInfo failed', 'Yes2SDK.Player.GetSignedPlayerInfoAsync'));
     }
 
 });

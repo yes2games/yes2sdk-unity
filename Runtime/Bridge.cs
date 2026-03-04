@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using Newtonsoft.Json;
 
@@ -50,400 +53,178 @@ namespace Yes2SDK
             DontDestroyOnLoad(gameObject);
         }
 
-        #region Initialization Callbacks
+        #region Handler Registry
 
-        /// <summary>
-        /// Called from JavaScript when initialization succeeds.
-        /// </summary>
-        public void OnInitializeSuccess(string message)
+        // Success handlers — either pass data through or ignore it
+        private static readonly Dictionary<string, Action<string>> _handlers = new Dictionary<string, Action<string>>
         {
-            Callbacks.InvokeInitializeSuccess();
-        }
+            // Init & Lifecycle
+            ["OnInitializeSuccess"] = _ => Callbacks.InvokeInitializeSuccess(),
+            ["OnStartGameSuccess"] = _ => Callbacks.InvokeStartGameSuccess(),
+            ["OnPause"] = _ => Callbacks.InvokePause(),
+            ["OnResume"] = _ => Callbacks.InvokeResume(),
 
-        /// <summary>
-        /// Called from JavaScript when initialization fails.
-        /// </summary>
-        public void OnInitializeError(string errorJson)
+            // Ads
+            ["OnInterstitialBeforeAd"] = _ => Yes2SDKAds.InvokeInterstitialBeforeAd(),
+            ["OnInterstitialAfterAd"] = _ => Yes2SDKAds.InvokeInterstitialAfterAd(),
+            ["OnRewardedBeforeAd"] = _ => Yes2SDKAds.InvokeRewardedBeforeAd(),
+            ["OnRewardedAfterAd"] = _ => Yes2SDKAds.InvokeRewardedAfterAd(),
+            ["OnRewardedAdDismissed"] = _ => Yes2SDKAds.InvokeRewardedAdDismissed(),
+            ["OnRewardedAdViewed"] = _ => Yes2SDKAds.InvokeRewardedAdViewed(),
+            ["OnBannerShown"] = _ => Yes2SDKAds.InvokeBannerShown(),
+            ["OnBannerHidden"] = _ => Yes2SDKAds.InvokeBannerHidden(),
+
+            // Session
+            ["OnGetEntryPointSuccess"] = Yes2SDKSession.InvokeGetEntryPointSuccess,
+
+            // Player
+            ["OnGetPlayerSuccess"] = Yes2SDKPlayer.InvokeGetPlayerSuccess,
+            ["OnGetDataSuccess"] = Yes2SDKPlayer.InvokeGetDataSuccess,
+            ["OnSetDataSuccess"] = _ => Yes2SDKPlayer.InvokeSetDataSuccess(),
+            ["OnFlushDataSuccess"] = _ => Yes2SDKPlayer.InvokeFlushDataSuccess(),
+            ["OnGetConnectedPlayersSuccess"] = Yes2SDKPlayer.InvokeGetConnectedPlayersSuccess,
+            ["OnGetSignedPlayerInfoSuccess"] = Yes2SDKPlayer.InvokeGetSignedPlayerInfoSuccess,
+
+            // Auth
+            ["OnGetCurrentUserSuccess"] = Yes2SDKAuth.InvokeGetCurrentUserSuccess,
+            ["OnSignInSuccess"] = Yes2SDKAuth.InvokeSignInSuccess,
+            ["OnGetTokenSuccess"] = Yes2SDKAuth.InvokeGetTokenSuccess,
+            ["OnAccountLinkSuccess"] = Yes2SDKAuth.InvokeAccountLinkSuccess,
+
+            // Game
+            ["OnInviteLinkSuccess"] = Yes2SDKGame.InvokeInviteLinkSuccess,
+            ["OnSettingsChanged"] = Yes2SDKGame.InvokeSettingsChanged,
+
+            // Banners
+            ["OnBannerRequestSuccess"] = _ => Yes2SDKBanners.InvokeBannerRequestSuccess(),
+
+            // Friends
+            ["OnListFriendsSuccess"] = Yes2SDKFriends.InvokeListFriendsSuccess,
+        };
+
+        // Error handlers — receive parsed Error struct
+        private static readonly Dictionary<string, Action<Error>> _errorHandlers = new Dictionary<string, Action<Error>>
         {
-            var error = ParseError(errorJson);
-            Callbacks.InvokeInitializeError(error);
+            // Init & Lifecycle
+            ["OnInitializeError"] = Callbacks.InvokeInitializeError,
+            ["OnStartGameError"] = Callbacks.InvokeStartGameError,
+
+            // Ads
+            ["OnInterstitialError"] = Yes2SDKAds.InvokeInterstitialError,
+            ["OnRewardedError"] = Yes2SDKAds.InvokeRewardedError,
+            ["OnBannerShowError"] = Yes2SDKAds.InvokeBannerShowError,
+            ["OnBannerHideError"] = Yes2SDKAds.InvokeBannerHideError,
+
+            // Session
+            ["OnGetEntryPointError"] = Yes2SDKSession.InvokeGetEntryPointError,
+
+            // Player
+            ["OnGetPlayerError"] = Yes2SDKPlayer.InvokeGetPlayerError,
+            ["OnGetDataError"] = Yes2SDKPlayer.InvokeGetDataError,
+            ["OnSetDataError"] = Yes2SDKPlayer.InvokeSetDataError,
+            ["OnFlushDataError"] = Yes2SDKPlayer.InvokeFlushDataError,
+            ["OnGetConnectedPlayersError"] = Yes2SDKPlayer.InvokeGetConnectedPlayersError,
+            ["OnGetSignedPlayerInfoError"] = Yes2SDKPlayer.InvokeGetSignedPlayerInfoError,
+
+            // Auth
+            ["OnGetCurrentUserError"] = Yes2SDKAuth.InvokeGetCurrentUserError,
+            ["OnSignInError"] = Yes2SDKAuth.InvokeSignInError,
+            ["OnGetTokenError"] = Yes2SDKAuth.InvokeGetTokenError,
+            ["OnAccountLinkError"] = Yes2SDKAuth.InvokeAccountLinkError,
+
+            // Game
+            ["OnInviteLinkError"] = Yes2SDKGame.InvokeInviteLinkError,
+
+            // Banners
+            ["OnBannerRequestError"] = Yes2SDKBanners.InvokeBannerRequestError,
+
+            // Friends
+            ["OnListFriendsError"] = Yes2SDKFriends.InvokeListFriendsError,
+        };
+
+        #endregion
+
+        #region Dispatch
+
+        private void Handle(string data, [CallerMemberName] string name = null)
+        {
+            if (_handlers.TryGetValue(name, out var h)) { h(data); return; }
+            if (_errorHandlers.TryGetValue(name, out var eh)) { eh(ParseError(data)); return; }
+            Yes2Log.Warning($"Bridge: unhandled callback '{name}'");
         }
 
         #endregion
 
-        #region Game Start Callbacks
+        #region Callbacks (called from JavaScript via SendMessage)
 
-        /// <summary>
-        /// Called from JavaScript when game start succeeds.
-        /// </summary>
-        public void OnStartGameSuccess(string message)
-        {
-            Callbacks.InvokeStartGameSuccess();
-        }
+        // Init & Lifecycle
+        public void OnInitializeSuccess(string msg) => Handle(msg);
+        public void OnInitializeError(string msg) => Handle(msg);
+        public void OnStartGameSuccess(string msg) => Handle(msg);
+        public void OnStartGameError(string msg) => Handle(msg);
+        public void OnPause(string msg) => Handle(msg);
+        public void OnResume(string msg) => Handle(msg);
 
-        /// <summary>
-        /// Called from JavaScript when game start fails.
-        /// </summary>
-        public void OnStartGameError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Callbacks.InvokeStartGameError(error);
-        }
+        // Ads
+        public void OnInterstitialBeforeAd(string msg) => Handle(msg);
+        public void OnInterstitialAfterAd(string msg) => Handle(msg);
+        public void OnInterstitialError(string msg) => Handle(msg);
+        public void OnRewardedBeforeAd(string msg) => Handle(msg);
+        public void OnRewardedAfterAd(string msg) => Handle(msg);
+        public void OnRewardedAdDismissed(string msg) => Handle(msg);
+        public void OnRewardedAdViewed(string msg) => Handle(msg);
+        public void OnRewardedError(string msg) => Handle(msg);
+        public void OnBannerShown(string msg) => Handle(msg);
+        public void OnBannerShowError(string msg) => Handle(msg);
+        public void OnBannerHidden(string msg) => Handle(msg);
+        public void OnBannerHideError(string msg) => Handle(msg);
 
-        #endregion
+        // Session
+        public void OnGetEntryPointSuccess(string msg) => Handle(msg);
+        public void OnGetEntryPointError(string msg) => Handle(msg);
 
-        #region Lifecycle Callbacks
+        // Player
+        public void OnGetPlayerSuccess(string msg) => Handle(msg);
+        public void OnGetPlayerError(string msg) => Handle(msg);
+        public void OnGetDataSuccess(string msg) => Handle(msg);
+        public void OnGetDataError(string msg) => Handle(msg);
+        public void OnSetDataSuccess(string msg) => Handle(msg);
+        public void OnSetDataError(string msg) => Handle(msg);
+        public void OnFlushDataSuccess(string msg) => Handle(msg);
+        public void OnFlushDataError(string msg) => Handle(msg);
+        public void OnGetConnectedPlayersSuccess(string msg) => Handle(msg);
+        public void OnGetConnectedPlayersError(string msg) => Handle(msg);
+        public void OnGetSignedPlayerInfoSuccess(string msg) => Handle(msg);
+        public void OnGetSignedPlayerInfoError(string msg) => Handle(msg);
 
-        /// <summary>
-        /// Called from JavaScript when game should pause.
-        /// </summary>
-        public void OnPause(string message)
-        {
-            Callbacks.InvokePause();
-        }
+        // Auth
+        public void OnGetCurrentUserSuccess(string msg) => Handle(msg);
+        public void OnGetCurrentUserError(string msg) => Handle(msg);
+        public void OnSignInSuccess(string msg) => Handle(msg);
+        public void OnSignInError(string msg) => Handle(msg);
+        public void OnGetTokenSuccess(string msg) => Handle(msg);
+        public void OnGetTokenError(string msg) => Handle(msg);
+        public void OnAccountLinkSuccess(string msg) => Handle(msg);
+        public void OnAccountLinkError(string msg) => Handle(msg);
 
-        /// <summary>
-        /// Called from JavaScript when game can resume.
-        /// </summary>
-        public void OnResume(string message)
-        {
-            Callbacks.InvokeResume();
-        }
+        // Game
+        public void OnInviteLinkSuccess(string msg) => Handle(msg);
+        public void OnInviteLinkError(string msg) => Handle(msg);
+        public void OnSettingsChanged(string msg) => Handle(msg);
 
-        #endregion
+        // Banners
+        public void OnBannerRequestSuccess(string msg) => Handle(msg);
+        public void OnBannerRequestError(string msg) => Handle(msg);
 
-        #region Ads Callbacks
-
-        /// <summary>
-        /// Called from JavaScript before an interstitial ad is shown.
-        /// </summary>
-        public void OnInterstitialBeforeAd(string message)
-        {
-            Yes2SDKAds.InvokeInterstitialBeforeAd();
-        }
-
-        /// <summary>
-        /// Called from JavaScript after an interstitial ad completes.
-        /// </summary>
-        public void OnInterstitialAfterAd(string message)
-        {
-            Yes2SDKAds.InvokeInterstitialAfterAd();
-        }
-
-        /// <summary>
-        /// Called from JavaScript when an interstitial ad fails.
-        /// </summary>
-        public void OnInterstitialError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKAds.InvokeInterstitialError(error);
-        }
-
-        /// <summary>
-        /// Called from JavaScript before a rewarded ad is shown.
-        /// </summary>
-        public void OnRewardedBeforeAd(string message)
-        {
-            Yes2SDKAds.InvokeRewardedBeforeAd();
-        }
-
-        /// <summary>
-        /// Called from JavaScript after a rewarded ad completes.
-        /// </summary>
-        public void OnRewardedAfterAd(string message)
-        {
-            Yes2SDKAds.InvokeRewardedAfterAd();
-        }
-
-        /// <summary>
-        /// Called from JavaScript when a rewarded ad is dismissed without reward.
-        /// </summary>
-        public void OnRewardedAdDismissed(string message)
-        {
-            Yes2SDKAds.InvokeRewardedAdDismissed();
-        }
-
-        /// <summary>
-        /// Called from JavaScript when a rewarded ad is fully viewed.
-        /// </summary>
-        public void OnRewardedAdViewed(string message)
-        {
-            Yes2SDKAds.InvokeRewardedAdViewed();
-        }
-
-        /// <summary>
-        /// Called from JavaScript when a rewarded ad fails.
-        /// </summary>
-        public void OnRewardedError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKAds.InvokeRewardedError(error);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when a banner ad is shown.
-        /// </summary>
-        public void OnBannerShown(string message)
-        {
-            Yes2SDKAds.InvokeBannerShown();
-        }
-
-        /// <summary>
-        /// Called from JavaScript when showing a banner ad fails.
-        /// </summary>
-        public void OnBannerShowError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKAds.InvokeBannerShowError(error);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when a banner ad is hidden.
-        /// </summary>
-        public void OnBannerHidden(string message)
-        {
-            Yes2SDKAds.InvokeBannerHidden();
-        }
-
-        /// <summary>
-        /// Called from JavaScript when hiding a banner ad fails.
-        /// </summary>
-        public void OnBannerHideError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKAds.InvokeBannerHideError(error);
-        }
-
-        #endregion
-
-        #region Session Callbacks
-
-        /// <summary>
-        /// Called from JavaScript when GetEntryPoint succeeds.
-        /// </summary>
-        public void OnGetEntryPointSuccess(string entryPoint)
-        {
-            Yes2SDKSession.InvokeGetEntryPointSuccess(entryPoint);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when GetEntryPoint fails.
-        /// </summary>
-        public void OnGetEntryPointError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKSession.InvokeGetEntryPointError(error);
-        }
-
-        #endregion
-
-        #region Player Callbacks
-
-        /// <summary>
-        /// Called from JavaScript when GetPlayer succeeds.
-        /// </summary>
-        public void OnGetPlayerSuccess(string playerJson)
-        {
-            Yes2SDKPlayer.InvokeGetPlayerSuccess(playerJson);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when GetPlayer fails.
-        /// </summary>
-        public void OnGetPlayerError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKPlayer.InvokeGetPlayerError(error);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when GetData succeeds.
-        /// </summary>
-        public void OnGetDataSuccess(string dataJson)
-        {
-            Yes2SDKPlayer.InvokeGetDataSuccess(dataJson);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when GetData fails.
-        /// </summary>
-        public void OnGetDataError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKPlayer.InvokeGetDataError(error);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when SetData succeeds.
-        /// </summary>
-        public void OnSetDataSuccess(string message)
-        {
-            Yes2SDKPlayer.InvokeSetDataSuccess();
-        }
-
-        /// <summary>
-        /// Called from JavaScript when SetData fails.
-        /// </summary>
-        public void OnSetDataError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKPlayer.InvokeSetDataError(error);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when FlushData succeeds.
-        /// </summary>
-        public void OnFlushDataSuccess(string message)
-        {
-            Yes2SDKPlayer.InvokeFlushDataSuccess();
-        }
-
-        /// <summary>
-        /// Called from JavaScript when FlushData fails.
-        /// </summary>
-        public void OnFlushDataError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKPlayer.InvokeFlushDataError(error);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when GetConnectedPlayers succeeds.
-        /// </summary>
-        public void OnGetConnectedPlayersSuccess(string playersJson)
-        {
-            Yes2SDKPlayer.InvokeGetConnectedPlayersSuccess(playersJson);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when GetConnectedPlayers fails.
-        /// </summary>
-        public void OnGetConnectedPlayersError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKPlayer.InvokeGetConnectedPlayersError(error);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when GetSignedPlayerInfo succeeds.
-        /// </summary>
-        public void OnGetSignedPlayerInfoSuccess(string signatureJson)
-        {
-            Yes2SDKPlayer.InvokeGetSignedPlayerInfoSuccess(signatureJson);
-        }
-
-        /// <summary>
-        /// Called from JavaScript when GetSignedPlayerInfo fails.
-        /// </summary>
-        public void OnGetSignedPlayerInfoError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKPlayer.InvokeGetSignedPlayerInfoError(error);
-        }
-
-        #endregion
-
-        #region Auth Callbacks
-
-        public void OnGetCurrentUserSuccess(string userJson)
-        {
-            Yes2SDKAuth.InvokeGetCurrentUserSuccess(userJson);
-        }
-
-        public void OnGetCurrentUserError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKAuth.InvokeGetCurrentUserError(error);
-        }
-
-        public void OnSignInSuccess(string userJson)
-        {
-            Yes2SDKAuth.InvokeSignInSuccess(userJson);
-        }
-
-        public void OnSignInError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKAuth.InvokeSignInError(error);
-        }
-
-        public void OnGetTokenSuccess(string token)
-        {
-            Yes2SDKAuth.InvokeGetTokenSuccess(token);
-        }
-
-        public void OnGetTokenError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKAuth.InvokeGetTokenError(error);
-        }
-
-        public void OnAccountLinkSuccess(string result)
-        {
-            Yes2SDKAuth.InvokeAccountLinkSuccess(result);
-        }
-
-        public void OnAccountLinkError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKAuth.InvokeAccountLinkError(error);
-        }
-
-        #endregion
-
-        #region Game Callbacks
-
-        public void OnInviteLinkSuccess(string link)
-        {
-            Yes2SDKGame.InvokeInviteLinkSuccess(link);
-        }
-
-        public void OnInviteLinkError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKGame.InvokeInviteLinkError(error);
-        }
-
-        public void OnSettingsChanged(string settingsJson)
-        {
-            Yes2SDKGame.InvokeSettingsChanged(settingsJson);
-        }
-
-        #endregion
-
-        #region Banners Callbacks
-
-        public void OnBannerRequestSuccess(string message)
-        {
-            Yes2SDKBanners.InvokeBannerRequestSuccess();
-        }
-
-        public void OnBannerRequestError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKBanners.InvokeBannerRequestError(error);
-        }
-
-        #endregion
-
-        #region Friends Callbacks
-
-        public void OnListFriendsSuccess(string pageJson)
-        {
-            Yes2SDKFriends.InvokeListFriendsSuccess(pageJson);
-        }
-
-        public void OnListFriendsError(string errorJson)
-        {
-            var error = ParseError(errorJson);
-            Yes2SDKFriends.InvokeListFriendsError(error);
-        }
+        // Friends
+        public void OnListFriendsSuccess(string msg) => Handle(msg);
+        public void OnListFriendsError(string msg) => Handle(msg);
 
         #endregion
 
         #region Utility
 
-        private Error ParseError(string errorJson)
+        private static Error ParseError(string errorJson)
         {
             if (string.IsNullOrEmpty(errorJson))
             {
@@ -478,10 +259,10 @@ namespace Yes2SDK
     /// </summary>
     internal static class Callbacks
     {
-        internal static System.Action InitializeSuccessCallback;
-        internal static System.Action<Error> InitializeErrorCallback;
-        internal static System.Action StartGameSuccessCallback;
-        internal static System.Action<Error> StartGameErrorCallback;
+        internal static Action InitializeSuccessCallback;
+        internal static Action<Error> InitializeErrorCallback;
+        internal static Action StartGameSuccessCallback;
+        internal static Action<Error> StartGameErrorCallback;
 
         internal static void InvokeInitializeSuccess()
         {

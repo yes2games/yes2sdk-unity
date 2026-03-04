@@ -66,20 +66,24 @@
 
         window.Yes2SDK = {
             _initialized: false,
+            _gameStarted: false,
             _platform: 'poki',
 
             initializeAsync: function() {
                 var self = this;
-                return PokiSDK.init().then(function() {
-                    self._initialized = true;
-                    PokiSDK.gameLoadingStart();
-                    __y2.log('Initialized for Poki');
-                    return Promise.resolve();
-                });
+                if (self._initialized) return Promise.resolve();
+                self._initialized = true;
+                // On Poki.com the platform auto-handles init(), gameLoadingStart(),
+                // and gameLoadingFinished(). Calling them again produces warnings
+                // and duplicate lifecycle events. We only set our internal flags.
+                __y2.log('Initialized for Poki');
+                return Promise.resolve();
             },
 
             startGameAsync: function() {
-                PokiSDK.gameLoadingFinished();
+                if (!this._gameStarted) {
+                    this._gameStarted = true;
+                }
                 __y2.log('Game started');
                 return Promise.resolve();
             },

@@ -1,19 +1,14 @@
 mergeInto(LibraryManager.library, {
 
     // Show an interstitial (full-screen) ad
-    Yes2SDK_ShowInterstitialJS__deps: ['$__y2'],
+    Yes2SDK_ShowInterstitialJS__deps: ['$__y2', '$__y2h'],
     Yes2SDK_ShowInterstitialJS: function(placementPtr, descriptionPtr) {
         var placement = UTF8ToString(placementPtr);
         // description is passed from C# but not used by the Core SDK API
 
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
-            window.__y2.error('SDK or Ads module not loaded. Yes2SDK:', typeof window.Yes2SDK, 'ads:', window.Yes2SDK ? typeof window.Yes2SDK.ads : 'N/A');
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Ads module not loaded',
-                context: 'Yes2SDK.Ads.ShowInterstitial'
-            });
-            SendMessage('Bridge', 'OnInterstitialError', errorJson);
+        if (!__y2h.has('ads')) {
+            window.__y2.error('SDK or Ads module not loaded.');
+            __y2h.sendError('OnInterstitialError', 'NotInitialized', 'Yes2SDK Ads module not loaded', 'Yes2SDK.Ads.ShowInterstitial');
             return;
         }
 
@@ -25,37 +20,20 @@ mergeInto(LibraryManager.library, {
                 SendMessage('Bridge', 'OnInterstitialAfterAd', '');
             },
             noFill: function() {
-                var errorJson = JSON.stringify({
-                    code: 'NoFill',
-                    message: 'No interstitial ad available',
-                    context: 'Yes2SDK.Ads.ShowInterstitial'
-                });
-                SendMessage('Bridge', 'OnInterstitialError', errorJson);
+                __y2h.sendError('OnInterstitialError', 'NoFill', 'No interstitial ad available', 'Yes2SDK.Ads.ShowInterstitial');
             }
-        }).catch(function(error) {
-            var errorJson = JSON.stringify({
-                code: (error && error.code) || 'Unknown',
-                message: (error && error.message) || 'Interstitial ad failed',
-                context: 'Yes2SDK.Ads.ShowInterstitial'
-            });
-            SendMessage('Bridge', 'OnInterstitialError', errorJson);
-        });
+        }).catch(__y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'));
     },
 
     // Show a rewarded video ad
-    Yes2SDK_ShowRewardedJS__deps: ['$__y2'],
+    Yes2SDK_ShowRewardedJS__deps: ['$__y2', '$__y2h'],
     Yes2SDK_ShowRewardedJS: function(placementPtr, descriptionPtr) {
         var placement = UTF8ToString(placementPtr);
         // description is passed from C# but not used by the Core SDK API
 
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
-            window.__y2.error('SDK or Ads module not loaded. Yes2SDK:', typeof window.Yes2SDK, 'ads:', window.Yes2SDK ? typeof window.Yes2SDK.ads : 'N/A');
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Ads module not loaded',
-                context: 'Yes2SDK.Ads.ShowRewarded'
-            });
-            SendMessage('Bridge', 'OnRewardedError', errorJson);
+        if (!__y2h.has('ads')) {
+            window.__y2.error('SDK or Ads module not loaded.');
+            __y2h.sendError('OnRewardedError', 'NotInitialized', 'Yes2SDK Ads module not loaded', 'Yes2SDK.Ads.ShowRewarded');
             return;
         }
 
@@ -73,34 +51,17 @@ mergeInto(LibraryManager.library, {
                 SendMessage('Bridge', 'OnRewardedAdViewed', '');
             },
             noFill: function() {
-                var errorJson = JSON.stringify({
-                    code: 'NoFill',
-                    message: 'No rewarded ad available',
-                    context: 'Yes2SDK.Ads.ShowRewarded'
-                });
-                SendMessage('Bridge', 'OnRewardedError', errorJson);
+                __y2h.sendError('OnRewardedError', 'NoFill', 'No rewarded ad available', 'Yes2SDK.Ads.ShowRewarded');
             }
-        }).catch(function(error) {
-            var errorJson = JSON.stringify({
-                code: (error && error.code) || 'Unknown',
-                message: (error && error.message) || 'Rewarded ad failed',
-                context: 'Yes2SDK.Ads.ShowRewarded'
-            });
-            SendMessage('Bridge', 'OnRewardedError', errorJson);
-        });
+        }).catch(__y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'));
     },
 
     // Show a banner ad at the specified position
-    Yes2SDK_ShowBannerJS__deps: ['$__y2'],
+    Yes2SDK_ShowBannerJS__deps: ['$__y2', '$__y2h'],
     Yes2SDK_ShowBannerJS: function(position) {
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
+        if (!__y2h.has('ads')) {
             window.__y2.error('SDK or Ads module not loaded.');
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Ads module not loaded',
-                context: 'Yes2SDK.Ads.ShowBanner'
-            });
-            SendMessage('Bridge', 'OnBannerShowError', errorJson);
+            __y2h.sendError('OnBannerShowError', 'NotInitialized', 'Yes2SDK Ads module not loaded', 'Yes2SDK.Ads.ShowBanner');
             return;
         }
 
@@ -112,27 +73,15 @@ mergeInto(LibraryManager.library, {
             .then(function() {
                 SendMessage('Bridge', 'OnBannerShown', '');
             })
-            .catch(function(error) {
-                var errorJson = JSON.stringify({
-                    code: (error && error.code) || 'Unknown',
-                    message: (error && error.message) || 'Banner show failed',
-                    context: 'Yes2SDK.Ads.ShowBanner'
-                });
-                SendMessage('Bridge', 'OnBannerShowError', errorJson);
-            });
+            .catch(__y2h.handleCatch('OnBannerShowError', 'Banner show failed', 'Yes2SDK.Ads.ShowBanner'));
     },
 
     // Hide the currently displayed banner ad
-    Yes2SDK_HideBannerJS__deps: ['$__y2'],
+    Yes2SDK_HideBannerJS__deps: ['$__y2', '$__y2h'],
     Yes2SDK_HideBannerJS: function() {
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
+        if (!__y2h.has('ads')) {
             window.__y2.error('SDK or Ads module not loaded.');
-            var errorJson = JSON.stringify({
-                code: 'NotInitialized',
-                message: 'Yes2SDK Ads module not loaded',
-                context: 'Yes2SDK.Ads.HideBanner'
-            });
-            SendMessage('Bridge', 'OnBannerHideError', errorJson);
+            __y2h.sendError('OnBannerHideError', 'NotInitialized', 'Yes2SDK Ads module not loaded', 'Yes2SDK.Ads.HideBanner');
             return;
         }
 
@@ -141,22 +90,14 @@ mergeInto(LibraryManager.library, {
             window.Yes2SDK.ads.hideBanner();
             SendMessage('Bridge', 'OnBannerHidden', '');
         } catch(error) {
-            var errorJson = JSON.stringify({
-                code: (error && error.code) || 'Unknown',
-                message: (error && error.message) || 'Banner hide failed',
-                context: 'Yes2SDK.Ads.HideBanner'
-            });
-            SendMessage('Bridge', 'OnBannerHideError', errorJson);
+            __y2h.handleCatch('OnBannerHideError', 'Banner hide failed', 'Yes2SDK.Ads.HideBanner')(error);
         }
     },
 
     // Check if ads are blocked for the current session
-    Yes2SDK_IsAdBlockedJS__deps: ['$__y2'],
+    Yes2SDK_IsAdBlockedJS__deps: ['$__y2h'],
     Yes2SDK_IsAdBlockedJS: function() {
-        if (typeof window.Yes2SDK === 'undefined' || typeof window.Yes2SDK.ads === 'undefined') {
-            window.__y2.warn('SDK or Ads module not loaded. Returning false for isAdBlocked.');
-            return false;
-        }
+        if (!__y2h.has('ads')) return false;
 
         // isAdBlocked exists on the Poki inline wrapper but not on the Core SDK.
         // Fall back gracefully if the method doesn't exist.

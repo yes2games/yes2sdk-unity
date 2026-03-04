@@ -1,5 +1,4 @@
 using System;
-using UnityEngine;
 
 namespace Yes2SDK
 {
@@ -7,63 +6,21 @@ namespace Yes2SDK
     /// In-App Purchase API for Yes2SDK.
     /// Currently a stub — returns FeatureNotSupported on all platforms.
     /// </summary>
-    public class Yes2SDKIAP
+    public class Yes2SDKIAP : Yes2SDKStubModule
     {
-        /// <summary>
-        /// Whether IAP is supported on the current platform.
-        /// </summary>
-        public bool IsSupported() => false;
+        protected override string FeatureName => "IAP";
+        protected override string ModuleName => "IAP";
 
-        /// <summary>
-        /// Get the product catalog.
-        /// </summary>
         public void GetCatalogAsync(Action<string> onSuccess = null, Action<Error> onError = null)
-        {
-            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetCatalogAsync() — FeatureNotSupported");
-            onError?.Invoke(NotSupportedError("Yes2SDK.IAP.GetCatalogAsync"));
-        }
+            => Stub(onError, nameof(GetCatalogAsync));
 
-        /// <summary>
-        /// Purchase a product.
-        /// </summary>
         public void PurchaseAsync(string productId, Action<string> onSuccess = null, Action<Error> onError = null)
-        {
-            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: PurchaseAsync({productId}) — FeatureNotSupported");
-            onError?.Invoke(NotSupportedError("Yes2SDK.IAP.PurchaseAsync"));
-        }
+            => Stub(onError, nameof(PurchaseAsync), productId);
 
-        /// <summary>
-        /// Get all unconsumed purchases.
-        /// </summary>
         public void GetPurchasesAsync(Action<string> onSuccess = null, Action<Error> onError = null)
-        {
-            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: GetPurchasesAsync() — FeatureNotSupported");
-            onError?.Invoke(NotSupportedError("Yes2SDK.IAP.GetPurchasesAsync"));
-        }
+            => Stub(onError, nameof(GetPurchasesAsync));
 
-        /// <summary>
-        /// Consume a purchase.
-        /// </summary>
         public void ConsumePurchaseAsync(string purchaseToken, Action onSuccess = null, Action<Error> onError = null)
-        {
-            Yes2Log.Log($"{(IsEditor() ? "Mock" : "Stub")}: ConsumePurchaseAsync({purchaseToken}) — FeatureNotSupported");
-            onError?.Invoke(NotSupportedError("Yes2SDK.IAP.ConsumePurchaseAsync"));
-        }
-
-        private static bool IsEditor()
-        {
-#if UNITY_EDITOR
-            return true;
-#else
-            return false;
-#endif
-        }
-
-        private static Error NotSupportedError(string context) => new Error
-        {
-            Code = "FeatureNotSupported",
-            Message = "IAP is not supported on the current platform",
-            Context = context
-        };
+            => Stub(onError, nameof(ConsumePurchaseAsync), purchaseToken);
     }
 }
