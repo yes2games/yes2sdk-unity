@@ -22,14 +22,15 @@ namespace Yes2SDK.Editor
             bool hasDebugTemplate = Directory.Exists(Path.Combine(Application.dataPath, "WebGLTemplates", "Yes2SDK"));
             bool hasPokiTemplate = Directory.Exists(Path.Combine(Application.dataPath, "WebGLTemplates", "Yes2SDK-Poki"));
             bool hasCrazyGamesTemplate = Directory.Exists(Path.Combine(Application.dataPath, "WebGLTemplates", "Yes2SDK-CrazyGames"));
+            bool hasYandexTemplate = Directory.Exists(Path.Combine(Application.dataPath, "WebGLTemplates", "Yes2SDK-Yandex"));
 
             // Check run in background setting
             bool hasRunInBackground = PlayerSettings.runInBackground;
 
             // All templates must exist
-            bool allTemplatesExist = hasDebugTemplate && hasPokiTemplate && hasCrazyGamesTemplate;
+            bool allTemplatesExist = hasDebugTemplate && hasPokiTemplate && hasCrazyGamesTemplate && hasYandexTemplate;
 
-            Debug.Log($"[Yes2SDK] Setup check - Debug:{hasDebugTemplate}, Poki:{hasPokiTemplate}, CrazyGames:{hasCrazyGamesTemplate}, RunInBackground:{hasRunInBackground}");
+            Debug.Log($"[Yes2SDK] Setup check - Debug:{hasDebugTemplate}, Poki:{hasPokiTemplate}, CrazyGames:{hasCrazyGamesTemplate}, Yandex:{hasYandexTemplate}, RunInBackground:{hasRunInBackground}");
 
             return allTemplatesExist && hasRunInBackground;
         }
@@ -89,7 +90,7 @@ namespace Yes2SDK.Editor
             }
 
             // Copy all templates
-            var templates = new[] { "Yes2SDK", "Yes2SDK-Poki", "Yes2SDK-CrazyGames" };
+            var templates = new[] { "Yes2SDK", "Yes2SDK-Poki", "Yes2SDK-CrazyGames", "Yes2SDK-Yandex" };
             int installedCount = 0;
 
             foreach (var template in templates)

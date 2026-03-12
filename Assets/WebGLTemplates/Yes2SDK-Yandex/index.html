@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <style>
+        * { margin: 0; padding: 0; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+        #unity-container { width: 100%; height: 100%; position: absolute; }
+        #unity-canvas { width: 100%; height: 100%; background: #231F20; }
+    </style>
+</head>
+<body>
+    <div id="unity-container">
+        <canvas id="unity-canvas" tabindex="-1"></canvas>
+    </div>
+
+    <!-- Yandex Games SDK -->
+    <script src="/sdk.js"></script>
+
+    <!-- Mock Yandex SDK for local testing (on Yandex Games this is injected automatically) -->
+    <script>
+        if (typeof YaGames === 'undefined') {
+            console.log('[Yes2SDK] Local testing mode - using mock Yandex SDK');
+            window.YaGames = {
+                init: function() {
+                    console.log('[YandexSDK Mock] init');
+                    var mockPlayer = {
+                        getUniqueID: function() { return 'mock-player-id'; },
+                        getName: function() { return 'MockPlayer'; },
+                        getPhoto: function(size) { return ''; },
+                        isAuthorized: function() { return false; },
+                        getPayingStatus: function() { return 'unknown'; },
+                        getData: function(keys) { return Promise.resolve({}); },
+                        setData: function(data, flush) { return Promise.resolve(); },
+                        getStats: function(keys) { return Promise.resolve({}); },
+                        setStats: function(stats) { return Promise.resolve(); },
+                        incrementStats: function(stats) { return Promise.resolve({}); }
+                    };
+                    return Promise.resolve({
+                        environment: {
+                            app: { id: 'mock-app-id' },
+                            i18n: { lang: 'en', tld: 'com' },
+                            payload: ''
+                        },
+                        auth: {
+                            openAuthDialog: function() {
+                                console.log('[YandexSDK Mock] openAuthDialog');
+                                return Promise.reject('User cancelled');
+                            }
+                        },
+                        adv: {
+                            showFullscreenAdv: function(opts) {
+                                console.log('[YandexSDK Mock] showFullscreenAdv');
+                                if (opts && opts.callbacks) {
+                                    if (opts.callbacks.onOpen) opts.callbacks.onOpen();
+                                    if (opts.callbacks.onClose) opts.callbacks.onClose(true);
+                                }
+                            },
+                            showRewardedVideo: function(opts) {
+                                console.log('[YandexSDK Mock] showRewardedVideo');
+                                if (opts && opts.callbacks) {
+                                    if (opts.callbacks.onOpen) opts.callbacks.onOpen();
+                                    if (opts.callbacks.onRewarded) opts.callbacks.onRewarded();
+                                    if (opts.callbacks.onClose) opts.callbacks.onClose();
+                                }
+                            },
+                            showBannerAdv: function() {
+                                console.log('[YandexSDK Mock] showBannerAdv');
+                                return Promise.resolve({ stickyAdvIsShowing: true });
+                            },
+                            hideBannerAdv: function() {
+                                console.log('[YandexSDK Mock] hideBannerAdv');
+                                return Promise.resolve({ stickyAdvIsShowing: false });
+                            },
+                            getBannerAdvStatus: function() {
+                                return Promise.resolve({ stickyAdvIsShowing: false });
+                            }
+                        },
+                        getPlayer: function(opts) {
+                            console.log('[YandexSDK Mock] getPlayer');
+                            return Promise.resolve(mockPlayer);
+                        },
+                        getStorage: function() {
+                            return Promise.resolve(localStorage);
+                        },
+                        features: {
+                            LoadingAPI: {
+                                ready: function() { console.log('[YandexSDK Mock] LoadingAPI.ready'); }
+                            },
+                            GameplayAPI: {
+                                start: function() { console.log('[YandexSDK Mock] GameplayAPI.start'); },
+                                stop: function() { console.log('[YandexSDK Mock] GameplayAPI.stop'); }
+                            }
+                        },
+                        leaderboards: {
+                            setScore: function(name, score, extra) {
+                                console.log('[YandexSDK Mock] setScore:', name, score);
+                                return Promise.resolve();
+                            },
+                            getPlayerEntry: function(name) {
+                                return Promise.resolve(null);
+                            },
+                            getEntries: function(name, opts) {
+                                return Promise.resolve({ entries: [], ranges: [] });
+                            }
+                        },
+                        on: function(event, cb) { console.log('[YandexSDK Mock] on:', event); },
+                        off: function(event, cb) {},
+                        getFlags: function(opts) { return Promise.resolve({}); },
+                        EVENTS: {
+                            HISTORY_BACK: 'HISTORY_BACK',
+                            EXIT: 'EXIT'
+                        },
+                        dispatchEvent: function(event) {}
+                    });
+                }
+            };
+        }
+    </script>
+
+    <!-- Yes2SDK Yandex Wrapper -->
+    <script>
+        // Styled console logger — gives [Yes2SDK] a coloured background in browser DevTools
+        (function() {
+            var S = 'background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold';
+            function m(f) {
+                return function() {
+                    var a = [].slice.call(arguments);
+                    a.unshift('%c[Yes2SDK]%c ', S, '');
+                    console[f].apply(console, a);
+                };
+            }
+            window.__y2 = { log: m('log'), warn: m('warn'), error: m('error') };
+        })();
+
+        window.Yes2SDK = {
+            _initialized: false,
+            _gameStarted: false,
+            _platform: 'yandex',
+            _ysdk: null,
+            _player: null,
+            _dataCache: {},
+            _dataCacheLoaded: false,
+            _dataSaveTimer: null,
+
+            // Debounced cloud save — queues a single setData call after writes settle
+            _flushDataCache: function() {
+                var self = this;
+                if (self._dataSaveTimer) clearTimeout(self._dataSaveTimer);
+                self._dataSaveTimer = setTimeout(function() {
+                    self._dataSaveTimer = null;
+                    if (!self._player) return;
+                    self._player.setData(self._dataCache, true).then(function() {
+                        __y2.log('Cloud data saved');
+                    }).catch(function(e) {
+                        __y2.warn('Cloud data save failed:', e);
+                    });
+                }, 500);
+            },
+
+            initializeAsync: function() {
+                var self = this;
+                if (self._initialized) return Promise.resolve();
+
+                if (typeof YaGames === 'undefined') {
+                    __y2.error('Yandex Games SDK not found');
+                    return Promise.reject({ code: 'NotInitialized', message: 'Yandex Games SDK not found' });
+                }
+
+                return YaGames.init().then(function(ysdk) {
+                    self._ysdk = ysdk;
+                    self._initialized = true;
+
+                    // Pause/resume events — mute audio and notify Unity when platform requests it
+                    // (e.g., during ad display, or when the browser tab loses focus on Yandex)
+                    ysdk.on('game_api_pause', function() {
+                        __y2.log('Game paused by platform');
+                        if (window.unityInstance) {
+                            window.unityInstance.SendMessage('Bridge', 'OnPause', '');
+                        }
+                    });
+                    ysdk.on('game_api_resume', function() {
+                        __y2.log('Game resumed by platform');
+                        if (window.unityInstance) {
+                            window.unityInstance.SendMessage('Bridge', 'OnResume', '');
+                        }
+                    });
+
+                    // Pre-load player + cloud data cache for synchronous data.* access
+                    return ysdk.getPlayer().then(function(player) {
+                        self._player = player;
+                        return player.getData();
+                    }).then(function(data) {
+                        self._dataCache = data || {};
+                        self._dataCacheLoaded = true;
+                        __y2.log('Cloud data loaded:', Object.keys(self._dataCache).length, 'keys');
+                    }).catch(function(e) {
+                        __y2.warn('Cloud data preload failed, using empty cache:', e);
+                        self._dataCacheLoaded = true;
+                    });
+                }).then(function() {
+                    __y2.log('Initialized for Yandex Games');
+                }).catch(function(error) {
+                    __y2.error('Yandex SDK init failed:', error);
+                    return Promise.reject(error);
+                });
+            },
+
+            startGameAsync: function() {
+                if (this._ysdk && this._ysdk.features && this._ysdk.features.LoadingAPI) {
+                    this._ysdk.features.LoadingAPI.ready();
+                }
+                this._gameStarted = true;
+                __y2.log('Game started');
+                return Promise.resolve();
+            },
+
+            setLoadingProgress: function(progress) {
+                // Yandex doesn't have a loading progress API
+            },
+
+            performHapticFeedback: function() {
+                // Yandex doesn't support haptic feedback
+            },
+
+            getPlatform: function() {
+                return this._platform;
+            },
+
+            get isInitialized() {
+                return this._initialized;
+            },
+
+            // Ads module - wraps Yandex SDK ad methods
+            // Yandex API: showFullscreenAdv({callbacks}), showRewardedVideo({callbacks})
+            // Sticky banners: showBannerAdv(), hideBannerAdv()
+            ads: {
+                showInterstitial: function(placement, callbacks) {
+                    callbacks = callbacks || {};
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) {
+                        if (callbacks.noFill) callbacks.noFill();
+                        if (callbacks.afterAd) callbacks.afterAd();
+                        return Promise.resolve();
+                    }
+
+                    return new Promise(function(resolve) {
+                        ysdk.adv.showFullscreenAdv({
+                            callbacks: {
+                                onOpen: function() {
+                                    __y2.log('Fullscreen ad opened');
+                                    if (callbacks.beforeAd) callbacks.beforeAd();
+                                },
+                                onClose: function(wasShown) {
+                                    __y2.log('Fullscreen ad closed, wasShown:', wasShown);
+                                    if (!wasShown) {
+                                        if (callbacks.noFill) callbacks.noFill();
+                                    }
+                                    if (callbacks.afterAd) callbacks.afterAd();
+                                    resolve();
+                                },
+                                onError: function(error) {
+                                    __y2.warn('Fullscreen ad error:', error);
+                                    if (callbacks.noFill) callbacks.noFill();
+                                    if (callbacks.afterAd) callbacks.afterAd();
+                                    resolve();
+                                }
+                            }
+                        });
+                    });
+                },
+
+                showRewarded: function(placement, callbacks) {
+                    callbacks = callbacks || {};
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) {
+                        if (callbacks.noFill) callbacks.noFill();
+                        if (callbacks.afterAd) callbacks.afterAd();
+                        return Promise.resolve();
+                    }
+
+                    var rewarded = false;
+                    return new Promise(function(resolve) {
+                        ysdk.adv.showRewardedVideo({
+                            callbacks: {
+                                onOpen: function() {
+                                    __y2.log('Rewarded video opened');
+                                    if (callbacks.beforeAd) callbacks.beforeAd();
+                                },
+                                onRewarded: function() {
+                                    __y2.log('Rewarded video - reward earned');
+                                    rewarded = true;
+                                },
+                                onClose: function() {
+                                    __y2.log('Rewarded video closed');
+                                    if (rewarded) {
+                                        if (callbacks.adViewed) callbacks.adViewed();
+                                    } else {
+                                        if (callbacks.adDismissed) callbacks.adDismissed();
+                                    }
+                                    if (callbacks.afterAd) callbacks.afterAd();
+                                    resolve();
+                                },
+                                onError: function(error) {
+                                    __y2.warn('Rewarded video error:', error);
+                                    if (callbacks.noFill) callbacks.noFill();
+                                    if (callbacks.afterAd) callbacks.afterAd();
+                                    resolve();
+                                }
+                            }
+                        });
+                    });
+                },
+
+                showBanner: function(position) {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) {
+                        return Promise.reject({ code: 'NotInitialized', message: 'SDK not initialized', context: 'ads.showBanner' });
+                    }
+                    return ysdk.adv.showBannerAdv().then(function(result) {
+                        __y2.log('Sticky banner shown:', result);
+                    });
+                },
+
+                hideBanner: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk) {
+                        ysdk.adv.hideBannerAdv();
+                    }
+                },
+
+                isAdBlocked: function() {
+                    return false;
+                }
+            },
+
+            // Analytics module - maps unified API to Yandex GameplayAPI
+            analytics: {
+                logEvent: function(name, paramsJson) {
+                    __y2.log('Event:', name, paramsJson);
+                },
+                logLevelStart: function(level) {
+                    __y2.log('Level start:', level);
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk && ysdk.features && ysdk.features.GameplayAPI) {
+                        ysdk.features.GameplayAPI.start();
+                    }
+                },
+                logLevelEnd: function(level, score, success) {
+                    __y2.log('Level end:', level, score, success);
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk && ysdk.features && ysdk.features.GameplayAPI) {
+                        ysdk.features.GameplayAPI.stop();
+                    }
+                },
+                logScore: function(score, level) {
+                    __y2.log('Score:', score, level);
+                },
+                logTutorialStart: function() {
+                    __y2.log('Tutorial start');
+                },
+                logTutorialEnd: function() {
+                    __y2.log('Tutorial end');
+                },
+                logPurchase: function(productId, price, currency) {
+                    __y2.log('Purchase:', productId, price, currency);
+                }
+            },
+
+            // Session module - maps to Yandex environment object
+            session: {
+                _data: {},
+
+                getLocale: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk && ysdk.environment && ysdk.environment.i18n) {
+                        return ysdk.environment.i18n.lang || navigator.language || 'en';
+                    }
+                    return navigator.language || 'en';
+                },
+
+                getCountry: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk && ysdk.environment && ysdk.environment.i18n) {
+                        return ysdk.environment.i18n.tld || '';
+                    }
+                    return '';
+                },
+
+                getDevice: function() {
+                    var ua = navigator.userAgent || '';
+                    if (/tablet|ipad|playbook|silk/i.test(ua)) return 'tablet';
+                    if (/mobile|iphone|ipod|android|blackberry|opera mini|iemobile/i.test(ua)) return 'mobile';
+                    return 'desktop';
+                },
+
+                getOrientation: function() {
+                    return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+                },
+
+                getTrafficSource: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    var params = {};
+                    if (ysdk && ysdk.environment && ysdk.environment.payload) {
+                        params.payload = ysdk.environment.payload;
+                    }
+                    return JSON.stringify({ referrer: document.referrer || '', params: params });
+                },
+
+                getEntryPointData: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    var params = {};
+                    if (ysdk && ysdk.environment) {
+                        if (ysdk.environment.payload) params.payload = ysdk.environment.payload;
+                        if (ysdk.environment.app) params.appId = ysdk.environment.app.id;
+                    }
+                    return JSON.stringify(params);
+                },
+
+                setSessionData: function(dataJson) {
+                    try {
+                        this._data = JSON.parse(dataJson);
+                    } catch(e) {
+                        __y2.warn('Invalid session data JSON:', dataJson);
+                    }
+                },
+
+                getEntryPointAsync: function() {
+                    return Promise.resolve('yandex');
+                }
+            },
+
+            // Player module - maps to Yandex Player API
+            // ysdk.getPlayer() returns player with getUniqueID, getName, getPhoto, getData, setData
+            player: {
+                _ensurePlayer: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) {
+                        return Promise.reject({ code: 'NotInitialized', message: 'SDK not initialized', context: 'player' });
+                    }
+                    if (window.Yes2SDK._player) {
+                        return Promise.resolve(window.Yes2SDK._player);
+                    }
+                    return ysdk.getPlayer().then(function(player) {
+                        window.Yes2SDK._player = player;
+                        return player;
+                    });
+                },
+
+                getPlayerAsync: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) {
+                        return Promise.resolve({ id: 'anonymous', name: null, photo: null });
+                    }
+                    return ysdk.getPlayer().then(function(player) {
+                        window.Yes2SDK._player = player;
+                        return {
+                            id: player.getUniqueID() || 'anonymous',
+                            name: player.getName() || null,
+                            photo: player.getPhoto('medium') || null
+                        };
+                    }).catch(function() {
+                        return { id: 'anonymous', name: null, photo: null };
+                    });
+                },
+
+                getDataAsync: function(keysJson) {
+                    return this._ensurePlayer().then(function(player) {
+                        var keys = undefined;
+                        try {
+                            keys = JSON.parse(keysJson);
+                        } catch(e) {}
+                        return player.getData(keys).then(function(data) {
+                            return JSON.stringify(data || {});
+                        });
+                    });
+                },
+
+                setDataAsync: function(dataJson) {
+                    return this._ensurePlayer().then(function(player) {
+                        var data = {};
+                        try {
+                            data = JSON.parse(dataJson);
+                        } catch(e) {
+                            return Promise.reject({ code: 'InvalidParams', message: 'Invalid JSON', context: 'player.setDataAsync' });
+                        }
+                        return player.setData(data, true);
+                    });
+                },
+
+                flushDataAsync: function() {
+                    // Yandex setData with flush=true handles this
+                    return Promise.resolve();
+                },
+
+                getConnectedPlayersAsync: function() {
+                    return Promise.reject({
+                        code: 'FeatureNotSupported',
+                        message: 'Connected players are not supported on Yandex',
+                        context: 'player.getConnectedPlayersAsync'
+                    });
+                },
+
+                getSignedPlayerInfoAsync: function(payload) {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) {
+                        return Promise.reject({ code: 'NotInitialized', message: 'SDK not initialized', context: 'player.getSignedPlayerInfoAsync' });
+                    }
+                    return ysdk.getPlayer({ signed: true }).then(function(player) {
+                        return player.signature || '';
+                    });
+                }
+            },
+
+            // Data module - backed by Yandex cloud saves (player.setData/getData)
+            // Reads are synchronous from in-memory cache (preloaded during init).
+            // Writes update the cache immediately and debounce a cloud save.
+            // Works for both authorized AND anonymous users (Yandex falls back to its own local storage).
+            data: {
+                _c: function() { return window.Yes2SDK._dataCache; },
+
+                getInt: function(key, defaultValue) {
+                    var val = this._c()[key];
+                    if (val === undefined || val === null) return defaultValue;
+                    var parsed = parseInt(val, 10);
+                    return isNaN(parsed) ? defaultValue : parsed;
+                },
+                setInt: function(key, value) {
+                    this._c()[key] = value;
+                    window.Yes2SDK._flushDataCache();
+                },
+                getFloat: function(key, defaultValue) {
+                    var val = this._c()[key];
+                    if (val === undefined || val === null) return defaultValue;
+                    var parsed = parseFloat(val);
+                    return isNaN(parsed) ? defaultValue : parsed;
+                },
+                setFloat: function(key, value) {
+                    this._c()[key] = value;
+                    window.Yes2SDK._flushDataCache();
+                },
+                getString: function(key, defaultValue) {
+                    var val = this._c()[key];
+                    return (val === undefined || val === null) ? defaultValue : String(val);
+                },
+                setString: function(key, value) {
+                    this._c()[key] = value;
+                    window.Yes2SDK._flushDataCache();
+                },
+                hasKey: function(key) {
+                    return this._c()[key] !== undefined;
+                },
+                deleteKey: function(key) {
+                    delete this._c()[key];
+                    window.Yes2SDK._flushDataCache();
+                },
+                deleteAll: function() {
+                    window.Yes2SDK._dataCache = {};
+                    window.Yes2SDK._flushDataCache();
+                }
+            },
+
+            // Auth module - Yandex auth via ysdk.auth.openAuthDialog()
+            auth: {
+                isSupported: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    return !!(ysdk && ysdk.auth);
+                },
+
+                getCurrentUserAsync: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) return Promise.resolve(null);
+                    return ysdk.getPlayer().then(function(player) {
+                        if (!player.isAuthorized()) return null;
+                        return {
+                            id: player.getUniqueID() || '',
+                            name: player.getName() || '',
+                            photo: player.getPhoto('medium') || '',
+                            isAuthenticated: true
+                        };
+                    }).catch(function() {
+                        return null;
+                    });
+                },
+
+                signInAsync: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk || !ysdk.auth) {
+                        return Promise.reject({ code: 'FeatureNotSupported', message: 'Auth not available', context: 'auth.signInAsync' });
+                    }
+                    return ysdk.auth.openAuthDialog().then(function() {
+                        // Re-fetch player after auth
+                        return ysdk.getPlayer().then(function(player) {
+                            window.Yes2SDK._player = player;
+                            return {
+                                id: player.getUniqueID() || '',
+                                name: player.getName() || '',
+                                photo: player.getPhoto('medium') || '',
+                                isAuthenticated: true
+                            };
+                        });
+                    }).catch(function() {
+                        return Promise.reject({ code: 'UserCancelled', message: 'User cancelled auth dialog', context: 'auth.signInAsync' });
+                    });
+                },
+
+                getTokenAsync: function() {
+                    // Yandex uses signed player info instead of tokens
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) {
+                        return Promise.reject({ code: 'FeatureNotSupported', message: 'Token not available', context: 'auth.getTokenAsync' });
+                    }
+                    return ysdk.getPlayer({ signed: true }).then(function(player) {
+                        return player.signature || '';
+                    });
+                },
+
+                showAccountLinkPromptAsync: function() {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Account link not available on Yandex', context: 'auth.showAccountLinkPromptAsync' });
+                }
+            },
+
+            // Game module - gameplay lifecycle via Yandex features API
+            game: {
+                gameplayStart: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk && ysdk.features && ysdk.features.GameplayAPI) {
+                        ysdk.features.GameplayAPI.start();
+                    }
+                },
+
+                gameplayStop: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk && ysdk.features && ysdk.features.GameplayAPI) {
+                        ysdk.features.GameplayAPI.stop();
+                    }
+                },
+
+                happyTime: function() {
+                    __y2.log('happyTime not supported on Yandex');
+                },
+
+                inviteLink: function(paramsJson) {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Invite links are not supported on Yandex', context: 'game.inviteLink' });
+                },
+
+                getInviteParam: function(key) { return ''; },
+
+                showInviteButton: function(paramsJson) {
+                    __y2.log('showInviteButton not supported on Yandex');
+                },
+
+                hideInviteButton: function() {},
+
+                getSettings: function() {
+                    return JSON.stringify({ disableChat: false, muteAudio: false });
+                },
+
+                addSettingsChangeListener: function(callback) {},
+
+                copyToClipboard: function(text) {
+                    if (navigator.clipboard) { navigator.clipboard.writeText(text); }
+                }
+            },
+
+            // Banners module - Yandex sticky banners only
+            banners: {
+                showBanner: function(id, size, x, y) {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (!ysdk) {
+                        return Promise.reject({ code: 'NotInitialized', message: 'SDK not initialized', context: 'banners.showBanner' });
+                    }
+                    return ysdk.adv.showBannerAdv().then(function(result) {
+                        __y2.log('Sticky banner shown:', result);
+                    });
+                },
+
+                hideBanner: function(id) {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk) ysdk.adv.hideBannerAdv();
+                },
+
+                hideAllBanners: function() {
+                    var ysdk = window.Yes2SDK._ysdk;
+                    if (ysdk) ysdk.adv.hideBannerAdv();
+                },
+
+                refreshBanners: function() {
+                    // Yandex manages banner refresh automatically
+                }
+            },
+
+            // Friends module - not supported on Yandex
+            friends: {
+                listFriendsAsync: function(page, size) {
+                    return Promise.reject({ code: 'FeatureNotSupported', message: 'Friends are not supported on Yandex', context: 'friends.listFriendsAsync' });
+                }
+            },
+
+            // Score module - maps to Yandex leaderboards
+            // Note: leaderboard name is game-specific and must be configured in Yandex Games Console
+            score: {
+                addScore: function(score) {
+                    __y2.log('Score:', score);
+                },
+
+                submitScore: function(encrypted) {
+                    __y2.log('SubmitScore:', encrypted);
+                }
+            }
+        };
+
+        // Debug: Verify Yes2SDK is loaded
+        __y2.log('Yes2SDK wrapper loaded, platform:', window.Yes2SDK._platform);
+    </script>
+
+    <script>
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
+        var config = {
+            dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+            frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if MEMORY_FILENAME
+            memoryUrl: buildUrl + "/{{{ MEMORY_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+            symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+            codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "{{{ COMPANY_NAME }}}",
+            productName: "{{{ PRODUCT_NAME }}}",
+            productVersion: "{{{ PRODUCT_VERSION }}}"
+        };
+
+        var canvas = document.querySelector("#unity-canvas");
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = function() {
+            createUnityInstance(canvas, config, function(progress) {
+                // Loading progress
+            }).then(function(unityInstance) {
+                window.unityInstance = unityInstance;
+            }).catch(function(message) {
+                alert(message);
+            });
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>

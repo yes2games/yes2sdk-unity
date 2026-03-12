@@ -9,6 +9,7 @@ namespace Yes2SDK.Editor
     {
         Poki,
         CrazyGames,
+        Yandex,
         // Facebook, // Coming soon - template not yet implemented
         Debug
     }
@@ -79,6 +80,22 @@ namespace Yes2SDK.Editor
             description: "CrazyGames.com - Gzip compression, no decompression fallback"
         );
 
+        /// <summary>
+        /// Yandex Games build configuration.
+        /// - Gzip compression (Yandex hosts on their CDN)
+        /// - Standard template with Yandex Games SDK
+        /// </summary>
+        public static BuildConfig Yandex => new BuildConfig(
+            platform: TargetPlatform.Yandex,
+            templateName: "Yes2SDK-Yandex",
+            displayName: "Yandex Games",
+            compression: WebGLCompressionFormat.Gzip,
+            decompressionFallback: true,
+            codeStripping: ManagedStrippingLevel.Low,
+            exceptionSupport: WebGLExceptionSupport.None,
+            description: "Yandex Games - Gzip compression with decompression fallback"
+        );
+
         // Facebook Instant Games - Coming soon (template not yet implemented)
         // public static BuildConfig Facebook => new BuildConfig(...);
 
@@ -107,6 +124,7 @@ namespace Yes2SDK.Editor
             {
                 TargetPlatform.Poki => Poki,
                 TargetPlatform.CrazyGames => CrazyGames,
+                TargetPlatform.Yandex => Yandex,
                 // TargetPlatform.Facebook => Facebook, // Coming soon
                 TargetPlatform.Debug => Debug,
                 _ => Debug

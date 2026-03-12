@@ -12,6 +12,7 @@ namespace Yes2SDK
         Unknown,
         Poki,
         CrazyGames,
+        Yandex,
         Debug
     }
 
@@ -483,6 +484,7 @@ namespace Yes2SDK
             {
                 "poki" => Platform.Poki,
                 "crazygames" => Platform.CrazyGames,
+                "yandex" => Platform.Yandex,
                 "debug" => Platform.Debug,
                 _ => Platform.Unknown
             };

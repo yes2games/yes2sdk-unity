@@ -208,7 +208,7 @@ namespace Yes2SDK.Editor
             EditorGUILayout.HelpBox(
                 "Yes2SDK needs to be set up before you can build.\n\n" +
                 "This will:\n" +
-                "• Install WebGL templates (Poki, CrazyGames, Debug)\n" +
+                "• Install WebGL templates (Poki, CrazyGames, Yandex, Debug)\n" +
                 "• Configure project settings for WebGL games",
                 MessageType.Warning);
 
@@ -235,7 +235,8 @@ namespace Yes2SDK.Editor
                     "Templates installed:\n" +
                     "• Yes2SDK (Debug)\n" +
                     "• Yes2SDK-Poki\n" +
-                    "• Yes2SDK-CrazyGames\n\n" +
+                    "• Yes2SDK-CrazyGames\n" +
+                    "• Yes2SDK-Yandex\n\n" +
                     "You can now build for any platform.",
                     "OK");
 
