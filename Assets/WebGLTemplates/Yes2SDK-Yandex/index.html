@@ -145,15 +145,20 @@
             _dataCache: {},
             _dataCacheLoaded: false,
             _dataSaveTimer: null,
+            _lastSavedSnapshot: '',
 
             // Debounced cloud save — queues a single setData call after writes settle
+            // Skips the call if data hasn't changed (Yandex SDK rejects identical setData)
             _flushDataCache: function() {
                 var self = this;
                 if (self._dataSaveTimer) clearTimeout(self._dataSaveTimer);
                 self._dataSaveTimer = setTimeout(function() {
                     self._dataSaveTimer = null;
                     if (!self._player) return;
+                    var snapshot = JSON.stringify(self._dataCache);
+                    if (snapshot === self._lastSavedSnapshot) return;
                     self._player.setData(self._dataCache, true).then(function() {
+                        self._lastSavedSnapshot = snapshot;
                         __y2.log('Cloud data saved');
                     }).catch(function(e) {
                         __y2.warn('Cloud data save failed:', e);
@@ -196,6 +201,7 @@
                     }).then(function(data) {
                         self._dataCache = data || {};
                         self._dataCacheLoaded = true;
+                        self._lastSavedSnapshot = JSON.stringify(self._dataCache);
                         __y2.log('Cloud data loaded:', Object.keys(self._dataCache).length, 'keys');
                     }).catch(function(e) {
                         __y2.warn('Cloud data preload failed, using empty cache:', e);
