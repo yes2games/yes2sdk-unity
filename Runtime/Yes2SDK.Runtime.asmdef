@@ -1,0 +1,25 @@
+{
+    "name": "Yes2SDK.Runtime",
+    "rootNamespace": "Yes2SDK",
+    "references": [
+        "Unity.Nuget.Newtonsoft-Json"
+    ],
+    "includePlatforms": [
+        "Editor",
+        "WebGL"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.cloud.ktx",
+            "expression": "",
+            "define": "YES2SDK_KTX"
+        }
+    ],
+    "noEngineReferences": false
+}

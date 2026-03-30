@@ -1,0 +1,28 @@
+{
+    "name": "Yes2SDK.Ktx2",
+    "rootNamespace": "Yes2SDK",
+    "references": [
+        "Yes2SDK.Runtime",
+        "GUID:3d354272d3f2f4c3387dbccbaebd0f60"
+    ],
+    "includePlatforms": [
+        "Editor",
+        "WebGL"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "YES2SDK_KTX"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.cloud.ktx",
+            "expression": "",
+            "define": "YES2SDK_KTX"
+        }
+    ],
+    "noEngineReferences": false
+}

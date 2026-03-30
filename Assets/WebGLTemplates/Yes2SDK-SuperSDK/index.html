@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    #unity-container { width: 100%; height: 100%; }
+    #unity-canvas { width: 100%; height: 100%; background: #000; }
+    #unity-loading-bar { display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+    #unity-progress-bar-empty { width: 200px; height: 4px; background: #333; border-radius: 2px; }
+    #unity-progress-bar-full { width: 0%; height: 100%; background: #6366f1; border-radius: 2px; transition: width 0.1s; }
+  </style>
+</head>
+<body>
+  <div id="unity-container">
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="unity-loading-bar">
+      <div id="unity-progress-bar-empty">
+        <div id="unity-progress-bar-full"></div>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    Yes2SDK is NOT defined here.
+    The dashboard pipeline injects yes2sdk.umd.js + yes2sdk-{platform}.js
+    which provides window.Yes2SDK with all module APIs.
+
+    For local development without the dashboard, include:
+    <script src="yes2sdk.umd.js"></script>
+  -->
+
+  <script>
+    var buildUrl = "Build";
+    var loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
+    var config = {
+      dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+      frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_WASM
+      codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#endif
+#if MEMORY_FILENAME
+      memoryUrl: buildUrl + "/{{{ MEMORY_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+      symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "{{{ COMPANY_NAME }}}",
+      productName: "{{{ PRODUCT_NAME }}}",
+      productVersion: "{{{ PRODUCT_VERSION }}}",
+    };
+
+    var container = document.querySelector("#unity-container");
+    var canvas = document.querySelector("#unity-canvas");
+    var loadingBar = document.querySelector("#unity-loading-bar");
+    var progressBarFull = document.querySelector("#unity-progress-bar-full");
+
+    loadingBar.style.display = "block";
+
+    var script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = function() {
+      createUnityInstance(canvas, config, function(progress) {
+        progressBarFull.style.width = 100 * progress + "%";
+        // Report progress to Yes2SDK if available
+        if (window.Yes2SDK && window.Yes2SDK.setLoadingProgress) {
+          window.Yes2SDK.setLoadingProgress(Math.round(progress * 100));
+        }
+      }).then(function(unityInstance) {
+        loadingBar.style.display = "none";
+        // Store unity instance globally for SDK bridge access
+        window.unityInstance = unityInstance;
+      }).catch(function(message) {
+        alert(message);
+      });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>
