@@ -1,6 +1,6 @@
 {
     "name": "com.yes2games.yes2sdk",
-    "version": "2.0.0-alpha.1",
+    "version": "2.0.0",
     "displayName": "Yes2SDK",
     "description": "Yes2SDK Unity package for the SuperSDK pipeline — build once, publish to 5 platforms",
     "unity": "2021.3",
