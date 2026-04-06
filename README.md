@@ -1,8 +1,8 @@
 # Yes2SDK for Unity
 
-A unified WebGL SDK that lets you integrate once and publish to **Poki** and **CrazyGames** with a single codebase.
+A unified WebGL SDK that lets you integrate once and publish to **Poki**, **CrazyGames**, **Yandex Games**, **Game Distribution**, and **YouTube Playables** with a single codebase.
 
-Yes2SDK wraps platform-specific APIs behind a common C# interface. Write your integration code once, select a build target, and ship to either platform without changing game code.
+Yes2SDK wraps platform-specific APIs behind a common C# interface. Write your integration code once, build a single WebGL output, upload to the Yes2SDK Dashboard, and the dashboard handles platform-specific SDK injection and bundling.
 
 ## Requirements
 
@@ -30,17 +30,17 @@ Yes2SDK wraps platform-specific APIs behind a common C# interface. Write your in
 
 After installing the package:
 
-1. Open **Yes2SDK > Settings** in the Unity menu bar
-2. Click **Setup Yes2SDK** — this installs the WebGL templates and configures project settings
-3. Select your target platform (Poki, CrazyGames, or Debug) in the Build Settings section
+1. Open **Yes2SDK > Build Window** in the Unity menu bar
+2. Click **Install Template** — this installs the `Yes2SDK-SuperSDK` WebGL template to your project
+3. The status indicator at the bottom changes from "Setup Pending" to "Ready"
 
-> **After editing templates in the package**, re-run the installer via **Yes2SDK > Settings > Reinstall Templates** to copy changes into your project.
+> **After editing templates in the package**, click **Reinstall Template** in the Settings section to copy changes into your project.
 
 ---
 
 ## Quick Start
 
-This is the **minimum integration** required to publish on both Poki and CrazyGames.
+This is the **minimum integration** required to publish on all supported platforms.
 
 ```csharp
 using Yes2SDK;
@@ -70,13 +70,13 @@ public class GameManager : MonoBehaviour
 }
 ```
 
-Both Poki and CrazyGames **require** this initialization flow. Without it, your game won't load on either platform.
+All platforms **require** this initialization flow. Without it, your game won't load on any platform.
 
 ---
 
-## Cross-Platform API (Poki + CrazyGames)
+## Cross-Platform API (All Platforms)
 
-The following APIs work identically on both platforms and represent the **recommended integration surface** for maximum reach. If you only implement these, your game will pass review on both Poki and CrazyGames.
+The following APIs work identically on all supported platforms and represent the **recommended integration surface** for maximum reach. If you only implement these, your game will pass review on every platform.
 
 ### Lifecycle (mandatory)
 
@@ -102,7 +102,7 @@ Yes2SDK.Yes2SDK.OnResume += () => { Time.timeScale = 1; AudioListener.pause = fa
 
 ### Ads (mandatory)
 
-Both platforms require ad integration. Call interstitial ads between levels or natural break points. Call rewarded ads when the player opts in for a reward.
+All platforms require ad integration. Call interstitial ads between levels or natural break points. Call rewarded ads when the player opts in for a reward.
 
 ```csharp
 // Interstitial — between levels, menu transitions, etc.
@@ -128,7 +128,7 @@ Yes2SDK.Yes2SDK.Ads.ShowRewarded(
 
 ### Gameplay Tracking (mandatory)
 
-Platforms use this to understand player engagement. **Both Poki and CrazyGames require it.**
+Platforms use this to understand player engagement. **All platforms require it.**
 
 ```csharp
 // When gameplay begins (level start, round start, etc.)
@@ -159,11 +159,11 @@ string locale = Yes2SDK.Yes2SDK.Session.GetLocale();   // e.g. "en", "fr"
 string device = Yes2SDK.Yes2SDK.Session.GetDevice();    // "desktop" or "mobile"
 ```
 
-> `GetCountry()` is only available on CrazyGames. On Poki it returns an empty string.
+> `GetCountry()` is only available on CrazyGames and Yandex. On other platforms it returns an empty string.
 
 ### Data Storage (mandatory)
 
-Simple key-value storage that works on both platforms (localStorage on Poki, cloud storage on CrazyGames, PlayerPrefs in Editor).
+Simple key-value storage that works on all platforms (localStorage on Poki, cloud storage on CrazyGames, platform API on Yandex, PlayerPrefs in Editor).
 
 ```csharp
 // Save
@@ -182,7 +182,7 @@ Yes2SDK.Yes2SDK.Data.DeleteKey("highScore");
 
 ## Platform-Specific APIs (CrazyGames Only)
 
-These features are available only on CrazyGames. On Poki they return `FeatureNotSupported` or are silently ignored. Use `IsSupported` checks where available.
+These features are available only on CrazyGames. On other platforms they return `FeatureNotSupported` or are silently ignored. Use `IsSupported` checks where available.
 
 ### Auth
 
@@ -270,23 +270,23 @@ if (Yes2SDK.Yes2SDK.Player.IsConnectedPlayersSupported())
 
 ## Platform Support Matrix
 
-| Feature | Poki | CrazyGames | Editor |
-|---------|:----:|:----------:|:------:|
-| **Lifecycle** (Init, StartGame, Loading) | yes | yes | mock |
-| **Ads** (Interstitial, Rewarded) | yes | yes | mock |
-| **Ads** (Banner via `Ads.ShowBanner`) | yes | yes | mock |
-| **Analytics** | yes | yes | mock |
-| **Session** (Locale, Device, Orientation) | yes | yes | defaults |
-| **Session** (Country) | -- | yes | -- |
-| **Data** (Key-Value Storage) | localStorage | cloud | PlayerPrefs |
-| **Game** (GameplayStart/Stop) | yes | yes | mock |
-| **Game** (HappyTime, Invite, Settings) | -- | yes | mock |
-| **Player** (GetPlayer) | anonymous | full | anonymous |
-| **Player** (Data, Social) | -- | yes | -- |
-| **Auth** | -- | yes | -- |
-| **Banners** (Multi-Size Display) | -- | yes | mock |
-| **Friends** | -- | yes | -- |
-| **Score** | log only | yes | mock |
+| Feature | Poki | CrazyGames | Yandex | Game Distribution | YouTube | Editor |
+|---------|:----:|:----------:|:------:|:-----------------:|:-------:|:------:|
+| **Lifecycle** (Init, StartGame, Loading) | yes | yes | yes | yes | yes | mock |
+| **Ads** (Interstitial, Rewarded) | yes | yes | yes | yes | yes | mock |
+| **Ads** (Banner via `Ads.ShowBanner`) | yes | yes | yes | yes | -- | mock |
+| **Analytics** | yes | yes | yes | yes | yes | mock |
+| **Session** (Locale, Device, Orientation) | yes | yes | yes | yes | yes | defaults |
+| **Session** (Country) | -- | yes | yes | -- | -- | -- |
+| **Data** (Key-Value Storage) | localStorage | cloud | platform API | localStorage | localStorage | PlayerPrefs |
+| **Game** (GameplayStart/Stop) | yes | yes | yes | yes | yes | mock |
+| **Game** (HappyTime, Invite, Settings) | -- | yes | -- | -- | -- | mock |
+| **Player** (GetPlayer) | anonymous | full | full | anonymous | anonymous | anonymous |
+| **Player** (Data, Social) | -- | yes | -- | -- | -- | -- |
+| **Auth** | -- | yes | -- | -- | -- | -- |
+| **Banners** (Multi-Size Display) | -- | yes | -- | -- | -- | mock |
+| **Friends** | -- | yes | -- | -- | -- | -- |
+| **Score** | log only | yes | -- | -- | -- | mock |
 
 **yes** = fully supported | **mock** = simulated for testing | **--** = not available / returns `FeatureNotSupported` | **anonymous** = returns anonymous player info
 
@@ -294,7 +294,7 @@ if (Yes2SDK.Yes2SDK.Player.IsConnectedPlayersSupported())
 
 ## Mandatory Integration Checklist
 
-Use this checklist to ensure your game will pass review on both platforms.
+Use this checklist to ensure your game will pass review on all platforms.
 
 - [ ] Call `InitializeAsync` at startup
 - [ ] Call `SetLoadingProgress` during loading
@@ -305,22 +305,32 @@ Use this checklist to ensure your game will pass review on both platforms.
 - [ ] Always resume the game in `afterAd` AND `onError` callbacks
 - [ ] Call `Game.GameplayStart()` when a round/level begins
 - [ ] Call `Game.GameplayStop()` when a round/level ends or player returns to menu
-- [ ] Use `Data` module for saving/loading player data (cloud on CrazyGames, localStorage on Poki)
+- [ ] Use `Data` module for saving/loading player data
 
 ---
 
 ## Building
 
-1. Open **Yes2SDK > Settings**
-2. Select the target platform (Poki / CrazyGames / Debug)
-3. Click **Apply Settings** — this sets compression, stripping, and WebGL template
-4. Click **Build** or **Build and Run**
+Yes2SDK uses the **SuperSDK pipeline** — you build once and the dashboard handles platform-specific bundling.
 
-| Setting | Poki | CrazyGames | Debug |
-|---------|------|------------|-------|
-| Compression | None | Gzip | None |
-| Code Stripping | Low | Low | Disabled |
-| Exception Support | None | None | FullWithStacktrace |
+1. Open **Yes2SDK > Build Window**
+2. Click **Apply Settings** — this sets the WebGL template and build configuration
+3. Click **Build WebGL** or **Build and Run**
+4. Zip the build output folder
+5. Upload to the **Yes2SDK Dashboard**
+6. Select target platforms in the dashboard
+7. Download platform-specific bundles (or publish directly)
+
+### Build Configuration
+
+| Setting | Value |
+|---------|-------|
+| Template | Yes2SDK-SuperSDK |
+| Compression | Disabled (platforms handle CDN delivery) |
+| Code Stripping | Medium |
+| Exception Support | None |
+
+> There is no per-platform build configuration in Unity. The dashboard injects the correct platform SDK at upload time.
 
 ---
 
@@ -329,10 +339,9 @@ Use this checklist to ensure your game will pass review on both platforms.
 In the Unity Editor, all SDK calls work with mock implementations:
 
 - `InitializeAsync` / `StartGameAsync` succeed immediately
-- Ads simulate the full callback flow (beforeAd → afterAd → adViewed)
+- Ads simulate the full callback flow (beforeAd -> afterAd -> adViewed)
 - `Data` module uses `PlayerPrefs`
 - Platform-specific APIs return `FeatureNotSupported`
-- Set the **Debug** build target to test with the debug WebGL template (mock inline wrapper)
 
 ---
 
@@ -372,14 +381,15 @@ onError: err => {
 ## Architecture
 
 ```
-C# Runtime  →  .jslib bridge  →  window.Yes2SDK.*  →  Platform SDK
-                                        ↑
-                          inline wrapper in HTML template
+C# Runtime  ->  .jslib bridge  ->  window.Yes2SDK.*  ->  Platform SDK
+                                          ^
+                            injected by Yes2SDK Dashboard
 ```
 
 - **C# Runtime** (`Runtime/`): Static facade + module classes. Uses `[DllImport("__Internal")]` for WebGL, mock fallbacks via `#if UNITY_WEBGL && !UNITY_EDITOR`.
-- **jslib Bridges** (`Plugins/`): JavaScript functions that call `window.Yes2SDK.*` and return results via `SendMessage('Bridge', ...)`.
-- **WebGL Templates** (`Assets/WebGLTemplates/`): Each template defines `window.Yes2SDK = { ... }` as an inline wrapper that talks directly to the platform SDK.
+- **jslib Bridges** (`Plugins/`): 12 JavaScript files that call `window.Yes2SDK.*` and return results via `SendMessage('Bridge', ...)`.
+- **WebGL Template** (`Assets/WebGLTemplates/Yes2SDK-SuperSDK/`): Bare HTML template. Does not define `window.Yes2SDK` — the dashboard injects the SuperSDK Core (`yes2sdk.umd.js`) and the selected platform adapter at build time.
+- **Dashboard Pipeline**: Upload build zip -> dashboard injects SDK -> select target platforms -> download platform-ready bundles.
 
 ---
 
