@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-04-12
+
+### Added
+- Branded Yes2Games loading screen — animated logo with breathing glow, shimmer progress bar, and smooth fade-out
+- Logo embedded as base64 in WebGL template (zero network requests, ~26KB)
+- Three-phase animation: entrance (fade + scale) → breathing loop (glow pulse) → completion (pulse + fade-out)
+
+### Changed
+- `Yes2SDK-SuperSDK` WebGL template background from `#000` to `#0a0a0a`
+- Loading progress bar replaced with branded `Y2GLoader` controller
+
 ## [2.0.0] - 2026-03-19
 
 ### Breaking Changes
