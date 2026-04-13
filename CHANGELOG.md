@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-04-13
+
+### Fixed
+- **CrazyGames SDK crash on non-CG domains** — init code no longer blindly loads CrazyGames SDK from CDN when `window.Yes2SDK` is missing. Now checks for actual CG signals (namespace, hostname, referrer) before attempting detection. On non-CG domains (dashboard inspector, localhost, GameDistribution, Poki, etc.) the SDK reports a clear error instead of crashing with `sdkDisabled`.
+- **SDK errors no longer show browser popups** — added global error boundary that catches platform SDK errors before Unity's error handler can trigger `alert()` dialogs. All SDK errors now log to console only.
+- **Partial dashboard injection detection** — when `window.__yes2sdkConfig` exists but `yes2sdk.umd.js` failed to load, reports a specific `SDKLoadFailed` error instead of falling into CrazyGames detection.
+- **try-catch on all critical paths** — `doInit()`, `onSDKAvailable()`, `startGameAsync()`, and all ad entry points (interstitial, rewarded, banner) now catch synchronous throws from platform SDKs.
+
 ## [2.1.0] - 2026-04-12
 
 ### Added
