@@ -1,7 +1,24 @@
 mergeInto(LibraryManager.library, {
 
-    // Styled console logger — lazy-init in case template hasn't set it up
-    $__y2__postset: '(function(){if(window.__y2)return;var S="background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold";function m(f){return function(){var a=[].slice.call(arguments);a.unshift("%c[Yes2SDK]%c ",S,"");console[f].apply(console,a);};}window.__y2={log:m("log"),warn:m("warn"),error:m("error")};})();',
+    // Styled console logger + error boundary — lazy-init in case template hasn't set it up.
+    // The error boundary catches known platform SDK errors (CrazyGames GeneralError,
+    // sdkDisabled, etc.) BEFORE Unity's error handler can turn them into alert() popups.
+    $__y2__postset: '\
+(function(){\
+  if(window.__y2)return;\
+  var S="background:#6C5CE7;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold";\
+  function m(f){return function(){var a=[].slice.call(arguments);a.unshift("%c[Yes2SDK]%c ",S,"");console[f].apply(console,a);};}\
+  window.__y2={log:m("log"),warn:m("warn"),error:m("error")};\
+  function isSdkError(e){\
+    return e&&typeof e==="object"&&typeof e.code==="string"&&typeof e.message==="string";\
+  }\
+  window.addEventListener("error",function(ev){\
+    if(isSdkError(ev.error)){window.__y2.error("Platform SDK error (suppressed popup):",ev.error.code,ev.error.message);ev.preventDefault();}\
+  });\
+  window.addEventListener("unhandledrejection",function(ev){\
+    if(isSdkError(ev.reason)){window.__y2.error("Platform SDK rejection (suppressed):",ev.reason.code,ev.reason.message);ev.preventDefault();}\
+  });\
+})();',
     $__y2: {},
 
     // Shared helpers for jslib bridges — use bare __y2h in jslib (NOT window.__y2h)
@@ -39,23 +56,32 @@ mergeInto(LibraryManager.library, {
     Yes2SDK_InitializeJS: function() {
         window.__y2.log('[Init] Step 1: Yes2SDK_InitializeJS called');
 
-        // Helper: run init once wrapper exists
+        // Helper: run init once wrapper exists (try-catch prevents uncaught throws → no popup)
         function doInit() {
-            window.__y2.log('[Init] doInit: calling window.Yes2SDK.initializeAsync()');
-            window.Yes2SDK.initializeAsync()
-                .then(function() {
-                    window.__y2.log('[Init] initializeAsync succeeded');
-                    SendMessage('Bridge', 'OnInitializeSuccess', '');
-                })
-                .catch(function(error) {
-                    window.__y2.error('[Init] initializeAsync failed:', error);
-                    var errorJson = JSON.stringify({
-                        code: error.code || 'Unknown',
-                        message: error.message || 'Initialization failed',
-                        context: 'Yes2SDK.InitializeAsync'
+            try {
+                window.__y2.log('[Init] doInit: calling window.Yes2SDK.initializeAsync()');
+                window.Yes2SDK.initializeAsync()
+                    .then(function() {
+                        window.__y2.log('[Init] initializeAsync succeeded');
+                        SendMessage('Bridge', 'OnInitializeSuccess', '');
+                    })
+                    .catch(function(error) {
+                        window.__y2.error('[Init] initializeAsync failed:', error);
+                        var errorJson = JSON.stringify({
+                            code: error.code || 'Unknown',
+                            message: error.message || 'Initialization failed',
+                            context: 'Yes2SDK.InitializeAsync'
+                        });
+                        SendMessage('Bridge', 'OnInitializeError', errorJson);
                     });
-                    SendMessage('Bridge', 'OnInitializeError', errorJson);
-                });
+            } catch(error) {
+                window.__y2.error('[Init] initializeAsync threw:', error);
+                SendMessage('Bridge', 'OnInitializeError', JSON.stringify({
+                    code: (error && error.code) || 'Unknown',
+                    message: (error && error.message) || String(error),
+                    context: 'Yes2SDK.InitializeAsync'
+                }));
+            }
         }
 
         // Helper: check if CG SDK is available and try to create wrapper
@@ -157,21 +183,30 @@ mergeInto(LibraryManager.library, {
             resolved = true;
             if (currentPollTimer) clearInterval(currentPollTimer);
 
-            window.__y2.log('[Init] Step 4: CG SDK detected via', source,
-                'CrazyGames.SDK:', typeof (window.CrazyGames && window.CrazyGames.SDK));
+            try {
+                window.__y2.log('[Init] Step 4: CG SDK detected via', source,
+                    'CrazyGames.SDK:', typeof (window.CrazyGames && window.CrazyGames.SDK));
 
-            // Create the Yes2SDK wrapper
-            if (tryCreateWrapper()) {
-                window.__y2.log('[Init] Step 5: wrapper created via', source, '— calling doInit');
-                doInit();
-            } else {
-                window.__y2.error('[Init] Step 5: FAILED — CG SDK found via', source,
-                    'but wrapper creation failed.',
-                    'CrazyGames:', typeof window.CrazyGames,
-                    'CrazyGames.SDK:', window.CrazyGames ? typeof window.CrazyGames.SDK : 'N/A');
+                // Create the Yes2SDK wrapper
+                if (tryCreateWrapper()) {
+                    window.__y2.log('[Init] Step 5: wrapper created via', source, '— calling doInit');
+                    doInit();
+                } else {
+                    window.__y2.error('[Init] Step 5: FAILED — CG SDK found via', source,
+                        'but wrapper creation failed.',
+                        'CrazyGames:', typeof window.CrazyGames,
+                        'CrazyGames.SDK:', window.CrazyGames ? typeof window.CrazyGames.SDK : 'N/A');
+                    SendMessage('Bridge', 'OnInitializeError', JSON.stringify({
+                        code: 'NotInitialized',
+                        message: 'CrazyGames SDK found (' + source + ') but wrapper creation failed',
+                        context: 'Yes2SDK.InitializeAsync'
+                    }));
+                }
+            } catch(error) {
+                window.__y2.error('[Init] onSDKAvailable threw:', error);
                 SendMessage('Bridge', 'OnInitializeError', JSON.stringify({
-                    code: 'NotInitialized',
-                    message: 'CrazyGames SDK found (' + source + ') but wrapper creation failed',
+                    code: (error && error.code) || 'Unknown',
+                    message: (error && error.message) || String(error),
                     context: 'Yes2SDK.InitializeAsync'
                 }));
             }
@@ -259,11 +294,15 @@ mergeInto(LibraryManager.library, {
             return;
         }
 
-        window.Yes2SDK.startGameAsync()
-            .then(function() {
-                SendMessage('Bridge', 'OnStartGameSuccess', '');
-            })
-            .catch(__y2h.handleCatch('OnStartGameError', 'Start game failed', 'Yes2SDK.StartGameAsync'));
+        try {
+            window.Yes2SDK.startGameAsync()
+                .then(function() {
+                    SendMessage('Bridge', 'OnStartGameSuccess', '');
+                })
+                .catch(__y2h.handleCatch('OnStartGameError', 'Start game failed', 'Yes2SDK.StartGameAsync'));
+        } catch(error) {
+            __y2h.handleCatch('OnStartGameError', 'Start game failed', 'Yes2SDK.StartGameAsync')(error);
+        }
     },
 
     // Set loading progress (0-100)
