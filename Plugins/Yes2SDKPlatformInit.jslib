@@ -29,7 +29,18 @@ mergeInto(LibraryManager.library, {
             window.__y2 = { log: m('log'), warn: m('warn'), error: m('error') };
         }
 
-        // Guard 2: not on CrazyGames — check multiple possible globals
+        // Guard 2: if yes2sdk-data.js config explicitly names a non-CG platform, never
+        // create a CG wrapper. GD/CrazyGames share Azerion infrastructure so
+        // window.CrazyGames.SDK can be present on revision.gamedistribution.com — without
+        // this guard, the postset would wrongly replace the GD SDK with a CG wrapper.
+        var cfgPlatform = window.__yes2sdkConfig && window.__yes2sdkConfig.platform;
+        if (cfgPlatform && cfgPlatform !== 'crazygames') {
+            window.__y2.log('PlatformInit: dashboard config says platform is "' + cfgPlatform +
+                '", skipping CG wrapper creation.');
+            return;
+        }
+
+        // Guard 3: not on CrazyGames — check multiple possible globals
         var hasCG = (typeof window.CrazyGames !== 'undefined' && window.CrazyGames.SDK);
         if (!hasCG) {
             window.__y2.log('PlatformInit: window.CrazyGames.SDK not found, skipping CG wrapper.',
