@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] - 2026-04-13
+
+### Fixed
+- **WebGL template popup suppressed** — `createUnityInstance().catch()` in `Yes2SDK-SuperSDK/index.html` previously called `alert(message)` on any Unity runtime error. Now logs to `console.error` only — no popup ever reaches the player.
+
 ## [2.1.1] - 2026-04-13
 
 ### Fixed

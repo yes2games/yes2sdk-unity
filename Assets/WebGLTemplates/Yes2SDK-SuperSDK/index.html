@@ -226,7 +226,7 @@
         // Store unity instance globally for SDK bridge access
         window.unityInstance = unityInstance;
       }).catch(function(message) {
-        alert(message);
+        console.error('[Yes2SDK] Unity instance error:', message);
       });
     };
     document.body.appendChild(script);
