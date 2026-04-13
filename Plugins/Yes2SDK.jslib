@@ -82,7 +82,57 @@ mergeInto(LibraryManager.library, {
             return;
         }
 
-        // C. CG SDK not available yet.
+        // C. No wrapper found. Check for CrazyGames signals before attempting
+        //    CG-specific detection. CrazyGames replaces the HTML template so
+        //    window.Yes2SDK won't exist, but we must NOT blindly load the CG SDK
+        //    from CDN on non-CG domains — that causes sdkDisabled crashes.
+
+        // C.0: Dashboard config exists but SDK object failed to load
+        if (typeof window.__yes2sdkConfig !== 'undefined') {
+            var cfgPlatform = window.__yes2sdkConfig.platform || 'unknown';
+            window.__y2.error('[Init] Dashboard config found (platform: ' + cfgPlatform +
+                ') but window.Yes2SDK is not defined.',
+                'The yes2sdk.umd.js file may have failed to load.');
+            SendMessage('Bridge', 'OnInitializeError', JSON.stringify({
+                code: 'SDKLoadFailed',
+                message: 'Dashboard config found (platform: ' + cfgPlatform +
+                    ') but yes2sdk.umd.js failed to load. Check browser console for script errors.',
+                context: 'Yes2SDK.InitializeAsync'
+            }));
+            return;
+        }
+
+        // C.1: Check for CrazyGames signals before attempting CG detection
+        var hasCGSignals = (
+            // CG namespace exists (partially loaded — SDK injected async)
+            typeof window.CrazyGames !== 'undefined' ||
+            // CG ads namespace
+            typeof window.CrazyGamesAds !== 'undefined' ||
+            // Running on CG domain or subdomain
+            (window.location.hostname &&
+                window.location.hostname.indexOf('crazygames.') !== -1) ||
+            // Embedded in CG iframe
+            (document.referrer &&
+                document.referrer.indexOf('crazygames.') !== -1)
+        );
+
+        if (!hasCGSignals) {
+            // Not CrazyGames, no dashboard config, no wrapper — fail gracefully
+            window.__y2.error('[Init] No platform SDK detected.',
+                'window.Yes2SDK is undefined and no CrazyGames signals found.',
+                'Ensure the game HTML includes the platform wrapper script',
+                '(Poki, CrazyGames, Yandex, GameDistribution, etc.).',
+                'Location:', window.location.href);
+            SendMessage('Bridge', 'OnInitializeError', JSON.stringify({
+                code: 'NoPlatformDetected',
+                message: 'No platform SDK found. The game must be served with a platform wrapper ' +
+                    '(via dashboard bundling or an HTML template that creates window.Yes2SDK).',
+                context: 'Yes2SDK.InitializeAsync'
+            }));
+            return;
+        }
+
+        // C.2: CG signals found — proceed with CG-specific detection.
         //    CrazyGames injects their SDK ASYNCHRONOUSLY after framework.js loads.
         //    The platform also BLOCKS CDN loads (ERR_CONNECTION_RESET), so we
         //    primarily rely on polling for the platform-injected SDK.
@@ -93,8 +143,7 @@ mergeInto(LibraryManager.library, {
         //    - CDN load attempted in parallel (works on some CG environments)
         //    - Total max wait: ~35 seconds before giving up
 
-        window.__y2.log('[Init] Step 3: CG SDK not available yet.',
-            'Starting detection (poll + CDN)...',
+        window.__y2.log('[Init] Step 3: CG signals detected, waiting for SDK...',
             'CrazyGames:', typeof window.CrazyGames,
             'CrazyGamesAds:', typeof window.CrazyGamesAds);
 
