@@ -12,17 +12,21 @@ mergeInto(LibraryManager.library, {
             return;
         }
 
-        window.Yes2SDK.ads.showInterstitial(placement, {
-            beforeAd: function() {
-                SendMessage('Bridge', 'OnInterstitialBeforeAd', '');
-            },
-            afterAd: function() {
-                SendMessage('Bridge', 'OnInterstitialAfterAd', '');
-            },
-            noFill: function() {
-                __y2h.sendError('OnInterstitialError', 'NoFill', 'No interstitial ad available', 'Yes2SDK.Ads.ShowInterstitial');
-            }
-        }).catch(__y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'));
+        try {
+            window.Yes2SDK.ads.showInterstitial(placement, {
+                beforeAd: function() {
+                    SendMessage('Bridge', 'OnInterstitialBeforeAd', '');
+                },
+                afterAd: function() {
+                    SendMessage('Bridge', 'OnInterstitialAfterAd', '');
+                },
+                noFill: function() {
+                    __y2h.sendError('OnInterstitialError', 'NoFill', 'No interstitial ad available', 'Yes2SDK.Ads.ShowInterstitial');
+                }
+            }).catch(__y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'));
+        } catch(error) {
+            __y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial')(error);
+        }
     },
 
     // Show a rewarded video ad
@@ -37,23 +41,27 @@ mergeInto(LibraryManager.library, {
             return;
         }
 
-        window.Yes2SDK.ads.showRewarded(placement, {
-            beforeAd: function() {
-                SendMessage('Bridge', 'OnRewardedBeforeAd', '');
-            },
-            afterAd: function() {
-                SendMessage('Bridge', 'OnRewardedAfterAd', '');
-            },
-            adDismissed: function() {
-                SendMessage('Bridge', 'OnRewardedAdDismissed', '');
-            },
-            adViewed: function() {
-                SendMessage('Bridge', 'OnRewardedAdViewed', '');
-            },
-            noFill: function() {
-                __y2h.sendError('OnRewardedError', 'NoFill', 'No rewarded ad available', 'Yes2SDK.Ads.ShowRewarded');
-            }
-        }).catch(__y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'));
+        try {
+            window.Yes2SDK.ads.showRewarded(placement, {
+                beforeAd: function() {
+                    SendMessage('Bridge', 'OnRewardedBeforeAd', '');
+                },
+                afterAd: function() {
+                    SendMessage('Bridge', 'OnRewardedAfterAd', '');
+                },
+                adDismissed: function() {
+                    SendMessage('Bridge', 'OnRewardedAdDismissed', '');
+                },
+                adViewed: function() {
+                    SendMessage('Bridge', 'OnRewardedAdViewed', '');
+                },
+                noFill: function() {
+                    __y2h.sendError('OnRewardedError', 'NoFill', 'No rewarded ad available', 'Yes2SDK.Ads.ShowRewarded');
+                }
+            }).catch(__y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'));
+        } catch(error) {
+            __y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded')(error);
+        }
     },
 
     // Show a banner ad at the specified position
@@ -69,11 +77,15 @@ mergeInto(LibraryManager.library, {
         var positionStr = position === 0 ? 'top' : 'bottom';
 
         // Core SDK showBanner(position) returns a Promise, no callbacks
-        window.Yes2SDK.ads.showBanner(positionStr)
-            .then(function() {
-                SendMessage('Bridge', 'OnBannerShown', '');
-            })
-            .catch(__y2h.handleCatch('OnBannerShowError', 'Banner show failed', 'Yes2SDK.Ads.ShowBanner'));
+        try {
+            window.Yes2SDK.ads.showBanner(positionStr)
+                .then(function() {
+                    SendMessage('Bridge', 'OnBannerShown', '');
+                })
+                .catch(__y2h.handleCatch('OnBannerShowError', 'Banner show failed', 'Yes2SDK.Ads.ShowBanner'));
+        } catch(error) {
+            __y2h.handleCatch('OnBannerShowError', 'Banner show failed', 'Yes2SDK.Ads.ShowBanner')(error);
+        }
     },
 
     // Hide the currently displayed banner ad
