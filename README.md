@@ -1,14 +1,12 @@
 # Yes2SDK for Unity
 
-A unified WebGL SDK that lets you integrate once and publish to **Poki**, **CrazyGames**, **Yandex Games**, **Game Distribution**, and **YouTube Playables** with a single codebase.
-
-Yes2SDK wraps platform-specific APIs behind a common C# interface. Write your integration code once, build a single WebGL output, upload to the Yes2SDK Dashboard, and the dashboard handles platform-specific SDK injection and bundling.
+A single SDK for your Unity WebGL game. Integrate once against Yes2SDK, submit through the Yes2Games Dashboard, and the Yes2Games team handles the rest.
 
 ## Requirements
 
 - Unity 2021.3 or newer
 - WebGL build target
-- Dependency: `com.unity.nuget.newtonsoft-json` (>= 3.2.1)
+- `com.unity.nuget.newtonsoft-json` (>= 3.2.1)
 
 ## Installation
 
@@ -28,19 +26,17 @@ Yes2SDK wraps platform-specific APIs behind a common C# interface. Write your in
 
 ### Initial Setup
 
-After installing the package:
-
 1. Open **Yes2SDK > Build Window** in the Unity menu bar
-2. Click **Install Template** — this installs the `Yes2SDK-SuperSDK` WebGL template to your project
-3. The status indicator at the bottom changes from "Setup Pending" to "Ready"
+2. Click **Install Template** — this installs the `Yes2SDK-SuperSDK` WebGL template into your project
+3. The status indicator changes from "Setup Pending" to "Ready"
 
-> **After editing templates in the package**, click **Reinstall Template** in the Settings section to copy changes into your project.
+> After updating the SDK package, click **Reinstall Template** in the Settings section to copy changes into your project.
 
 ---
 
 ## Quick Start
 
-This is the **minimum integration** required to publish on all supported platforms.
+This is the **minimum integration** your game must have.
 
 ```csharp
 using Yes2SDK;
@@ -55,10 +51,10 @@ public class GameManager : MonoBehaviour
             {
                 Debug.Log("SDK ready");
 
-                // 2. Signal loading progress (call repeatedly as assets load)
+                // 2. Report loading progress as your assets load
                 Yes2SDK.Yes2SDK.SetLoadingProgress(100);
 
-                // 3. Tell the platform the game is ready to play
+                // 3. Tell the SDK the game is playable
                 Yes2SDK.Yes2SDK.StartGameAsync(
                     onSuccess: () => Debug.Log("Game started"),
                     onError: err => Debug.LogError(err)
@@ -70,75 +66,82 @@ public class GameManager : MonoBehaviour
 }
 ```
 
-All platforms **require** this initialization flow. Without it, your game won't load on any platform.
+Without this flow your game won't be accepted for review.
 
 ---
 
-## Cross-Platform API (All Platforms)
+## Core API
 
-The following APIs work identically on all supported platforms and represent the **recommended integration surface** for maximum reach. If you only implement these, your game will pass review on every platform.
+Implement everything in this section. Together these cover what Yes2Games needs to validate and monetize your game.
 
-### Lifecycle (mandatory)
-
-Every game **must** call these:
+### Lifecycle (required)
 
 ```csharp
-// Initialize — call once at startup
+// Call once at startup
 Yes2SDK.Yes2SDK.InitializeAsync(onSuccess, onError);
 
-// Loading progress — call as your game loads (0-100)
+// Call as your game loads (0-100)
 Yes2SDK.Yes2SDK.SetLoadingProgress(progress);
 
-// Start game — call when loading is complete and game is playable
+// Call when loading finishes and the game is playable
 Yes2SDK.Yes2SDK.StartGameAsync(onSuccess, onError);
 ```
 
-**Pause/Resume** — subscribe to know when the platform pauses your game (e.g., during an ad):
+Handle pause / resume so your game reacts when the SDK pauses you (e.g. during an ad):
 
 ```csharp
-Yes2SDK.Yes2SDK.OnPause += () => { Time.timeScale = 0; AudioListener.pause = true; };
+Yes2SDK.Yes2SDK.OnPause  += () => { Time.timeScale = 0; AudioListener.pause = true;  };
 Yes2SDK.Yes2SDK.OnResume += () => { Time.timeScale = 1; AudioListener.pause = false; };
 ```
 
-### Ads (mandatory)
+### Ads (required)
 
-All platforms require ad integration. Call interstitial ads between levels or natural break points. Call rewarded ads when the player opts in for a reward.
+Interstitial ads run at natural break points. Rewarded ads run only when the player opts in.
 
 ```csharp
-// Interstitial — between levels, menu transitions, etc.
 Yes2SDK.Yes2SDK.Ads.ShowInterstitial(
     placement: "level-end",
     description: "Between levels",
     beforeAd: () => PauseGame(),
-    afterAd: () => ResumeGame(),
-    onError: err => ResumeGame()   // always resume even on error
+    afterAd:  () => ResumeGame(),
+    onError:  err => ResumeGame()   // always resume, even on error
 );
 
-// Rewarded — player chooses to watch for a reward
 Yes2SDK.Yes2SDK.Ads.ShowRewarded(
     placement: "extra-life",
     description: "Extra life reward",
-    beforeAd: () => PauseGame(),
-    afterAd: () => ResumeGame(),
+    beforeAd:    () => PauseGame(),
+    afterAd:     () => ResumeGame(),
     adDismissed: () => { /* no reward */ },
-    adViewed: () => GiveReward(),
-    onError: err => ResumeGame()
+    adViewed:    () => GiveReward(),
+    onError:     err => ResumeGame()
 );
 ```
 
-### Gameplay Tracking (mandatory)
+### Gameplay Tracking (required)
 
-Platforms use this to understand player engagement. **All platforms require it.**
+Tells Yes2Games when an active round begins and ends. Also call `GameplayStop()` before any ad and `GameplayStart()` after.
 
 ```csharp
-// When gameplay begins (level start, round start, etc.)
 Yes2SDK.Yes2SDK.Game.GameplayStart();
-
-// When gameplay ends (level complete, game over, back to menu, etc.)
 Yes2SDK.Yes2SDK.Game.GameplayStop();
 ```
 
-> On Poki, `GameplayStart`/`GameplayStop` are also triggered by `Analytics.LogLevelStart`/`LogLevelEnd` — you can use either, but don't call both.
+> `Analytics.LogLevelStart` / `LogLevelEnd` can also trigger gameplay start / stop — use either pair, but don't call both.
+
+### Data (required)
+
+Key-value storage. Persists across sessions automatically.
+
+```csharp
+Yes2SDK.Yes2SDK.Data.SetInt("highScore", 1500);
+Yes2SDK.Yes2SDK.Data.SetString("playerName", "Hero");
+
+int score = Yes2SDK.Yes2SDK.Data.GetInt("highScore", defaultValue: 0);
+
+bool exists = Yes2SDK.Yes2SDK.Data.HasKey("highScore");
+Yes2SDK.Yes2SDK.Data.DeleteKey("highScore");
+```
 
 ### Analytics (recommended)
 
@@ -152,37 +155,20 @@ Yes2SDK.Yes2SDK.Analytics.LogLevelEnd("level-1", score: 1500, success: true);
 Yes2SDK.Yes2SDK.Analytics.LogScore(1500);
 ```
 
-### Session Info (recommended)
+### Session (recommended)
 
 ```csharp
-string locale = Yes2SDK.Yes2SDK.Session.GetLocale();   // e.g. "en", "fr"
-string device = Yes2SDK.Yes2SDK.Session.GetDevice();    // "desktop" or "mobile"
+string locale = Yes2SDK.Yes2SDK.Session.GetLocale();  // e.g. "en", "fr"
+string device = Yes2SDK.Yes2SDK.Session.GetDevice();   // "desktop" or "mobile"
 ```
 
-> `GetCountry()` is only available on CrazyGames and Yandex. On other platforms it returns an empty string.
-
-### Data Storage (mandatory)
-
-Simple key-value storage that works on all platforms (localStorage on Poki, cloud storage on CrazyGames, platform API on Yandex, PlayerPrefs in Editor).
-
-```csharp
-// Save
-Yes2SDK.Yes2SDK.Data.SetInt("highScore", 1500);
-Yes2SDK.Yes2SDK.Data.SetString("playerName", "Hero");
-
-// Load
-int score = Yes2SDK.Yes2SDK.Data.GetInt("highScore", defaultValue: 0);
-
-// Check & delete
-bool exists = Yes2SDK.Yes2SDK.Data.HasKey("highScore");
-Yes2SDK.Yes2SDK.Data.DeleteKey("highScore");
-```
+> Treat session info as a hint, not a guarantee. Don't branch your core game logic on it.
 
 ---
 
-## Platform-Specific APIs (CrazyGames Only)
+## Optional APIs
 
-These features are available only on CrazyGames. On other platforms they return `FeatureNotSupported` or are silently ignored. Use `IsSupported` checks where available.
+These modules add extra player-facing features. They are **not guaranteed** to be available at runtime — always guard with `IsSupported()` and handle `FeatureNotSupported` gracefully. Don't make your core gameplay depend on them.
 
 ### Auth
 
@@ -191,12 +177,12 @@ if (Yes2SDK.Yes2SDK.Auth.IsSupported())
 {
     Yes2SDK.Yes2SDK.Auth.GetCurrentUserAsync(
         onSuccess: user => Debug.Log($"User: {user.Name}, authenticated: {user.IsAuthenticated}"),
-        onError: err => Debug.LogError(err)
+        onError:   err  => Debug.LogError(err)
     );
 
     Yes2SDK.Yes2SDK.Auth.SignInAsync(
         onSuccess: user => Debug.Log($"Signed in as {user.Name}"),
-        onError: err => Debug.LogError(err)
+        onError:   err  => Debug.LogError(err)
     );
 }
 ```
@@ -214,9 +200,9 @@ Yes2SDK.Yes2SDK.Friends.ListFriendsAsync(
 );
 ```
 
-### Banners (Display Ads)
+### Banners
 
-Container-based display ads at fixed positions. Different from `Ads.ShowBanner`.
+Container-based display ads. Different from `Ads.ShowBanner`.
 
 ```csharp
 Yes2SDK.Yes2SDK.Banners.ShowBanner("sidebar-left", BannerSize.Medium_300x250);
@@ -227,7 +213,7 @@ Yes2SDK.Yes2SDK.Banners.HideAllBanners();
 ### Game Extras
 
 ```csharp
-Yes2SDK.Yes2SDK.Game.HappyTime();     // CG "happy moment" signal
+Yes2SDK.Yes2SDK.Game.HappyTime();
 
 Yes2SDK.Yes2SDK.Game.InviteLinkAsync(
     new Dictionary<string, string> { { "roomId", "abc123" } },
@@ -237,7 +223,7 @@ Yes2SDK.Yes2SDK.Game.InviteLinkAsync(
 Yes2SDK.Yes2SDK.Game.ShowInviteButton(new Dictionary<string, string> { { "roomId", "abc123" } });
 Yes2SDK.Yes2SDK.Game.HideInviteButton();
 
-GameSettings settings = Yes2SDK.Yes2SDK.Game.GetSettings(); // { DisableChat, MuteAudio }
+GameSettings settings = Yes2SDK.Yes2SDK.Game.GetSettings();
 Yes2SDK.Yes2SDK.Game.OnSettingsChanged += s => ApplySettings(s);
 
 Yes2SDK.Yes2SDK.Game.CopyToClipboard("https://...");
@@ -250,7 +236,7 @@ Yes2SDK.Yes2SDK.Score.AddScore(150f);
 Yes2SDK.Yes2SDK.Score.SubmitScore("encrypted-score-string");
 ```
 
-### Player Data & Social (via Player module)
+### Player Data
 
 ```csharp
 if (Yes2SDK.Yes2SDK.Player.IsDataSupported())
@@ -268,80 +254,54 @@ if (Yes2SDK.Yes2SDK.Player.IsConnectedPlayersSupported())
 
 ---
 
-## Platform Support Matrix
+## Integration Checklist
 
-| Feature | Poki | CrazyGames | Yandex | Game Distribution | YouTube | Editor |
-|---------|:----:|:----------:|:------:|:-----------------:|:-------:|:------:|
-| **Lifecycle** (Init, StartGame, Loading) | yes | yes | yes | yes | yes | mock |
-| **Ads** (Interstitial, Rewarded) | yes | yes | yes | yes | yes | mock |
-| **Ads** (Banner via `Ads.ShowBanner`) | yes | yes | yes | yes | -- | mock |
-| **Analytics** | yes | yes | yes | yes | yes | mock |
-| **Session** (Locale, Device, Orientation) | yes | yes | yes | yes | yes | defaults |
-| **Session** (Country) | -- | yes | yes | -- | -- | -- |
-| **Data** (Key-Value Storage) | localStorage | cloud | platform API | localStorage | localStorage | PlayerPrefs |
-| **Game** (GameplayStart/Stop) | yes | yes | yes | yes | yes | mock |
-| **Game** (HappyTime, Invite, Settings) | -- | yes | -- | -- | -- | mock |
-| **Player** (GetPlayer) | anonymous | full | full | anonymous | anonymous | anonymous |
-| **Player** (Data, Social) | -- | yes | -- | -- | -- | -- |
-| **Auth** | -- | yes | -- | -- | -- | -- |
-| **Banners** (Multi-Size Display) | -- | yes | -- | -- | -- | mock |
-| **Friends** | -- | yes | -- | -- | -- | -- |
-| **Score** | log only | yes | -- | -- | -- | mock |
+Your build is ready for review when:
 
-**yes** = fully supported | **mock** = simulated for testing | **--** = not available / returns `FeatureNotSupported` | **anonymous** = returns anonymous player info
+- [ ] `InitializeAsync` is called at startup
+- [ ] `SetLoadingProgress` is called as assets load
+- [ ] `StartGameAsync` is called when the game is playable
+- [ ] `OnPause` / `OnResume` are handled (mute audio, pause gameplay)
+- [ ] Interstitial ads run at natural break points
+- [ ] Rewarded ads grant reward **only** in `adViewed`
+- [ ] `Game.GameplayStop()` is called before every ad; `Game.GameplayStart()` after
+- [ ] Gameplay resumes in `afterAd` AND `onError`
+- [ ] `Data` is used for persistent player data
 
----
-
-## Mandatory Integration Checklist
-
-Use this checklist to ensure your game will pass review on all platforms.
-
-- [ ] Call `InitializeAsync` at startup
-- [ ] Call `SetLoadingProgress` during loading
-- [ ] Call `StartGameAsync` when loading completes
-- [ ] Handle `OnPause` / `OnResume` (mute audio, pause game)
-- [ ] Show interstitial ads at natural break points (level transitions, menus)
-- [ ] Show rewarded ads with proper `adViewed` / `adDismissed` handling
-- [ ] Always resume the game in `afterAd` AND `onError` callbacks
-- [ ] Call `Game.GameplayStart()` when a round/level begins
-- [ ] Call `Game.GameplayStop()` when a round/level ends or player returns to menu
-- [ ] Use `Data` module for saving/loading player data
+The QA Inspector in the Yes2Games Dashboard validates all of this automatically.
 
 ---
 
 ## Building
 
-Yes2SDK uses the **SuperSDK pipeline** — you build once and the dashboard handles platform-specific bundling.
-
 1. Open **Yes2SDK > Build Window**
-2. Click **Apply Settings** — this sets the WebGL template and build configuration
+2. Click **Apply Settings** — sets the WebGL template and build configuration
 3. Click **Build WebGL** or **Build and Run**
 4. Zip the build output folder
-5. Upload to the **Yes2SDK Dashboard**
-6. Select target platforms in the dashboard
-7. Download platform-specific bundles (or publish directly)
+5. Upload the zip to the **Yes2Games Dashboard**
+6. Run through the QA Inspector; when everything is green, **Request Review**
 
 ### Build Configuration
 
 | Setting | Value |
 |---------|-------|
 | Template | Yes2SDK-SuperSDK |
-| Compression | Disabled (platforms handle CDN delivery) |
+| Compression | Disabled |
 | Code Stripping | Medium |
 | Exception Support | None |
-
-> There is no per-platform build configuration in Unity. The dashboard injects the correct platform SDK at upload time.
 
 ---
 
 ## Editor Testing
 
-In the Unity Editor, all SDK calls work with mock implementations:
+In the Unity Editor, SDK calls run against mock implementations:
 
 - `InitializeAsync` / `StartGameAsync` succeed immediately
-- Ads simulate the full callback flow (beforeAd -> afterAd -> adViewed)
-- `Data` module uses `PlayerPrefs`
-- Platform-specific APIs return `FeatureNotSupported`
+- Ads simulate the full callback flow (`beforeAd` → `afterAd` → `adViewed`)
+- `Data` uses `PlayerPrefs`
+- Optional APIs return `FeatureNotSupported`
+
+For richer simulation — forced errors, specific locales, ad failure modes — use the **QA Inspector** in the Yes2Games Dashboard.
 
 ---
 
@@ -352,10 +312,10 @@ All async methods accept an `onError` callback with an `Error` struct:
 ```csharp
 public struct Error
 {
-    public string Code;       // e.g. "FeatureNotSupported"
-    public string Message;    // human-readable description
-    public string Context;    // additional context
-    public ErrorCode ErrorCode; // parsed enum
+    public string Code;
+    public string Message;
+    public string Context;
+    public ErrorCode ErrorCode;
 }
 
 public enum ErrorCode
@@ -381,18 +341,17 @@ onError: err => {
 ## Architecture
 
 ```
-C# Runtime  ->  .jslib bridge  ->  window.Yes2SDK.*  ->  Platform SDK
+C# Runtime  ->  .jslib bridge  ->  window.Yes2SDK.*
                                           ^
-                            injected by Yes2SDK Dashboard
+                          injected by the Yes2Games Dashboard
 ```
 
-- **C# Runtime** (`Runtime/`): Static facade + module classes. Uses `[DllImport("__Internal")]` for WebGL, mock fallbacks via `#if UNITY_WEBGL && !UNITY_EDITOR`.
-- **jslib Bridges** (`Plugins/`): 12 JavaScript files that call `window.Yes2SDK.*` and return results via `SendMessage('Bridge', ...)`.
-- **WebGL Template** (`Assets/WebGLTemplates/Yes2SDK-SuperSDK/`): Bare HTML template. Does not define `window.Yes2SDK` — the dashboard injects the SuperSDK Core (`yes2sdk.umd.js`) and the selected platform adapter at build time.
-- **Dashboard Pipeline**: Upload build zip -> dashboard injects SDK -> select target platforms -> download platform-ready bundles.
+- **C# Runtime** (`Runtime/`) — static facade + module classes. Uses `[DllImport("__Internal")]` for WebGL, mock fallbacks via `#if UNITY_WEBGL && !UNITY_EDITOR`.
+- **jslib Bridges** (`Plugins/`) — JavaScript files that call `window.Yes2SDK.*` and return results via `SendMessage('Bridge', ...)`.
+- **WebGL Template** (`Assets/WebGLTemplates/Yes2SDK-SuperSDK/`) — bare HTML template. Does not define `window.Yes2SDK` — the dashboard injects the SuperSDK Core (`yes2sdk.umd.js`) at upload time.
 
 ---
 
 ## License
 
-Proprietary. See LICENSE file for details.
+Proprietary. See LICENSE for details.
