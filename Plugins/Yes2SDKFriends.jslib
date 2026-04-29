@@ -12,6 +12,13 @@ mergeInto(LibraryManager.library, {
                 SendMessage('Bridge', 'OnListFriendsSuccess', JSON.stringify(result));
             })
             .catch(__y2h.handleCatch('OnListFriendsError', 'ListFriends failed', 'Yes2SDK.Friends.ListFriendsAsync'));
+    },
+
+    Yes2SDK_Friends_IsSupportedJS__deps: ['$__y2h'],
+    Yes2SDK_Friends_IsSupportedJS: function() {
+        if (!__y2h.has('friends')) return false;
+        try { return window.Yes2SDK.friends.isSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     }
 
 });

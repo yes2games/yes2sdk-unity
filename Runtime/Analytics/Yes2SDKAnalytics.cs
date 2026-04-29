@@ -20,7 +20,7 @@ namespace Yes2SDK
         private static extern void Yes2SDK_LogLevelStartJS(string level);
 
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_LogLevelEndJS(string level, int score, bool success);
+        private static extern void Yes2SDK_LogLevelEndJS(string level, int score, bool success, float durationSeconds);
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_LogScoreJS(int score, string level);
@@ -74,12 +74,16 @@ namespace Yes2SDK
         /// <param name="level">Level identifier.</param>
         /// <param name="score">Score achieved.</param>
         /// <param name="success">Whether the level was completed successfully.</param>
-        public void LogLevelEnd(string level, int score, bool success)
+        /// <param name="durationSeconds">
+        /// Optional duration of the level in seconds. Pass any negative value (default <c>-1</c>) to omit.
+        /// Useful for time-based games (racing, time-attack).
+        /// </param>
+        public void LogLevelEnd(string level, int score, bool success, float durationSeconds = -1f)
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_LogLevelEndJS(level, score, success);
+            Yes2SDK_LogLevelEndJS(level, score, success, durationSeconds);
 #else
-            Yes2Log.Log($"Mock: LogLevelEnd({level}, {score}, {success})");
+            Yes2Log.Log($"Mock: LogLevelEnd({level}, {score}, {success}, duration={durationSeconds})");
 #endif
         }
 

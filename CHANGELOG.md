@@ -10,17 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **`Task`-returning overloads on every async API** with `CancellationToken` support — `InitializeAsync`, `StartGameAsync`, `Auth.*Async`, `Friends.ListFriendsAsync`, `Game.InviteLinkAsync`, `Player.*Async`. Errors throw `Yes2SDKException` (whose `ErrorCode` mirrors the underlying `Error.ErrorCode`), so callers can `try/catch` with timeout via `CancellationTokenSource(TimeSpan)`. Closes #26 and the init-timeout part of #33.
 - **`Ads.IsAdShowing()`** — returns `true` while a `ShowInterstitial`/`ShowRewarded` is in flight. Concurrent `Show*` calls are now rejected immediately with `ErrorCode.InvalidParams` (message tagged `AdAlreadyShowing`) instead of putting the SDK in an undefined state. Closes the in-flight-guard part of #27.
+- **`Ads.IsRewardedAdAvailable()`** — best-effort readiness check; returns `true` while the platform's ad module is loaded. Treat as a UI hint — `ShowRewarded` can still fail with `noFill`. Closes #27.
+- **`IsSupported()` on Friends, Banners, Score** modules — gate Optional APIs UI consistently with the existing Auth/Player pattern. Underlying truth matches the Core SDK's per-platform support: Friends/Banners on CrazyGames only; Score on CrazyGames + Yandex (sticky) + YouTube. Closes #22.
+- **`Analytics.LogLevelEnd` `durationSeconds` parameter** — optional `float` defaulting to `-1f` (omitted). Useful for racing / time-attack games. The jslib bridge omits the field when negative. Closes #28.
 - **WebGL build-time guard** (`Yes2SDKBuildGuard.cs`) — fails WebGL builds early when the `Yes2SDK-SuperSDK` template is missing or not selected, so silent CI breakage stops shipping broken games. Closes #18 (already merged in 2.1.3 → main as part of feat/build-guard).
 
 ### Changed
-- **Editor window** trimmed down. Removed the dead "Show Debug Logs" toggle (the runtime logger never read it), the redundant Build Configuration display rows, the workflow hint block, and the always-on Setup section that took space even after install. Footer now pulls the version from `Yes2SDK.Version` instead of a hardcoded string. Net: ~200 lines deleted, same functionality, less to scan.
+- **Editor window** trimmed down. Removed the dead "Show Debug Logs" toggle (the runtime logger never read it), the redundant Build Configuration display rows, the workflow hint block, and the always-on Setup section that took space even after install. Footer now pulls the version from `Yes2SDK.Version` instead of a hardcoded string.
 
 ### Documentation
 - README adds an `await`-friendly section showing Task-based usage with `CancellationToken` timeouts.
 - New "Running alongside other SDKs" section covering init order, single-owner pause/resume, single-owner ads, namespace collisions, and init-timeout patterns. Partial fix for #33.
+- Optional APIs section (Friends/Banners/Score) now uses the `IsSupported()` guard pattern.
+- Ads section combines `IsAdShowing()` + `IsRewardedAdAvailable()` into a single button-state recipe.
+- Analytics example shows the new `durationSeconds` parameter on `LogLevelEnd`.
 
 ### Notes
-- `IsRewardedAdAvailable()`, `IsSupported()` audit (Friends/Banners/Score), `LogLevelEnd` `durationSeconds`, and async data setters (#22, #27 full, #28, #30) require coordinated upstream changes and ship in a follow-up.
+- Async data setters with success boolean (#30) need a Bridge callback round-trip in the jslib layer; ships in a follow-up.
+- The `IsSupported()`, `IsRewardedAdAvailable()`, and `LogLevelEnd` duration additions depend on the Core SDK round-4 build (yes2sdk-core feat/round-4-feedback-fixes) being live in the dashboard's `sdk-dist/`.
 
 ## [2.1.3] - 2026-04-14
 
