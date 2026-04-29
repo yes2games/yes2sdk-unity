@@ -54,6 +54,9 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern bool Yes2SDK_IsAdBlockedJS();
+
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_IsRewardedAdAvailableJS();
 #endif
 
         #endregion
@@ -268,6 +271,24 @@ namespace Yes2SDK
         /// while one is already showing prevents broken state.
         /// </summary>
         public bool IsAdShowing() => _adInFlight;
+
+        /// <summary>
+        /// Best-effort check whether a rewarded ad is currently available to show.
+        /// </summary>
+        /// <remarks>
+        /// Most platform SDKs don't expose an explicit readiness API — this returns
+        /// true when the platform's ad module appears loaded. Treat the result as a
+        /// hint for gating UI; calling <see cref="ShowRewarded"/> after a true result
+        /// can still fail (e.g. no fill).
+        /// </remarks>
+        public bool IsRewardedAdAvailable()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_IsRewardedAdAvailableJS();
+#else
+            return false;
+#endif
+        }
 
         #endregion
 

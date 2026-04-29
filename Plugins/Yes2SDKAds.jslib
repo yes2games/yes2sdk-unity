@@ -118,6 +118,18 @@ mergeInto(LibraryManager.library, {
         }
 
         return false;
+    },
+
+    // Best-effort check whether a rewarded ad is currently available.
+    // Returns false if the platform doesn't expose readiness or the ads module isn't loaded.
+    Yes2SDK_IsRewardedAdAvailableJS__deps: ['$__y2h'],
+    Yes2SDK_IsRewardedAdAvailableJS: function() {
+        if (!__y2h.has('ads')) return false;
+        if (typeof window.Yes2SDK.ads.isRewardedAdAvailable === 'function') {
+            try { return window.Yes2SDK.ads.isRewardedAdAvailable() ? 1 : 0; }
+            catch (e) { return 0; }
+        }
+        return 0;
     }
 
 });

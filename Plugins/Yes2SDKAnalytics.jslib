@@ -18,10 +18,11 @@ mergeInto(LibraryManager.library, {
     },
 
     Yes2SDK_LogLevelEndJS__deps: ['$__y2', '$__y2h'],
-    Yes2SDK_LogLevelEndJS: function(levelPtr, score, success) {
+    Yes2SDK_LogLevelEndJS: function(levelPtr, score, success, durationSeconds) {
         var level = UTF8ToString(levelPtr);
         if (!__y2h.has('analytics')) { window.__y2.warn('Analytics module not loaded'); return; }
-        try { window.Yes2SDK.analytics.logLevelEnd(level, score, success ? true : false); }
+        var duration = durationSeconds < 0 ? undefined : durationSeconds;
+        try { window.Yes2SDK.analytics.logLevelEnd(level, score, success ? true : false, duration); }
         catch(e) { window.__y2.error('analytics.logLevelEnd failed:', e); }
     },
 

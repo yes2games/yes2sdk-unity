@@ -31,6 +31,9 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_Banners_RefreshBannersJS();
+
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_Banners_IsSupportedJS();
 #endif
 
         #endregion
@@ -90,6 +93,19 @@ namespace Yes2SDK
             Yes2SDK_Banners_RefreshBannersJS();
 #else
             Yes2Log.Log("Mock: Banners.RefreshBanners()");
+#endif
+        }
+
+        /// <summary>
+        /// Check if Banners is supported on the current platform.
+        /// Use this to gate banner UI before calling <see cref="ShowBanner"/>.
+        /// </summary>
+        public bool IsSupported()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_Banners_IsSupportedJS();
+#else
+            return false;
 #endif
         }
 
