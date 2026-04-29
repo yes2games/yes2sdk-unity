@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -123,6 +125,28 @@ namespace Yes2SDK
             InvokeAccountLinkError(FeatureNotSupportedError("Yes2SDK.Auth.ShowAccountLinkPromptAsync"));
 #endif
         }
+
+        // Task-returning overloads.
+
+        public Task<AuthUser> GetCurrentUserAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<AuthUser>(
+                (success, error) => GetCurrentUserAsync(success, error),
+                cancellationToken);
+
+        public Task<AuthUser> SignInAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<AuthUser>(
+                (success, error) => SignInAsync(success, error),
+                cancellationToken);
+
+        public Task<string> GetTokenAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetTokenAsync(success, error),
+                cancellationToken);
+
+        public Task<bool> ShowAccountLinkPromptAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<bool>(
+                (success, error) => ShowAccountLinkPromptAsync(success, error),
+                cancellationToken);
 
         #endregion
 

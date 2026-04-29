@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-04-29
+
+### Added
+- **`Task`-returning overloads on every async API** with `CancellationToken` support — `InitializeAsync`, `StartGameAsync`, `Auth.*Async`, `Friends.ListFriendsAsync`, `Game.InviteLinkAsync`, `Player.*Async`. Errors throw `Yes2SDKException` (whose `ErrorCode` mirrors the underlying `Error.ErrorCode`), so callers can `try/catch` with timeout via `CancellationTokenSource(TimeSpan)`. Closes #26 and the init-timeout part of #33.
+- **`Ads.IsAdShowing()`** — returns `true` while a `ShowInterstitial`/`ShowRewarded` is in flight. Concurrent `Show*` calls are now rejected immediately with `ErrorCode.InvalidParams` (message tagged `AdAlreadyShowing`) instead of putting the SDK in an undefined state. Closes the in-flight-guard part of #27.
+- **WebGL build-time guard** (`Yes2SDKBuildGuard.cs`) — fails WebGL builds early when the `Yes2SDK-SuperSDK` template is missing or not selected, so silent CI breakage stops shipping broken games. Closes #18 (already merged in 2.1.3 → main as part of feat/build-guard).
+
+### Changed
+- **Editor window** trimmed down. Removed the dead "Show Debug Logs" toggle (the runtime logger never read it), the redundant Build Configuration display rows, the workflow hint block, and the always-on Setup section that took space even after install. Footer now pulls the version from `Yes2SDK.Version` instead of a hardcoded string. Net: ~200 lines deleted, same functionality, less to scan.
+
+### Documentation
+- README adds an `await`-friendly section showing Task-based usage with `CancellationToken` timeouts.
+- New "Running alongside other SDKs" section covering init order, single-owner pause/resume, single-owner ads, namespace collisions, and init-timeout patterns. Partial fix for #33.
+
+### Notes
+- `IsRewardedAdAvailable()`, `IsSupported()` audit (Friends/Banners/Score), `LogLevelEnd` `durationSeconds`, and async data setters (#22, #27 full, #28, #30) require coordinated upstream changes and ship in a follow-up.
+
 ## [2.1.3] - 2026-04-14
 
 ### Fixed

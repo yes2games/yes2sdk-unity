@@ -1,8 +1,8 @@
 {
     "name": "com.yes2games.yes2sdk",
-    "version": "2.1.3",
+    "version": "2.2.0",
     "displayName": "Yes2SDK",
-    "description": "Yes2SDK Unity package for the SuperSDK pipeline — build once, publish to 5 platforms",
+    "description": "Yes2SDK Unity package for the SuperSDK pipeline",
     "unity": "2021.3",
     "unityRelease": "0f1",
     "documentationUrl": "https://github.com/yes2games/yes2sdk-unity",

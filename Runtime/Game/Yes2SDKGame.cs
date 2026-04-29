@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -116,6 +118,11 @@ namespace Yes2SDK
             InvokeInviteLinkError(FeatureNotSupportedError("Yes2SDK.Game.InviteLinkAsync"));
 #endif
         }
+
+        public Task<string> InviteLinkAsync(Dictionary<string, string> parameters, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => InviteLinkAsync(parameters, success, error),
+                cancellationToken);
 
         /// <summary>
         /// Get the value of an invite parameter from the URL.
