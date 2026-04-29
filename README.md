@@ -192,15 +192,14 @@ adDismissed   → no reward (fires if the player skipped/closed early)
 
 > ⚠️ **Do NOT grant rewards in `afterAd`.** `afterAd` fires for both completion *and* dismissal — granting rewards there gives them away on skip. Always grant in `adViewed`.
 
-#### Concurrent ad guard
+#### Concurrent ad guard + readiness
 
-`Ads.IsAdShowing()` returns `true` while a `ShowInterstitial` or `ShowRewarded` is in flight (between the call and `afterAd`/error). Calling `Show*` again while one is already showing is rejected immediately — `onError` fires with `ErrorCode.InvalidParams` and a message starting `"Another ad is already in flight (AdAlreadyShowing)…"`. Use `IsAdShowing()` to gate the UI that triggers ads:
+- `Ads.IsAdShowing()` — returns `true` while a `ShowInterstitial` or `ShowRewarded` is in flight (between the call and `afterAd`/error). Calling `Show*` again while one is already showing is rejected immediately — `onError` fires with `ErrorCode.InvalidParams` and a message starting `"Another ad is already in flight (AdAlreadyShowing)…"`.
+- `Ads.IsRewardedAdAvailable()` — best-effort check whether a rewarded ad appears available right now. Most platform SDKs don't expose explicit readiness, so this returns `true` as long as the platform's ad module is loaded; the actual `ShowRewarded` call can still fail with `noFill`. Use it as a hint, not a guarantee.
 
 ```csharp
-if (!Yes2SDK.Ads.IsAdShowing())
-{
-    rewardButton.interactable = true;
-}
+rewardButton.interactable =
+    !Yes2SDK.Ads.IsAdShowing() && Yes2SDK.Ads.IsRewardedAdAvailable();
 ```
 
 ### Gameplay Tracking (required)
@@ -237,6 +236,8 @@ Yes2SDK.Analytics.LogEvent("custom-event", new Dictionary<string, object> {
 
 Yes2SDK.Analytics.LogLevelStart("level-1");
 Yes2SDK.Analytics.LogLevelEnd("level-1", score: 1500, success: true);
+// Time-based games (racing, time-attack) can include duration:
+Yes2SDK.Analytics.LogLevelEnd("level-1", score: 1500, success: true, durationSeconds: 87.3f);
 Yes2SDK.Analytics.LogScore(1500);
 ```
 
@@ -253,7 +254,7 @@ string device = Yes2SDK.Session.GetDevice();   // "desktop" or "mobile"
 
 ## Optional APIs
 
-These modules add extra player-facing features. They are **not guaranteed** to be available at runtime — guard with `IsSupported()` where the module exposes it (currently `Auth` and `Player`), and always handle `FeatureNotSupported` errors gracefully. Don't make your core gameplay depend on them.
+These modules add extra player-facing features. They are **not guaranteed** to be available at runtime — guard with `IsSupported()` (available on `Auth`, `Friends`, `Banners`, `Score`, and `Player`), and always handle `FeatureNotSupported` errors gracefully. Don't make your core gameplay depend on them.
 
 ### Auth
 
@@ -274,22 +275,18 @@ if (Yes2SDK.Auth.IsSupported())
 
 ### Friends
 
-`Friends` does not yet expose `IsSupported()` — handle the `FeatureNotSupported` error instead, and hide friends UI on platforms that reject the call.
-
 ```csharp
-Yes2SDK.Friends.ListFriendsAsync(
-    page: 0, size: 10,
-    onSuccess: page => {
-        foreach (var friend in page.Friends)
-            Debug.Log($"{friend.Username} ({friend.Id})");
-    },
-    onError: err => {
-        if (err.ErrorCode == ErrorCode.FeatureNotSupported)
-            HideFriendsUI();          // platform doesn't support friends
-        else
-            Debug.LogError(err);
-    }
-);
+if (Yes2SDK.Friends.IsSupported())
+{
+    Yes2SDK.Friends.ListFriendsAsync(
+        page: 0, size: 10,
+        onSuccess: page => {
+            foreach (var friend in page.Friends)
+                Debug.Log($"{friend.Username} ({friend.Id})");
+        },
+        onError: err => Debug.LogError(err)
+    );
+}
 ```
 
 ### Banners
@@ -297,9 +294,12 @@ Yes2SDK.Friends.ListFriendsAsync(
 Container-based display ads. Different from `Ads.ShowBanner`.
 
 ```csharp
-Yes2SDK.Banners.ShowBanner("sidebar-left", BannerSize.Medium_300x250);
-Yes2SDK.Banners.HideBanner("sidebar-left");
-Yes2SDK.Banners.HideAllBanners();
+if (Yes2SDK.Banners.IsSupported())
+{
+    Yes2SDK.Banners.ShowBanner("sidebar-left", BannerSize.Medium_300x250);
+    Yes2SDK.Banners.HideBanner("sidebar-left");
+    Yes2SDK.Banners.HideAllBanners();
+}
 ```
 
 ### Game Extras
@@ -326,8 +326,11 @@ Yes2SDK.Game.CopyToClipboard("https://...");
 ### Score
 
 ```csharp
-Yes2SDK.Score.AddScore(150f);
-Yes2SDK.Score.SubmitScore("encrypted-score-string");
+if (Yes2SDK.Score.IsSupported())
+{
+    Yes2SDK.Score.AddScore(150f);
+    Yes2SDK.Score.SubmitScore("encrypted-score-string");
+}
 ```
 
 ### Player Data
