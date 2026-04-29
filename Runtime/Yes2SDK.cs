@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Yes2SDK
@@ -66,7 +68,7 @@ namespace Yes2SDK
         /// <summary>
         /// SDK version string.
         /// </summary>
-        public static string Version => "2.1.3";
+        public static string Version => "2.2.0";
 
         private static Yes2SDKAds _ads;
 
@@ -371,6 +373,18 @@ namespace Yes2SDK
         }
 
         /// <summary>
+        /// Initialize the Yes2SDK and await completion. The token cancels the
+        /// awaiting Task — the underlying platform init may still complete in
+        /// the background, but its result is dropped.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token (use <see cref="CancellationToken.None"/> for no timeout).</param>
+        /// <returns>Task that completes when initialization succeeds or throws <see cref="Yes2SDKException"/>.</returns>
+        public static Task InitializeAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask(
+                (onSuccess, onError) => InitializeAsync(onSuccess, onError),
+                cancellationToken);
+
+        /// <summary>
         /// Notify the platform that the game has finished loading and is ready to play.
         /// Call this after your game assets are loaded.
         /// </summary>
@@ -399,6 +413,16 @@ namespace Yes2SDK
             Callbacks.InvokeStartGameSuccess();
 #endif
         }
+
+        /// <summary>
+        /// Notify the platform that the game has finished loading and await acknowledgement.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Task that completes when start is acknowledged or throws <see cref="Yes2SDKException"/>.</returns>
+        public static Task StartGameAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask(
+                (onSuccess, onError) => StartGameAsync(onSuccess, onError),
+                cancellationToken);
 
         /// <summary>
         /// Update the loading progress shown to the player.

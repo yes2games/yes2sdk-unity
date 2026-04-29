@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -160,6 +162,38 @@ namespace Yes2SDK
             InvokeGetSignedPlayerInfoError(FeatureNotSupportedError("Yes2SDK.Player.GetSignedPlayerInfoAsync"));
 #endif
         }
+
+        // Task-returning overloads.
+
+        public Task<PlayerInfo> GetPlayerAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<PlayerInfo>(
+                (success, error) => GetPlayerAsync(success, error),
+                cancellationToken);
+
+        public Task<string> GetDataAsync(string[] keys, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetDataAsync(keys, success, error),
+                cancellationToken);
+
+        public Task SetDataAsync(string dataJson, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask(
+                (success, error) => SetDataAsync(dataJson, success, error),
+                cancellationToken);
+
+        public Task FlushDataAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask(
+                (success, error) => FlushDataAsync(success, error),
+                cancellationToken);
+
+        public Task<string> GetConnectedPlayersAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetConnectedPlayersAsync(success, error),
+                cancellationToken);
+
+        public Task<string> GetSignedPlayerInfoAsync(string payload, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetSignedPlayerInfoAsync(payload, success, error),
+                cancellationToken);
 
         /// <summary>
         /// Whether player data persistence is supported on the current platform.

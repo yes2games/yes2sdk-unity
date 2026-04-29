@@ -19,10 +19,10 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 
 1. Open **Window > Package Manager**
 2. Click **+** > **Add package from git URL...**
-3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.1.3`
+3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.2.0`
 4. Click **Add**
 
-> Pinning the URL with `#v2.1.3` keeps the package hash stable across resolves. Bump the tag (e.g. `#v2.2.0`) to upgrade. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
+> Pinning the URL with `#v2.2.0` keeps the package hash stable across resolves. Bump the tag (e.g. `#v2.2.0`) to upgrade. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
 
 ### Via Local Folder
 
@@ -114,6 +114,34 @@ Yes2SDK.StartGameAsync(onSuccess, onError);
 
 > **Important:** these three calls fire in three distinct stages — *don't chain them*. `InitializeAsync` is at app launch. `SetLoadingProgress` is updated as your assets load. `StartGameAsync` runs **only when the game is actually playable** (splash gone, scene loaded, accepting input). See [Quick Start](#quick-start) for the full pattern.
 
+#### `await`-friendly overloads
+
+Every `*Async` method has a `Task`-returning overload that takes a `CancellationToken`. Pass `CancellationToken.None` for no timeout, or a real token for cancellation/timeout support. Errors are thrown as `Yes2SDKException` (whose `ErrorCode` matches the `Error.ErrorCode` of the underlying failure):
+
+```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Yes2SDK;
+
+// Cancel init if it hangs for more than 10 seconds
+using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+try
+{
+    await Yes2SDK.InitializeAsync(cts.Token);
+    Debug.Log("SDK ready");
+}
+catch (Yes2SDKException ex) when (ex.ErrorCode == ErrorCode.NetworkError)
+{
+    // Platform unreachable — fall back or retry with backoff
+}
+catch (TaskCanceledException)
+{
+    // Init didn't complete inside the timeout
+}
+```
+
+The callback-based form is unchanged and still preferred for short-lived game-loop call sites where allocating Tasks is overkill.
+
 Handle pause / resume so your game reacts when the SDK pauses you (e.g. during an ad):
 
 ```csharp
@@ -163,6 +191,17 @@ adDismissed   → no reward (fires if the player skipped/closed early)
 ```
 
 > ⚠️ **Do NOT grant rewards in `afterAd`.** `afterAd` fires for both completion *and* dismissal — granting rewards there gives them away on skip. Always grant in `adViewed`.
+
+#### Concurrent ad guard
+
+`Ads.IsAdShowing()` returns `true` while a `ShowInterstitial` or `ShowRewarded` is in flight (between the call and `afterAd`/error). Calling `Show*` again while one is already showing is rejected immediately — `onError` fires with `ErrorCode.InvalidParams` and a message starting `"Another ad is already in flight (AdAlreadyShowing)…"`. Use `IsAdShowing()` to gate the UI that triggers ads:
+
+```csharp
+if (!Yes2SDK.Ads.IsAdShowing())
+{
+    rewardButton.interactable = true;
+}
+```
 
 ### Gameplay Tracking (required)
 
@@ -330,11 +369,9 @@ The QA Inspector in the Yes2Games Dashboard validates all of this automatically.
 ## Building
 
 1. Open **Yes2SDK > Build Window**
-2. Click **Apply Settings** — sets the WebGL template and build configuration
-3. Click **Build WebGL** or **Build and Run**
-4. Zip the build output folder
-5. Upload the zip to the **Yes2Games Dashboard**
-6. Run through the QA Inspector; when everything is green, **Request Review**
+2. Click **Build WebGL** (or **Build and Run** to launch in browser).
+
+The output folder is what you upload to the **Yes2Games Dashboard** — the dashboard handles SDK injection, platform bundling, and walks you through the QA Inspector and review request.
 
 ### Build Configuration
 
@@ -410,6 +447,18 @@ onError: err => {
 | `RateLimited` | Too many calls in a short window (e.g. ad spam protection). | Back off and try again later — don't retry immediately. |
 | `UserCancelled` | The player closed/dismissed a flow (e.g. login dialog, rewarded ad). | Not an error in the usual sense — silently respect the player's choice, no toast. |
 | `Unknown` | The error didn't match any of the above. | Log everything (`err.Code`, `err.Message`, `err.Context`) and treat as a hard failure. |
+
+---
+
+## Running alongside other SDKs
+
+Real games often ship with multiple platform SDKs in the same build (Yes2SDK + Poki + Yandex + Playgama, etc.). A few ground rules to keep them from stepping on each other:
+
+- **Init order.** Initialize Yes2SDK first. Yes2SDK figures out which actual platform is hosting the game and routes through it — initializing your own platform SDK directly first can race with Yes2SDK's detection.
+- **One owner for pause / resume.** Pick one SDK to drive `Time.timeScale` and `AudioListener.pause`. If both Yes2SDK and another SDK call resume/pause, you'll get oscillation. Recommended: subscribe to `Yes2SDK.OnPause` / `OnResume` and ignore the other SDK's equivalent.
+- **One owner for ads.** Don't call ads via two SDKs in the same session — the platform almost always rejects the second call. Pick the SDK that targets the platform you're actually hosted on.
+- **Namespace collisions.** If you have your own `Platform` type, qualify the Yes2SDK enum (`Yes2SDK.Platform`) at the call site or use a `using` alias (`using Y2 = Yes2SDK;`). C# resolves namespace-vs-type ambiguity by full qualification.
+- **Init timeout.** If you depend on Yes2SDK init completing before your other SDK's flow, wrap `InitializeAsync` in a `CancellationToken` with a timeout (see [`await`-friendly overloads](#await-friendly-overloads)) so your game doesn't hang on a wedged JS bridge.
 
 ---
 

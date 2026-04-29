@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using UnityEngine;
 
@@ -48,6 +50,11 @@ namespace Yes2SDK
             InvokeListFriendsError(FeatureNotSupportedError("Yes2SDK.Friends.ListFriendsAsync"));
 #endif
         }
+
+        public Task<FriendsPage> ListFriendsAsync(int page, int size, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<FriendsPage>(
+                (success, error) => ListFriendsAsync(page, size, success, error),
+                cancellationToken);
 
         #endregion
 

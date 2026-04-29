@@ -30,6 +30,11 @@ namespace Yes2SDK
         private static Action _bannerHiddenCallback;
         private static Action<Error> _bannerHideErrorCallback;
 
+        // True between any ShowInterstitial / ShowRewarded call and its
+        // afterAd / error completion. Used to reject concurrent ad calls and
+        // exposed via IsAdShowing().
+        private static bool _adInFlight;
+
         #endregion
 
         #region JavaScript Imports
@@ -77,6 +82,18 @@ namespace Yes2SDK
             Action afterAd = null,
             Action<Error> onError = null)
         {
+            if (_adInFlight)
+            {
+                onError?.Invoke(new Error
+                {
+                    Code = "InvalidParams",
+                    Message = "Another ad is already in flight (AdAlreadyShowing). Wait for afterAd before calling Show* again.",
+                    Context = "Yes2SDK.Ads.ShowInterstitial"
+                });
+                return;
+            }
+            _adInFlight = true;
+
             // Store callbacks
             _interstitialBeforeAdCallback = beforeAd;
             _interstitialAfterAdCallback = afterAd;
@@ -89,6 +106,7 @@ namespace Yes2SDK
             // Simulate ad flow in Editor
             _interstitialBeforeAdCallback?.Invoke();
             _interstitialAfterAdCallback?.Invoke();
+            _adInFlight = false;
 #endif
         }
 
@@ -125,6 +143,18 @@ namespace Yes2SDK
             Action adViewed = null,
             Action<Error> onError = null)
         {
+            if (_adInFlight)
+            {
+                onError?.Invoke(new Error
+                {
+                    Code = "InvalidParams",
+                    Message = "Another ad is already in flight (AdAlreadyShowing). Wait for afterAd before calling Show* again.",
+                    Context = "Yes2SDK.Ads.ShowRewarded"
+                });
+                return;
+            }
+            _adInFlight = true;
+
             // Store callbacks
             _rewardedBeforeAdCallback = beforeAd;
             _rewardedAfterAdCallback = afterAd;
@@ -149,6 +179,7 @@ namespace Yes2SDK
             {
                 _rewardedAdViewedCallback?.Invoke();
             }
+            _adInFlight = false;
 #endif
         }
 
@@ -230,6 +261,14 @@ namespace Yes2SDK
 #endif
         }
 
+        /// <summary>
+        /// Returns true while a `ShowInterstitial` or `ShowRewarded` call is in
+        /// progress (between the initial call and `afterAd`/error). Use this to
+        /// gate UI that triggers ads — hiding the "Watch for reward" button
+        /// while one is already showing prevents broken state.
+        /// </summary>
+        public bool IsAdShowing() => _adInFlight;
+
         #endregion
 
         #region Internal Callback Invocations (called by Bridge)
@@ -249,6 +288,7 @@ namespace Yes2SDK
         {
             _interstitialAfterAdCallback?.Invoke();
             ClearInterstitialCallbacks();
+            _adInFlight = false;
         }
 
         /// <summary>
@@ -258,6 +298,7 @@ namespace Yes2SDK
         {
             _interstitialErrorCallback?.Invoke(error);
             ClearInterstitialCallbacks();
+            _adInFlight = false;
         }
 
         /// <summary>
@@ -283,6 +324,7 @@ namespace Yes2SDK
         {
             _rewardedAdDismissedCallback?.Invoke();
             ClearRewardedCallbacks();
+            _adInFlight = false;
         }
 
         /// <summary>
@@ -292,6 +334,7 @@ namespace Yes2SDK
         {
             _rewardedAdViewedCallback?.Invoke();
             ClearRewardedCallbacks();
+            _adInFlight = false;
         }
 
         /// <summary>
@@ -301,6 +344,7 @@ namespace Yes2SDK
         {
             _rewardedErrorCallback?.Invoke(error);
             ClearRewardedCallbacks();
+            _adInFlight = false;
         }
 
         /// <summary>
