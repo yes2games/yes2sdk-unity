@@ -17,6 +17,9 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_Score_SubmitScoreJS(string encryptedScore);
+
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_Score_IsSupportedJS();
 #endif
 
         #endregion
@@ -46,6 +49,19 @@ namespace Yes2SDK
             Yes2SDK_Score_SubmitScoreJS(encryptedScore);
 #else
             Yes2Log.Log($"Mock: Score.SubmitScore({encryptedScore})");
+#endif
+        }
+
+        /// <summary>
+        /// Check if Score submission is supported on the current platform.
+        /// Use this to gate score-submit UI before calling <see cref="AddScore"/> or <see cref="SubmitScore"/>.
+        /// </summary>
+        public bool IsSupported()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_Score_IsSupportedJS();
+#else
+            return false;
 #endif
         }
 

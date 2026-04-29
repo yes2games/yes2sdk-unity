@@ -31,6 +31,13 @@ mergeInto(LibraryManager.library, {
     Yes2SDK_Banners_RefreshBannersJS__deps: ['$__y2h'],
     Yes2SDK_Banners_RefreshBannersJS: function() {
         if (__y2h.has('banners')) window.Yes2SDK.banners.refreshBanners();
+    },
+
+    Yes2SDK_Banners_IsSupportedJS__deps: ['$__y2h'],
+    Yes2SDK_Banners_IsSupportedJS: function() {
+        if (!__y2h.has('banners')) return false;
+        try { return window.Yes2SDK.banners.isSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     }
 
 });

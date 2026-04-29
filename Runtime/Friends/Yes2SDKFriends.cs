@@ -25,6 +25,9 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")]
         private static extern void Yes2SDK_Friends_ListFriendsAsyncJS(int page, int size);
+
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_Friends_IsSupportedJS();
 #endif
 
         #endregion
@@ -55,6 +58,19 @@ namespace Yes2SDK
             => TaskCallbackHelper.ToTask<FriendsPage>(
                 (success, error) => ListFriendsAsync(page, size, success, error),
                 cancellationToken);
+
+        /// <summary>
+        /// Check if Friends is supported on the current platform.
+        /// Use this to gate friends UI before calling <see cref="ListFriendsAsync(int,int,System.Action{FriendsPage},System.Action{Error})"/>.
+        /// </summary>
+        public bool IsSupported()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_Friends_IsSupportedJS();
+#else
+            return false;
+#endif
+        }
 
         #endregion
 
