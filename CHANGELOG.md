@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-04-30
+
+### Fixed
+- **`Yes2Log.cs.meta` GUID collision with `com.unity.ai.assistant`** (#39) — meta file shipped with a hand-typed placeholder GUID that collided with the AI Assistant package. Unity silently ignored one of the two, so projects using both packages failed to compile with `CS0103: Yes2Log does not exist`. Regenerated to a proper random GUID.
+- **WebGL template `setLoadingProgress` log spam** (#42) — `index.html` forwarded every Unity progress tick to the SDK, which the dashboard inspector logged as "Loading progress" hundreds of times per build. Throttled to forward only when the integer percentage changes — at most 101 calls per build.
+
+### Changed
+- **Build Window no longer auto-overrides Player Settings on every build** (#40). The previous version called `BuildConfig.Default.ApplySettings()` inside `BuildGame()`, silently resetting Exception Support / Compression / Stripping / Template each time the user clicked Build. The new Build Window has a collapsible **WebGL Settings** panel that inline-edits Player Settings (no Apply step) and a **Reset to recommended** button for opt-in re-apply. `Yes2SDKBuildGuard` still enforces the `Yes2SDK-SuperSDK` template — the only truly mandatory setting.
+- **New `Build Mode` dropdown** with Production / Production Safe / Diagnostic options. Production Safe forces Exception Support to `Explicitly Thrown` for one build (useful when Player Settings is `None`). Diagnostic forces `Full With Stacktrace`. Both restore Player Settings after the build via `IPostprocessBuildWithReport`.
+- **`BuildConfig.Default.exceptionSupport`** flipped from `None` → `ExplicitlyThrownExceptionsOnly` (#41). `None` is smaller but breaks projects where a dependency uses `try/catch` (Newtonsoft.Json, etc.). The new default is ~10% larger but compatible with the .NET ecosystem.
+
+### Documentation
+- README Build Configuration table reworked: added Memory Size row, expanded Notes column, prominent warning explaining `None` vs `Explicitly Thrown`.
+- New "Build Mode for diagnostics" subsection.
+- "Where to set these" updated to lead with the Build Window's Settings panel.
+
+### Behaviour notes for users on upgrade
+
+- Existing builds will get `ExplicitlyThrownExceptionsOnly` for Exception Support unless overridden — ~10% larger but more robust.
+- The Build Window now respects custom Player Settings rather than silently overwriting them. Verify your active settings via *Yes2SDK > Build Window > WebGL Settings*.
+- The `Apply Settings` link has been renamed **Reset to recommended** and moved into the WebGL Settings foldout.
+
 ## [2.2.0] - 2026-04-29
 
 ### Added

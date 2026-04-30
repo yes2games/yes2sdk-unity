@@ -37,7 +37,7 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 2. Click **Install Template** — this installs the `Yes2SDK-SuperSDK` WebGL template into your project
 3. The status indicator changes from "Setup Pending" to "Ready"
 
-> After updating the SDK package, click **Reinstall Template** in the Settings section to copy changes into your project.
+> After updating the SDK package, click **Reinstall Template** in the Build Window to copy changes into your project.
 
 ---
 
@@ -378,19 +378,37 @@ The output folder is what you upload to the **Yes2Games Dashboard** — the dash
 
 ### Build Configuration
 
-| Setting | Value |
-|---------|-------|
-| Template | Yes2SDK-SuperSDK |
-| Compression | Disabled |
-| Code Stripping | Medium |
-| Exception Support | None |
+| Setting | Recommended | Notes |
+|---|---|---|
+| Template | `Yes2SDK-SuperSDK` | Required. The build-time guard fails the build with any other template. |
+| Compression | Disabled | Required for dashboard upload — the CDN doesn't currently send `Content-Encoding` headers. |
+| Code Stripping | Medium | Balances build size and AOT safety. |
+| Exception Support | Explicitly Thrown Exceptions Only | See note below. |
+| Memory Size | 256 MB+ | Most games need at least 256–512 MB. Smaller heaps trigger a generic "unspecified error" at boot. |
 
-#### Where to set these — depends on your Unity version
+> ⚠️ **Why not `Exception Support: None`?**
+>
+> `None` produces the smallest build, but Unity WebGL's `None` mode strips exception infrastructure entirely — even an exception caught by a `try/catch` aborts the wasm. This breaks any code path where a dependency uses `try/catch` as control flow (Newtonsoft.Json — which the SDK itself imports — third-party Unity asset packages, save systems, etc.).
+>
+> Most games should ship with **Explicitly Thrown Exceptions Only**: about 10% larger build but compatible with the .NET ecosystem. Use `None` only after auditing your full dependency graph.
 
+#### Where to set these
+
+- **Yes2SDK Build Window** (recommended) — *Yes2SDK > Build Window > WebGL Settings* (collapsible panel). Edits write to Player Settings live, no Apply step. Click **Reset to recommended** to apply all the values from the table above at once.
 - **Unity 2021–2022**: *Edit > Project Settings > Player > WebGL* (project-wide).
-- **Unity 6+**: *File > Build Profiles* — select your WebGL profile, then click **Player Settings** at the bottom of the profile panel. Settings apply only to that profile, so make sure the profile you build is the one with these values.
+- **Unity 6+**: *File > Build Profiles* — select your WebGL profile, then click **Player Settings** at the bottom of the profile panel. Settings apply only to that profile.
 
-> Unity 6 moved WebGL settings from project-wide Player Settings into per-profile Build Profiles. If you set values in the old location on Unity 6+, the build will pick up the *profile's* defaults instead and your settings are silently ignored.
+> Unity 6 moved WebGL settings from project-wide Player Settings into per-profile Build Profiles. The Yes2SDK Build Window's Settings panel reads/writes the active settings regardless of where they live, so it's the safest place to edit.
+
+#### Build Mode for diagnostics
+
+The Build Window has a **Build Mode** dropdown for one-off overrides without changing your Player Settings:
+
+- **Production** — use Player Settings as-is. Default for shipping builds.
+- **Production Safe** — temporarily forces Exception Support to `Explicitly Thrown` for one build. Useful when your Player Settings is `None` but you need a build that catches third-party throws.
+- **Diagnostic** — temporarily forces `Full With Stacktrace`. Use to capture real C# class/method names in browser console errors when chasing a crash.
+
+The override saves and restores Player Settings around each build, so it never leaves your project in an unexpected state.
 
 ---
 
