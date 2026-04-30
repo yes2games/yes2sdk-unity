@@ -215,11 +215,18 @@
     var script = document.createElement("script");
     script.src = loaderUrl;
     script.onload = function() {
+      var lastSdkProgressPct = -1;
       createUnityInstance(canvas, config, function(progress) {
         Y2GLoader.setProgress(progress * 100);
-        // Report progress to Yes2SDK if available
-        if (window.Yes2SDK && window.Yes2SDK.setLoadingProgress) {
-          window.Yes2SDK.setLoadingProgress(Math.round(progress * 100));
+        // Report integer-percentage progress to Yes2SDK only when it
+        // changes — the dashboard inspector logs every call, so an
+        // unthrottled forward fills the boot console with hundreds of
+        // duplicate "Loading progress" entries.
+        var pct = Math.round(progress * 100);
+        if (pct !== lastSdkProgressPct &&
+            window.Yes2SDK && window.Yes2SDK.setLoadingProgress) {
+          window.Yes2SDK.setLoadingProgress(pct);
+          lastSdkProgressPct = pct;
         }
       }).then(function(unityInstance) {
         Y2GLoader.complete();
