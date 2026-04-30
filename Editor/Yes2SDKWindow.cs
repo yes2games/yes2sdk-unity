@@ -249,11 +249,6 @@ namespace Yes2SDK.Editor
             EditorGUILayout.LabelField("Build Mode", EditorStyles.boldLabel);
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-            EditorGUILayout.LabelField(
-                "Override Exception Support for the next build only — Player Settings is restored after.",
-                EditorStyles.wordWrappedMiniLabel);
-            EditorGUILayout.Space(4);
-
             // Dropdown — only one mode is active at a time, so a popup is
             // more honest than a radio group and stays compact for users
             // who never need to change it.
