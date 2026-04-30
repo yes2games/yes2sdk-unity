@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEditor;
 using System.IO;
+#if UNITY_6000_0_OR_NEWER
+using UnityEditor.Build.Profile;
+#endif
 
 namespace Yes2SDK.Editor
 {
@@ -13,12 +16,14 @@ namespace Yes2SDK.Editor
     public class Yes2SDKWindow : EditorWindow
     {
         private const string PrefsBuildPath = "Yes2SDK_BuildPath";
+        private const string PrefsSettingsExpanded = "Yes2SDK_SettingsExpanded";
         private const string DashboardUrl = "https://dashboard.yes2games.com";
         private const string DocsUrl = "https://github.com/yes2games/yes2sdk-unity";
         private const string IssuesUrl = "https://github.com/yes2games/yes2sdk-unity/issues";
 
         private string _buildPath;
         private bool _isSetupComplete;
+        private bool _settingsExpanded;
 
         [MenuItem("Yes2SDK/Build Window", false, 0)]
         public static void ShowWindow()
@@ -37,6 +42,7 @@ namespace Yes2SDK.Editor
         private void OnEnable()
         {
             _buildPath = EditorPrefs.GetString(PrefsBuildPath, "Builds");
+            _settingsExpanded = EditorPrefs.GetBool(PrefsSettingsExpanded, false);
             RefreshSetupStatus();
         }
 
@@ -56,8 +62,20 @@ namespace Yes2SDK.Editor
             DrawStatus();
             EditorGUILayout.Space(10);
 
-            if (!_isSetupComplete) DrawSetup();
-            else DrawBuild();
+            if (!_isSetupComplete)
+            {
+                DrawSetup();
+            }
+            else
+            {
+                DrawSettings();
+                EditorGUILayout.Space(10);
+
+                DrawBuildMode();
+                EditorGUILayout.Space(10);
+
+                DrawBuild();
+            }
 
             GUILayout.FlexibleSpace();
             DrawLinks();
@@ -139,6 +157,171 @@ namespace Yes2SDK.Editor
             EditorGUILayout.EndVertical();
         }
 
+        private void DrawSettings()
+        {
+            // Collapsible — defaults closed so the Build Window stays compact
+            // for users who don't need to fiddle. Persists open/closed state
+            // across Editor sessions.
+            EditorGUI.BeginChangeCheck();
+            _settingsExpanded = EditorGUILayout.Foldout(
+                _settingsExpanded,
+                "WebGL Settings",
+                toggleOnLabelClick: true,
+                EditorStyles.foldoutHeader);
+            if (EditorGUI.EndChangeCheck())
+                EditorPrefs.SetBool(PrefsSettingsExpanded, _settingsExpanded);
+
+            if (!_settingsExpanded) return;
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField(
+                "Edits apply to project-wide Player Settings immediately — no Apply step.",
+                EditorStyles.miniLabel);
+
+#if UNITY_6000_0_OR_NEWER
+            // Unity 6 Build Profiles can override Player Settings on a
+            // per-profile basis. If one is active, edits made here might be
+            // shadowed at build time — warn the user explicitly so this isn't
+            // a silent footgun.
+            var activeProfile = BuildProfile.GetActiveBuildProfile();
+            if (activeProfile != null)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Active Build Profile: \"{activeProfile.name}\".\n" +
+                    "If this profile has overrides for the WebGL settings below, " +
+                    "they will take precedence at build time. To edit the " +
+                    "profile's overrides instead, use File > Build Profiles.",
+                    MessageType.Info);
+            }
+#endif
+            EditorGUILayout.Space(4);
+
+            // Template — informational only. BuildGuard enforces this; show a
+            // warning if it drifts.
+            string currentTemplate = PlayerSettings.WebGL.template;
+            string expected = "PROJECT:Yes2SDK-SuperSDK";
+            EditorGUILayout.LabelField(
+                new GUIContent("Template",
+                    "Yes2SDK-SuperSDK is required. Other templates won't have the JS bridge wired up — Yes2SDKBuildGuard will fail the build."),
+                new GUIContent(currentTemplate));
+            if (currentTemplate != expected)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Template should be {expected}. Click \"Reset to recommended\" or set it via the Build Profile's Player Settings.",
+                    MessageType.Warning);
+            }
+
+            // Compression Format
+            EditorGUI.BeginChangeCheck();
+            var newCompression = (WebGLCompressionFormat)EditorGUILayout.EnumPopup(
+                new GUIContent("Compression",
+                    "Disabled is required for Yes2Games dashboard upload — the dashboard CDN doesn't currently send Content-Encoding headers, so Brotli/Gzip builds fail to decompress in browser."),
+                PlayerSettings.WebGL.compressionFormat);
+            if (EditorGUI.EndChangeCheck())
+                PlayerSettings.WebGL.compressionFormat = newCompression;
+
+            // Code Stripping
+            EditorGUI.BeginChangeCheck();
+            var currentStripping = PlayerSettings.GetManagedStrippingLevel(BuildTargetGroup.WebGL);
+            var newStripping = (ManagedStrippingLevel)EditorGUILayout.EnumPopup(
+                new GUIContent("Code Stripping",
+                    "Medium balances build size and AOT safety — recommended. High requires manual link.xml entries for reflection-only types. Low produces large builds; useful for debugging strip-related issues."),
+                currentStripping);
+            if (EditorGUI.EndChangeCheck())
+                PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.WebGL, newStripping);
+
+            // Exception Support
+            EditorGUI.BeginChangeCheck();
+            var newException = (WebGLExceptionSupport)EditorGUILayout.EnumPopup(
+                new GUIContent("Exception Support",
+                    "Explicitly Thrown is recommended for most games — catches throws from Newtonsoft.Json and other libraries. None is smaller but breaks any try/catch path. Full With Stacktrace is largest; use only for diagnostics."),
+                PlayerSettings.WebGL.exceptionSupport);
+            if (EditorGUI.EndChangeCheck())
+                PlayerSettings.WebGL.exceptionSupport = newException;
+
+            // Initial Memory Size
+            EditorGUI.BeginChangeCheck();
+            int newMemory = EditorGUILayout.IntField(
+                new GUIContent("Memory Size (MB)",
+                    "Initial WebAssembly heap size. Most games need 256–512+ MB. Too small triggers a generic 'unspecified error' at boot when Unity can't allocate the heap."),
+                PlayerSettings.WebGL.initialMemorySize);
+            if (EditorGUI.EndChangeCheck())
+                // Floor at 32 MB — Unity's empty-project default and a
+                // practical minimum for any real game. Lower values often
+                // trigger "unspecified error" at boot before Unity can even
+                // log a useful failure.
+                PlayerSettings.WebGL.initialMemorySize = Mathf.Max(32, newMemory);
+
+            EditorGUILayout.Space(6);
+
+            // Reset button — only opt-in path back to BuildConfig.Default
+            // values. Was previously the auto-applied step on every build,
+            // which caused issue #40.
+            if (GUILayout.Button(
+                new GUIContent("Reset to recommended",
+                    "Reset all WebGL settings above to Yes2SDK's recommended values (Yes2SDK-SuperSDK template, Disabled compression, Medium stripping, Explicitly Thrown exceptions)."),
+                EditorStyles.miniButton))
+            {
+                ResetToRecommended();
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawBuildMode()
+        {
+            EditorGUILayout.LabelField("Build Mode", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            // Dropdown — only one mode is active at a time, so a popup is
+            // more honest than a radio group and stays compact for users
+            // who never need to change it.
+            var current = Yes2SDKBuildMode.Current;
+            // Build option labels from the enum + DisplayName helper so they
+            // never drift if the helper text changes.
+            var modes = (Yes2SDKBuildMode.Mode[])System.Enum.GetValues(typeof(Yes2SDKBuildMode.Mode));
+            var modeLabels = new string[modes.Length];
+            for (int i = 0; i < modes.Length; i++)
+                modeLabels[i] = Yes2SDKBuildMode.DisplayName(modes[i]);
+
+            EditorGUI.BeginChangeCheck();
+            int newIndex = EditorGUILayout.Popup("Mode", (int)current, modeLabels);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Yes2SDKBuildMode.Current = (Yes2SDKBuildMode.Mode)newIndex;
+            }
+
+            EditorGUILayout.Space(4);
+
+            // Detail block for the currently-selected mode — visible by
+            // default (no hover required), updates live as the user picks
+            // different modes from the dropdown.
+            string description = Yes2SDKBuildMode.Current switch
+            {
+                Yes2SDKBuildMode.Mode.Production =>
+                    "Use your Player Settings as-is. Pick this for shipping builds when " +
+                    "Exception Support is already set the way you want it (recommended " +
+                    "default: Explicitly Thrown — click \"Reset to recommended\" in " +
+                    "WebGL Settings above).",
+                Yes2SDKBuildMode.Mode.ProductionSafe =>
+                    "Force Exception Support → Explicitly Thrown for this build, restore " +
+                    "Player Settings after. Pick this when your Player Settings has " +
+                    "Exception Support: None but you still need to ship a build that " +
+                    "catches third-party throws (Newtonsoft.Json, i2 Localization, etc.). " +
+                    "About 10% larger than None — fine to ship.",
+                Yes2SDKBuildMode.Mode.Diagnostic =>
+                    "Force Exception Support → Full With Stacktrace for this build, " +
+                    "restore after. Pick this only while debugging — captures real C# " +
+                    "class/method names and line numbers in browser console errors. " +
+                    "About 30% larger — DO NOT ship Diagnostic builds to the dashboard.",
+                _ => string.Empty,
+            };
+
+            EditorGUILayout.LabelField(description, EditorStyles.wordWrappedMiniLabel);
+
+            EditorGUILayout.EndVertical();
+        }
+
         private void DrawBuild()
         {
             EditorGUILayout.LabelField("Build", EditorStyles.boldLabel);
@@ -179,10 +362,10 @@ namespace Yes2SDK.Editor
 
             EditorGUILayout.Space(6);
 
-            // Inline tertiary actions.
+            // Reinstall template — only tertiary action remaining; "Apply
+            // Settings" moved into the WebGL Settings foldout as
+            // "Reset to recommended".
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Apply Settings", EditorStyles.linkLabel))
-                ApplySettingsOnly();
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Reinstall Template", EditorStyles.linkLabel))
                 PerformSetup();
@@ -237,16 +420,14 @@ namespace Yes2SDK.Editor
             }
         }
 
-        private void ApplySettingsOnly()
+        private void ResetToRecommended()
         {
             BuildConfig.Default.ApplySettings();
-            Debug.Log("[Yes2SDK] Build settings applied (template, compression, stripping).");
+            Debug.Log("[Yes2SDK] WebGL settings reset to recommended values (template, compression, stripping, exception support).");
         }
 
         private void BuildGame(bool runAfterBuild)
         {
-            var config = BuildConfig.Default;
-
             if (!Yes2SDKInstaller.IsSetupComplete())
             {
                 EditorUtility.DisplayDialog("Yes2SDK",
@@ -254,7 +435,10 @@ namespace Yes2SDK.Editor
                 return;
             }
 
-            config.ApplySettings();
+            // No auto-apply of BuildConfig.Default here. Whatever the user has
+            // configured in Player Settings (or chosen via the Build Mode
+            // radio's IPreprocessBuildWithReport override) is what the build
+            // uses. Yes2SDKBuildGuard still enforces the template requirement.
 
             var scenes = EditorBuildSettings.scenes;
             if (scenes.Length == 0)
