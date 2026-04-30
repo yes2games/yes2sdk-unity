@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEditor;
 using System.IO;
+#if UNITY_6000_0_OR_NEWER
+using UnityEditor.Build.Profile;
+#endif
 
 namespace Yes2SDK.Editor
 {
@@ -172,8 +175,25 @@ namespace Yes2SDK.Editor
 
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.LabelField(
-                "Edits apply to Player Settings immediately — no Apply step.",
+                "Edits apply to project-wide Player Settings immediately — no Apply step.",
                 EditorStyles.miniLabel);
+
+#if UNITY_6000_0_OR_NEWER
+            // Unity 6 Build Profiles can override Player Settings on a
+            // per-profile basis. If one is active, edits made here might be
+            // shadowed at build time — warn the user explicitly so this isn't
+            // a silent footgun.
+            var activeProfile = BuildProfile.GetActiveBuildProfile();
+            if (activeProfile != null)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Active Build Profile: \"{activeProfile.name}\".\n" +
+                    "If this profile has overrides for the WebGL settings below, " +
+                    "they will take precedence at build time. To edit the " +
+                    "profile's overrides instead, use File > Build Profiles.",
+                    MessageType.Info);
+            }
+#endif
             EditorGUILayout.Space(4);
 
             // Template — informational only. BuildGuard enforces this; show a
@@ -226,7 +246,11 @@ namespace Yes2SDK.Editor
                     "Initial WebAssembly heap size. Most games need 256–512+ MB. Too small triggers a generic 'unspecified error' at boot when Unity can't allocate the heap."),
                 PlayerSettings.WebGL.initialMemorySize);
             if (EditorGUI.EndChangeCheck())
-                PlayerSettings.WebGL.initialMemorySize = Mathf.Max(16, newMemory);
+                // Floor at 32 MB — Unity's empty-project default and a
+                // practical minimum for any real game. Lower values often
+                // trigger "unspecified error" at boot before Unity can even
+                // log a useful failure.
+                PlayerSettings.WebGL.initialMemorySize = Mathf.Max(32, newMemory);
 
             EditorGUILayout.Space(6);
 
@@ -253,16 +277,15 @@ namespace Yes2SDK.Editor
             // more honest than a radio group and stays compact for users
             // who never need to change it.
             var current = Yes2SDKBuildMode.Current;
+            // Build option labels from the enum + DisplayName helper so they
+            // never drift if the helper text changes.
+            var modes = (Yes2SDKBuildMode.Mode[])System.Enum.GetValues(typeof(Yes2SDKBuildMode.Mode));
+            var modeLabels = new string[modes.Length];
+            for (int i = 0; i < modes.Length; i++)
+                modeLabels[i] = Yes2SDKBuildMode.DisplayName(modes[i]);
+
             EditorGUI.BeginChangeCheck();
-            int newIndex = EditorGUILayout.Popup(
-                "Mode",
-                (int)current,
-                new[]
-                {
-                    "Production",
-                    "Production Safe (Explicitly Thrown)",
-                    "Diagnostic (Full With Stacktrace)",
-                });
+            int newIndex = EditorGUILayout.Popup("Mode", (int)current, modeLabels);
             if (EditorGUI.EndChangeCheck())
             {
                 Yes2SDKBuildMode.Current = (Yes2SDKBuildMode.Mode)newIndex;

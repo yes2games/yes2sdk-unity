@@ -398,7 +398,7 @@ The output folder is what you upload to the **Yes2Games Dashboard** — the dash
 - **Unity 2021–2022**: *Edit > Project Settings > Player > WebGL* (project-wide).
 - **Unity 6+**: *File > Build Profiles* — select your WebGL profile, then click **Player Settings** at the bottom of the profile panel. Settings apply only to that profile.
 
-> Unity 6 moved WebGL settings from project-wide Player Settings into per-profile Build Profiles. The Yes2SDK Build Window's Settings panel reads/writes the active settings regardless of where they live, so it's the safest place to edit.
+> Unity 6 moved WebGL settings from project-wide Player Settings into per-profile Build Profiles. The Yes2SDK Build Window's Settings panel reads and writes the **project-wide** Player Settings. If you have an active Build Profile with overrides for these settings, the profile takes precedence at build time — edit those overrides via *File > Build Profiles*. The panel will surface a notice when an active profile is detected so you don't edit values that are then ignored.
 
 #### Build Mode for diagnostics
 
