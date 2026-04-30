@@ -31,16 +31,23 @@ namespace Yes2SDK.Editor
         }
 
         /// <summary>
-        /// Default build config for the SuperSDK pipeline.
+        /// Recommended build config for the SuperSDK pipeline. Surfaced in
+        /// the Build Window's "Reset to recommended" button — NOT auto-applied
+        /// during builds (which was the source of issue #40 — the override
+        /// blocked diagnostic builds).
         /// - No compression (dashboard/platform handles CDN compression)
         /// - Medium code stripping for size
-        /// - No exceptions for production
+        /// - Explicitly Thrown exceptions: catches throws from Newtonsoft.Json
+        ///   and other third-party libs that use try/catch as control flow.
+        ///   Only ~10% larger than None and far more compatible with the
+        ///   .NET ecosystem. Use None only if you've audited your full
+        ///   dependency graph for throws.
         /// </summary>
         public static BuildConfig Default => new BuildConfig(
             compression: WebGLCompressionFormat.Disabled,
             decompressionFallback: false,
             codeStripping: ManagedStrippingLevel.Medium,
-            exceptionSupport: WebGLExceptionSupport.None,
+            exceptionSupport: WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly,
             description: "Build for Yes2SDK Dashboard.\n" +
                          "Upload the build zip to the dashboard to inject SDK and bundle for specific platforms.\n" +
                          "No compression — platforms handle CDN delivery."
