@@ -1,0 +1,68 @@
+name: Notify Google Chat on Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Google Chat notification
+        env:
+          WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+          NAME: ${{ github.event.release.name }}
+          URL: ${{ github.event.release.html_url }}
+          AUTHOR: ${{ github.event.release.author.login }}
+          BODY: ${{ github.event.release.body }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+
+          BODY_TRUNC=$(printf '%s' "${BODY:-_(no release notes)_}" | head -c 1500)
+          DISPLAY_NAME="${NAME:-$TAG}"
+          STATUS_LABEL="Stable Release"
+          if [ "$PRERELEASE" = "true" ]; then
+            STATUS_LABEL="Pre-release"
+          fi
+
+          jq -n \
+            --arg repo       "$REPO" \
+            --arg tag        "$TAG" \
+            --arg name       "$DISPLAY_NAME" \
+            --arg url        "$URL" \
+            --arg author     "$AUTHOR" \
+            --arg body       "$BODY_TRUNC" \
+            --arg status     "$STATUS_LABEL" \
+            '{
+              cardsV2: [{
+                cardId: "release-card",
+                card: {
+                  header: {
+                    title: ("New Release " + $tag),
+                    subtitle: $repo,
+                    imageUrl: "https://github.githubassets.com/favicons/favicon.png",
+                    imageType: "CIRCLE"
+                  },
+                  sections: [{
+                    widgets: [
+                      { decoratedText: { topLabel: "Release",  text: $name } },
+                      { decoratedText: { topLabel: "Status",   text: $status } },
+                      { decoratedText: { topLabel: "Author",   text: $author } },
+                      { textParagraph:  { text: $body } },
+                      { buttonList: { buttons: [
+                        { text: "View on GitHub",
+                          onClick: { openLink: { url: $url } } }
+                      ] } }
+                    ]
+                  }]
+                }
+              }]
+            }' \
+            | curl -sS --fail-with-body \
+                -X POST \
+                -H "Content-Type: application/json; charset=UTF-8" \
+                --data-binary @- \
+                "$WEBHOOK_URL"
