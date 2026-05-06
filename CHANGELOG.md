@@ -21,6 +21,10 @@ YouTube Playables certification readiness. Surfaces the lifecycle and audio-stat
 - Subscribe to `OnPause`, `OnResume`, `OnAudioEnabledChange` AFTER `InitializeAsync` has called back successfully. Subscribing earlier is fine (events are static), but events won't fire until the JS bridge has wired them.
 - Internal pause-aware data flush + 3 MiB save data guard from Yes2SDK Core 2.0.0-alpha.1 are active for Unity games at runtime — the JS bundle is shared. No Unity-side change needed for those.
 
+### Build Window
+- **`Clean Build` button** — wipes the WebGL output folder, then runs a fresh build. Use before YouTube / cert submissions to guarantee a clean upload artifact, or when switching Build Modes (Production / Production Safe / Diagnostic) to avoid pollution from the prior mode's leftover files.
+- **`Clear Build Cache` link** (footer) — clears Unity's WebGL incremental build cache (`Library/Bee/artifacts/WebGL`, `Library/PlayerDataCache`, `Library/il2cpp_cache`). Last-resort fix for "build appears to be corrupted" or mismatched-assembly errors that survive a Clean Build. Slower next build (+2-5 min) but does not require a full project reimport.
+
 ### Sample integration
 
 ```csharp

@@ -360,6 +360,14 @@ namespace Yes2SDK.Editor
             if (GUILayout.Button("Build and Run", GUILayout.Height(22)))
                 BuildGame(true);
 
+            // Clean Build — wipes the WebGL output folder before building so leftover
+            // files from a prior failed build can't pollute the new one. Useful when:
+            // - switching Build Modes (Production / Production Safe / Diagnostic)
+            // - the previous build failed mid-way and left partial output
+            // - YouTube/cert testing wants a known-clean upload artifact
+            if (GUILayout.Button("Clean Build", GUILayout.Height(22)))
+                CleanBuild();
+
             EditorGUILayout.Space(6);
 
             // Reinstall template — only tertiary action remaining; "Apply
@@ -369,6 +377,9 @@ namespace Yes2SDK.Editor
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Reinstall Template", EditorStyles.linkLabel))
                 PerformSetup();
+            GUILayout.Label("·", EditorStyles.miniLabel);
+            if (GUILayout.Button("Clear Build Cache", EditorStyles.linkLabel))
+                ClearBuildCache();
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.EndVertical();
@@ -424,6 +435,111 @@ namespace Yes2SDK.Editor
         {
             BuildConfig.Default.ApplySettings();
             Debug.Log("[Yes2SDK] WebGL settings reset to recommended values (template, compression, stripping, exception support).");
+        }
+
+        /// <summary>
+        /// Wipe the WebGL output folder, then run a fresh build. Used to guarantee
+        /// no leftover files from a prior build pollute the new one — particularly
+        /// important before YouTube Playables / cert submissions where the upload
+        /// must be a clean artifact.
+        /// </summary>
+        private void CleanBuild()
+        {
+            if (!Yes2SDKInstaller.IsSetupComplete())
+            {
+                EditorUtility.DisplayDialog("Yes2SDK",
+                    "WebGL template not installed.\n\nClick Install Template first.", "OK");
+                return;
+            }
+
+            string fullBuildPath = Path.Combine(_buildPath, "WebGL");
+            bool exists = Directory.Exists(fullBuildPath);
+
+            string message = exists
+                ? $"Delete the existing WebGL build at:\n\n{fullBuildPath}\n\nThen run a fresh build?"
+                : "No existing WebGL build found.\n\nProceed with a fresh build?";
+
+            bool confirmed = EditorUtility.DisplayDialog(
+                "Clean Build",
+                message,
+                exists ? "Delete and Build" : "Build",
+                "Cancel");
+
+            if (!confirmed) return;
+
+            if (exists)
+            {
+                try
+                {
+                    Directory.Delete(fullBuildPath, recursive: true);
+                    Debug.Log($"[Yes2SDK] Clean Build: deleted {fullBuildPath}");
+                }
+                catch (System.Exception e)
+                {
+                    EditorUtility.DisplayDialog("Yes2SDK",
+                        $"Could not delete the existing build folder:\n\n{e.Message}\n\nClose any open Explorer / Finder windows pointing at it and try again.", "OK");
+                    return;
+                }
+            }
+
+            BuildGame(false);
+        }
+
+        /// <summary>
+        /// Clear Unity's WebGL incremental build cache (Library/Bee/artifacts/WebGL
+        /// and Library/PlayerDataCache). Used as a last resort when builds produce
+        /// stale or corrupted output even after a Clean Build. Forces Unity to
+        /// recompile shaders, re-strip assemblies, and re-link emscripten output
+        /// — adds 2-5 minutes to the next build but resolves "build appears to be
+        /// corrupted" / mismatched assembly errors that don't go away otherwise.
+        ///
+        /// Does NOT delete Library/ScriptAssemblies or Library/PackageCache, so
+        /// the project does not need a full reimport.
+        /// </summary>
+        private void ClearBuildCache()
+        {
+            bool confirmed = EditorUtility.DisplayDialog(
+                "Clear Build Cache",
+                "Clear Unity's WebGL incremental build cache?\n\n" +
+                "This forces the next build to recompile shaders and re-link " +
+                "WebGL output (slower by 2-5 minutes), but resolves rare " +
+                "build-corruption issues.\n\n" +
+                "Your scenes, scripts, and packages are not affected.",
+                "Clear Cache",
+                "Cancel");
+
+            if (!confirmed) return;
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string[] cachePaths = new[]
+            {
+                Path.Combine(projectRoot, "Library", "Bee", "artifacts", "WebGL"),
+                Path.Combine(projectRoot, "Library", "PlayerDataCache"),
+                Path.Combine(projectRoot, "Library", "il2cpp_cache"),
+            };
+
+            int deleted = 0;
+            foreach (var path in cachePaths)
+            {
+                if (!Directory.Exists(path)) continue;
+                try
+                {
+                    Directory.Delete(path, recursive: true);
+                    Debug.Log($"[Yes2SDK] Clear Build Cache: deleted {path}");
+                    deleted++;
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"[Yes2SDK] Clear Build Cache: could not delete {path} — {e.Message}");
+                }
+            }
+
+            EditorUtility.DisplayDialog(
+                "Clear Build Cache",
+                deleted > 0
+                    ? $"Cleared {deleted} cache folder{(deleted == 1 ? "" : "s")}. The next build will be slower but should produce fresh output."
+                    : "No cache folders found to clear. The build cache may already be empty.",
+                "OK");
         }
 
         private void BuildGame(bool runAfterBuild)
