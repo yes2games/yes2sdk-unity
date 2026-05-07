@@ -483,20 +483,6 @@ Real games often ship with multiple platform SDKs in the same build (Yes2SDK + P
 
 ---
 
-## Architecture
-
-```
-C# Runtime  ->  .jslib bridge  ->  window.Yes2SDK.*
-                                          ^
-                          injected by the Yes2Games Dashboard
-```
-
-- **C# Runtime** (`Runtime/`) — static facade + module classes. Uses `[DllImport("__Internal")]` for WebGL, mock fallbacks via `#if UNITY_WEBGL && !UNITY_EDITOR`.
-- **jslib Bridges** (`Plugins/`) — JavaScript files that call `window.Yes2SDK.*` and return results via `SendMessage('Bridge', ...)`.
-- **WebGL Template** (`Assets/WebGLTemplates/Yes2SDK-SuperSDK/`) — bare HTML template. Does not define `window.Yes2SDK` — the dashboard injects the SuperSDK Core (`yes2sdk.umd.js`) at upload time.
-
----
-
 ## License
 
-Proprietary. See LICENSE for details.
+MIT — see [LICENSE](LICENSE).

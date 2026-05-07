@@ -19,7 +19,6 @@ YouTube Playables certification readiness. Surfaces the lifecycle and audio-stat
 
 ### Notes
 - Subscribe to `OnPause`, `OnResume`, `OnAudioEnabledChange` AFTER `InitializeAsync` has called back successfully. Subscribing earlier is fine (events are static), but events won't fire until the JS bridge has wired them.
-- Internal pause-aware data flush + 3 MiB save data guard from Yes2SDK Core 2.0.0-alpha.1 are active for Unity games at runtime — the JS bundle is shared. No Unity-side change needed for those.
 
 ### Build Window
 - **`Clean Build` button** — wipes the WebGL output folder, then runs a fresh build. Use before YouTube / cert submissions to guarantee a clean upload artifact, or when switching Build Modes (Production / Production Safe / Diagnostic) to avoid pollution from the prior mode's leftover files.
@@ -101,7 +100,7 @@ public class GameRoot : MonoBehaviour
 
 ### Notes
 - Async data setters with success boolean (#30) need a Bridge callback round-trip in the jslib layer; ships in a follow-up.
-- The `IsSupported()`, `IsRewardedAdAvailable()`, and `LogLevelEnd` duration additions depend on the Core SDK round-4 build (yes2sdk-core feat/round-4-feedback-fixes) being live in the dashboard's `sdk-dist/`.
+- The `IsSupported()`, `IsRewardedAdAvailable()`, and `LogLevelEnd` duration additions depend on a matching Yes2SDK Core update.
 
 ## [2.1.3] - 2026-04-14
 
@@ -135,26 +134,23 @@ public class GameRoot : MonoBehaviour
 ## [2.0.0] - 2026-03-19
 
 ### Breaking Changes
-- **SuperSDK pipeline**: Platform-specific WebGL templates removed. Games now use a single bare template (`Yes2SDK-SuperSDK`) and the Yes2SDK Dashboard handles platform-specific SDK injection.
-- **No inline `window.Yes2SDK`**: The template no longer defines `window.Yes2SDK`. The SuperSDK Core (`yes2sdk.umd.js`) is injected by the dashboard build pipeline.
-- **Platform selection moved to dashboard**: Unity Editor no longer has a platform dropdown. Build once → upload to dashboard → select platforms there.
+- **Single template**: Platform-specific WebGL templates removed. Games now use a single `Yes2SDK-SuperSDK` template; per-platform builds are produced via the Yes2Games Dashboard at upload time.
+- **No inline `window.Yes2SDK`**: The template no longer defines `window.Yes2SDK` — it's provided at runtime by the dashboard upload flow.
+- **Platform selection moved to dashboard**: Unity Editor no longer has a platform dropdown. Build once → upload → select platforms there.
 
 ### Added
-- `Yes2SDK-SuperSDK` WebGL template — bare template compatible with the SuperSDK dashboard pipeline
-- SuperSDK Core TypeScript SDK (`@yes2sdk/core` v2.0.0-alpha.1) with 5 platform adapters:
-  - Poki, CrazyGames, Yandex Games, Game Distribution, YouTube Playables
+- `Yes2SDK-SuperSDK` WebGL template
 - 10 module APIs exposed via `window.Yes2SDK.*`:
   - `.ads`, `.session`, `.analytics`, `.player`, `.auth` (existing)
   - `.data`, `.game`, `.banners`, `.friends`, `.score` (new)
-- Yes2SDK Dashboard — web app for build management, SDK injection, and QA testing
-- QA Inspector — built-in tool to validate SDK integration before platform submission
-- Debug platform adapter with postMessage bridge for Inspector communication
+- Platform support: Poki, CrazyGames, Yandex Games, Game Distribution, YouTube Playables
+- QA Inspector — validates SDK integration before platform submission
 
 ### Removed
-- `Yes2SDK` (Debug) WebGL template — replaced by `Yes2SDK-SuperSDK`
-- `Yes2SDK-Poki` WebGL template — platform bundling now handled by dashboard
-- `Yes2SDK-CrazyGames` WebGL template — platform bundling now handled by dashboard
-- `Yes2SDK-Yandex` WebGL template — platform bundling now handled by dashboard
+- `Yes2SDK` (Debug) WebGL template
+- `Yes2SDK-Poki` WebGL template
+- `Yes2SDK-CrazyGames` WebGL template
+- `Yes2SDK-Yandex` WebGL template
 - Platform enum (`TargetPlatform`) from BuildConfig — single config now
 - Platform dropdown from Editor window
 
@@ -163,12 +159,11 @@ public class GameRoot : MonoBehaviour
 - `BuildConfig` reduced to a single `Default` configuration (no compression, medium stripping)
 - `Yes2SDKInstaller` installs only one template instead of four
 - Package version bumped to 2.0.0-alpha.1
-- Package description updated to reflect SuperSDK pipeline
 
 ### Retained
 - All C# Runtime modules (Ads, Analytics, Session, Player, Data, Auth, Game, Banners, Friends, Score)
-- All jslib bridges (12 files) — these call `window.Yes2SDK.*` which is now provided by the injected SuperSDK
-- `Yes2SDKPlatformInit.jslib` postset bootstrap — still needed for CrazyGames HTML replacement
+- All jslib bridges (12 files)
+- `Yes2SDKPlatformInit.jslib` postset bootstrap (CrazyGames HTML init)
 - Build optimization tools: Sprite Atlas, KTX2 compression, Texture Swap, Screenshot capture
 
 ## [1.1.1] - 2026-03-03
