@@ -63,6 +63,7 @@ namespace Yes2SDK
             ["OnStartGameSuccess"] = _ => Callbacks.InvokeStartGameSuccess(),
             ["OnPause"] = _ => Callbacks.InvokePause(),
             ["OnResume"] = _ => Callbacks.InvokeResume(),
+            ["OnAudioEnabledChange"] = data => Callbacks.InvokeAudioEnabledChange(data),
 
             // Ads
             ["OnInterstitialBeforeAd"] = _ => Yes2SDKAds.InvokeInterstitialBeforeAd(),
@@ -164,6 +165,7 @@ namespace Yes2SDK
         public void OnStartGameError(string msg) => Handle(msg);
         public void OnPause(string msg) => Handle(msg);
         public void OnResume(string msg) => Handle(msg);
+        public void OnAudioEnabledChange(string msg) => Handle(msg);
 
         // Ads
         public void OnInterstitialBeforeAd(string msg) => Handle(msg);
@@ -297,6 +299,32 @@ namespace Yes2SDK
         internal static void InvokeResume()
         {
             Yes2SDK.InvokeResume();
+        }
+
+        internal static void InvokeAudioEnabledChange(string dataJson)
+        {
+            // JSON shape from JS bridge: { "enabled": true }
+            bool enabled = true;
+            if (!string.IsNullOrEmpty(dataJson))
+            {
+                try
+                {
+                    var payload = JsonConvert.DeserializeObject<AudioEnabledChangePayload>(dataJson);
+                    enabled = payload?.Enabled ?? true;
+                }
+                catch
+                {
+                    // On parse failure, default to enabled — game shouldn't mute by accident.
+                    enabled = true;
+                }
+            }
+            Yes2SDK.InvokeAudioEnabledChange(enabled);
+        }
+
+        private class AudioEnabledChangePayload
+        {
+            [JsonProperty("enabled")]
+            public bool Enabled { get; set; }
         }
     }
 }

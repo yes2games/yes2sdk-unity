@@ -56,6 +56,31 @@ mergeInto(LibraryManager.library, {
     Yes2SDK_InitializeJS: function() {
         window.__y2.log('[Init] Step 1: Yes2SDK_InitializeJS called');
 
+        // Helper: subscribe to platform lifecycle events ONCE after init succeeds.
+        // Required for YouTube Playables certification (integration #14, #21, #22).
+        // The Core SDK fires these events; we forward them to Unity via SendMessage.
+        function wireLifecycleEvents() {
+            try {
+                if (typeof window.Yes2SDK.on !== 'function') {
+                    window.__y2.warn('[Lifecycle] Yes2SDK.on not available; pause/resume/audio events will not fire.');
+                    return;
+                }
+                window.Yes2SDK.on('pause', function() {
+                    SendMessage('Bridge', 'OnPause', '');
+                });
+                window.Yes2SDK.on('resume', function() {
+                    SendMessage('Bridge', 'OnResume', '');
+                });
+                window.Yes2SDK.on('audioEnabledChange', function(data) {
+                    var enabled = (data && data.enabled) === true;
+                    SendMessage('Bridge', 'OnAudioEnabledChange', JSON.stringify({ enabled: enabled }));
+                });
+                window.__y2.log('[Lifecycle] pause/resume/audioEnabledChange wired to Bridge');
+            } catch(error) {
+                window.__y2.error('[Lifecycle] failed to wire lifecycle events:', error);
+            }
+        }
+
         // Helper: run init once wrapper exists (try-catch prevents uncaught throws → no popup)
         function doInit() {
             try {
@@ -63,6 +88,7 @@ mergeInto(LibraryManager.library, {
                 window.Yes2SDK.initializeAsync()
                     .then(function() {
                         window.__y2.log('[Init] initializeAsync succeeded');
+                        wireLifecycleEvents();
                         SendMessage('Bridge', 'OnInitializeSuccess', '');
                     })
                     .catch(function(error) {

@@ -15,6 +15,8 @@ namespace Yes2SDK
         Poki,
         CrazyGames,
         Yandex,
+        GameDistribution,
+        YouTube,
         Debug
     }
 
@@ -47,6 +49,14 @@ namespace Yes2SDK
         public static event Action OnResume;
 
         /// <summary>
+        /// Called when the platform's audio-enabled state changes (e.g., user
+        /// muted/unmuted via the platform UI). Required for YouTube Playables
+        /// certification (integration requirement #14): the game MUST update
+        /// its audio state to match.
+        /// </summary>
+        public static event Action<bool> OnAudioEnabledChange;
+
+        /// <summary>
         /// Called when an SDK error occurs.
         /// </summary>
         public static event Action<Error> OnError;
@@ -68,7 +78,7 @@ namespace Yes2SDK
         /// <summary>
         /// SDK version string.
         /// </summary>
-        public static string Version => "2.3.0";
+        public static string Version => "2.4.0";
 
         private static Yes2SDKAds _ads;
 
@@ -495,6 +505,15 @@ namespace Yes2SDK
             OnResume?.Invoke();
         }
 
+        /// <summary>
+        /// Invokes the OnAudioEnabledChange event. Called internally by the bridge.
+        /// </summary>
+        internal static void InvokeAudioEnabledChange(bool enabled)
+        {
+            Yes2Log.Log($"Audio enabled changed: {enabled}");
+            OnAudioEnabledChange?.Invoke(enabled);
+        }
+
         #endregion
 
         #region Utility Methods
@@ -509,6 +528,8 @@ namespace Yes2SDK
                 "poki" => Platform.Poki,
                 "crazygames" => Platform.CrazyGames,
                 "yandex" => Platform.Yandex,
+                "gamedistribution" => Platform.GameDistribution,
+                "youtube" => Platform.YouTube,
                 "debug" => Platform.Debug,
                 _ => Platform.Unknown
             };

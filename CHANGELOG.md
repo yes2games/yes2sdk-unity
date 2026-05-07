@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-05-05
+
+YouTube Playables certification readiness. Surfaces the lifecycle and audio-state APIs that YouTube cert reviewers test for. Required for any Unity game shipping to YouTube — without these, games cannot satisfy YouTube cert integration requirements #14, #21, and #22.
+
+### Added
+- **`Yes2SDK.OnAudioEnabledChange`** event (`Action<bool>`) — fires when the platform's mute state changes. Required by YouTube cert (#14): the game MUST update its audio state to match.
+- **`Yes2SDK.Session.IsAudioEnabled()`** — read current platform audio state. Required by YouTube cert (#14) so the game can set its initial mute state at startup. Returns `true` on platforms without a native signal (Poki, CrazyGames, Yandex, GameDistribution).
+- **`Platform.YouTube`** and **`Platform.GameDistribution`** values added to the `Platform` enum. Detection wired through `Yes2SDK.GetPlatform()`.
+
+### Fixed
+- **`Yes2SDK.OnPause` / `Yes2SDK.OnResume` events now actually fire.** They were declared in 2.3.0 but the JS bridge never sent the SendMessage to invoke them — the events were dead code. Now wired through `Yes2SDK.on('pause' / 'resume', ...)` in the JS bridge after init succeeds. Required by YouTube cert (#21, #22): pause/resume must come from the SDK signal, not `document.visibilitychange` or any other web API.
+
+### Notes
+- Subscribe to `OnPause`, `OnResume`, `OnAudioEnabledChange` AFTER `InitializeAsync` has called back successfully. Subscribing earlier is fine (events are static), but events won't fire until the JS bridge has wired them.
+- Internal pause-aware data flush + 3 MiB save data guard from Yes2SDK Core 2.0.0-alpha.1 are active for Unity games at runtime — the JS bundle is shared. No Unity-side change needed for those.
+
+### Sample integration
+
+```csharp
+using Yes2SDK;
+using UnityEngine;
+
+public class GameRoot : MonoBehaviour
+{
+    void Start()
+    {
+        Yes2SDK.OnPause += OnPlatformPause;
+        Yes2SDK.OnResume += OnPlatformResume;
+        Yes2SDK.OnAudioEnabledChange += OnPlatformAudioChanged;
+
+        Yes2SDK.InitializeAsync(
+            onSuccess: () =>
+            {
+                // Cert #14: read initial audio state
+                if (!Yes2SDK.Session.IsAudioEnabled())
+                    AudioListener.volume = 0f;
+
+                Yes2SDK.StartGameAsync();
+            }
+        );
+    }
+
+    void OnPlatformPause()        { Time.timeScale = 0f; AudioListener.pause = true; }
+    void OnPlatformResume()       { Time.timeScale = 1f; AudioListener.pause = false; }
+    void OnPlatformAudioChanged(bool enabled) { AudioListener.volume = enabled ? 1f : 0f; }
+}
+```
+
 ## [2.3.0] - 2026-04-30
 
 ### Fixed

@@ -68,6 +68,19 @@ mergeInto(LibraryManager.library, {
                 SendMessage('Bridge', 'OnGetEntryPointSuccess', entryPoint || 'direct');
             })
             .catch(__y2h.handleCatch('OnGetEntryPointError', 'GetEntryPoint failed', 'Yes2SDK.Session.GetEntryPointAsync'));
+    },
+
+    // Check if platform audio is enabled. Required for YouTube Playables cert (#14):
+    // game must read this at startup to set its initial mute state.
+    // Returns 1 (true) on platforms without a native signal so games don't mute by accident.
+    Yes2SDK_IsAudioEnabledJS__deps: ['$__y2h'],
+    Yes2SDK_IsAudioEnabledJS: function() {
+        try {
+            if (__y2h.has('session') && typeof window.Yes2SDK.session.isAudioEnabled === 'function') {
+                return window.Yes2SDK.session.isAudioEnabled() ? 1 : 0;
+            }
+        } catch (e) {}
+        return 1;
     }
 
 });
