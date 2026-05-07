@@ -43,6 +43,9 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_GetEntryPointAsyncJS();
+
+        [DllImport("__Internal")]
+        private static extern int Yes2SDK_IsAudioEnabledJS();
 #endif
 
         #endregion
@@ -158,6 +161,33 @@ namespace Yes2SDK
 #else
             Yes2Log.Log("Mock: GetEntryPointAsync() — returning \"direct\"");
             InvokeGetEntryPointSuccess("direct");
+#endif
+        }
+
+        /// <summary>
+        /// Check whether the platform's audio is currently enabled.
+        ///
+        /// Required by YouTube Playables certification (integration #14): the game
+        /// MUST read this at startup to set its initial mute state, then subscribe
+        /// to <see cref="Yes2SDK.OnAudioEnabledChange"/> for runtime updates:
+        ///
+        /// <code>
+        /// if (!Yes2SDK.Session.IsAudioEnabled()) AudioListener.volume = 0f;
+        /// Yes2SDK.OnAudioEnabledChange += enabled => AudioListener.volume = enabled ? 1f : 0f;
+        /// </code>
+        ///
+        /// On platforms without a native audio-enabled signal (Poki, CrazyGames,
+        /// Yandex, GameDistribution), this returns true so games don't mute by
+        /// accident.
+        /// </summary>
+        /// <returns>True if audio is enabled.</returns>
+        public bool IsAudioEnabled()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_IsAudioEnabledJS() != 0;
+#else
+            Yes2Log.Log("Mock: IsAudioEnabled() — returning true");
+            return true;
 #endif
         }
 
