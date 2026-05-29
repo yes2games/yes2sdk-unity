@@ -303,28 +303,27 @@ namespace Yes2SDK
 
         internal static void InvokeAudioEnabledChange(string dataJson)
         {
-            // JSON shape from JS bridge: { "enabled": true }
+            // JSON shape from JS bridge: { "enabled": true } or { "enabled": false }
+            // Manual parse instead of JsonConvert: under IL2CPP Code Stripping = High,
+            // Newtonsoft.Json's reflection-based deserializer can throw internally even
+            // with link.xml preservation, and the silent catch below would default us
+            // to `enabled = true` — making mute toggles always report unmuted.
             bool enabled = true;
             if (!string.IsNullOrEmpty(dataJson))
             {
-                try
+                int idx = dataJson.IndexOf("\"enabled\"", StringComparison.Ordinal);
+                if (idx >= 0)
                 {
-                    var payload = JsonConvert.DeserializeObject<AudioEnabledChangePayload>(dataJson);
-                    enabled = payload?.Enabled ?? true;
-                }
-                catch
-                {
-                    // On parse failure, default to enabled — game shouldn't mute by accident.
-                    enabled = true;
+                    // Search forward from the key for `true` / `false` literal.
+                    int trueIdx = dataJson.IndexOf("true", idx, StringComparison.Ordinal);
+                    int falseIdx = dataJson.IndexOf("false", idx, StringComparison.Ordinal);
+                    if (falseIdx >= 0 && (trueIdx < 0 || falseIdx < trueIdx))
+                        enabled = false;
+                    else if (trueIdx >= 0)
+                        enabled = true;
                 }
             }
             Yes2SDK.InvokeAudioEnabledChange(enabled);
-        }
-
-        private class AudioEnabledChangePayload
-        {
-            [JsonProperty("enabled")]
-            public bool Enabled { get; set; }
         }
     }
 }
