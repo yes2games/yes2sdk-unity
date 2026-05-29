@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-05-29
+
+### Fixed
+- **`OnAudioEnabledChange` now reports the correct state under IL2CPP Code Stripping = High.** The `{ "enabled": ... }` payload from the JS bridge was being deserialized via Newtonsoft.Json, whose reflection-based deserializer can throw internally under aggressive stripping even with `link.xml` preservation. The exception was swallowed and the value defaulted to `true`, so mute toggles always surfaced as unmuted to the game. Replaced with a small manual parse so the value is preserved regardless of strip level. Required for YouTube cert (#14) on builds that ship with Code Stripping at High.
+
 ## [2.4.0] - 2026-05-05
 
 YouTube Playables certification readiness. Surfaces the lifecycle and audio-state APIs that YouTube cert reviewers test for. Required for any Unity game shipping to YouTube — without these, games cannot satisfy YouTube cert integration requirements #14, #21, and #22.
