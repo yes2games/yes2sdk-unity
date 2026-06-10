@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2] - 2026-06-10
+
+### Fixed
+- **`Player.IsDataSupported()` and `Player.IsConnectedPlayersSupported()` now report the real platform capability.** Both flags were hardcoded in C# to a CrazyGames-only check, which had drifted out of sync with the JS SDK. `IsDataSupported()` returned `false` on every platform except CrazyGames, so games that gate save/load on it skipped persistence on Yandex, YouTube, GameDistribution, and Poki — even though the SDK persists data on all of them (platform cloud save where available, local web storage otherwise). `IsConnectedPlayersSupported()` inversely returned `true` on CrazyGames, where the feature is not actually available. Both methods now delegate to the JS SDK so capability tracks the active platform adapter instead of being duplicated and stale.
+
+### Changed
+- **Player data save/load now works in the editor.** The editor/standalone mock for `Player.GetDataAsync` / `SetDataAsync` / `FlushDataAsync` previously returned `FeatureNotSupported`, which did not match the persistence the SDK provides in WebGL builds. The mock is now backed by `PlayerPrefs` (single merged JSON blob, same shape as the runtime store) and `IsDataSupported()` returns `true` in the editor, so save/load can be exercised in Play Mode without a WebGL build.
+
 ## [2.4.1] - 2026-05-29
 
 ### Fixed
