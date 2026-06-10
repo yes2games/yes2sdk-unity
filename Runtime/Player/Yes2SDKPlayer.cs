@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace Yes2SDK
@@ -10,7 +11,10 @@ namespace Yes2SDK
     /// <summary>
     /// Player API for Yes2SDK.
     /// Provides player info, data persistence, connected players, and signed info.
-    /// On Poki, only GetPlayerAsync returns an anonymous player; all data operations return FeatureNotSupported.
+    /// Data persistence is available on every platform at runtime — platform cloud
+    /// save where the platform supports it, local web storage otherwise. Identity is
+    /// anonymous on platforms without an auth API (e.g. Poki, YouTube). Connected
+    /// players and signed info are platform-gated; check IsConnectedPlayersSupported().
     /// </summary>
     public class Yes2SDKPlayer
     {
@@ -51,6 +55,12 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_GetSignedPlayerInfoAsyncJS(string payload);
+
+        [DllImport("__Internal")]
+        private static extern int Yes2SDK_IsDataSupportedJS();
+
+        [DllImport("__Internal")]
+        private static extern int Yes2SDK_IsConnectedPlayersSupportedJS();
 #endif
 
         #endregion
@@ -76,7 +86,7 @@ namespace Yes2SDK
 
         /// <summary>
         /// Get player data for the specified keys.
-        /// On Poki, returns FeatureNotSupported.
+        /// Reads from platform cloud save where supported, local web storage otherwise.
         /// </summary>
         /// <param name="keys">Array of data keys to retrieve.</param>
         public void GetDataAsync(string[] keys, Action<string> onSuccess = null, Action<Error> onError = null)
@@ -88,14 +98,23 @@ namespace Yes2SDK
             var keysJson = JsonConvert.SerializeObject(keys);
             Yes2SDK_GetDataAsyncJS(keysJson);
 #else
-            Yes2Log.Log("Mock: GetDataAsync() — FeatureNotSupported");
-            InvokeGetDataError(FeatureNotSupportedError("Yes2SDK.Player.GetDataAsync"));
+            Yes2Log.Log("Mock: GetDataAsync() — reading from PlayerPrefs store");
+            var store = LoadMockStore();
+            var result = new JObject();
+            foreach (var key in keys)
+            {
+                if (store.TryGetValue(key, out var value))
+                {
+                    result[key] = value;
+                }
+            }
+            InvokeGetDataSuccess(result.ToString(Formatting.None));
 #endif
         }
 
         /// <summary>
         /// Set player data.
-        /// On Poki, returns FeatureNotSupported.
+        /// Writes to platform cloud save where supported, local web storage otherwise.
         /// </summary>
         /// <param name="dataJson">JSON string of key-value data to store.</param>
         public void SetDataAsync(string dataJson, Action onSuccess = null, Action<Error> onError = null)
@@ -106,14 +125,30 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_SetDataAsyncJS(dataJson);
 #else
-            Yes2Log.Log("Mock: SetDataAsync() — FeatureNotSupported");
-            InvokeSetDataError(FeatureNotSupportedError("Yes2SDK.Player.SetDataAsync"));
+            Yes2Log.Log("Mock: SetDataAsync() — writing to PlayerPrefs store");
+            try
+            {
+                var store = LoadMockStore();
+                var incoming = string.IsNullOrEmpty(dataJson) ? new JObject() : JObject.Parse(dataJson);
+                store.Merge(incoming, new JsonMergeSettings { MergeArrayHandling = MergeArrayHandling.Replace });
+                SaveMockStore(store);
+                InvokeSetDataSuccess();
+            }
+            catch (Exception e)
+            {
+                InvokeSetDataError(new Error
+                {
+                    Code = "Unknown",
+                    Message = $"Failed to write mock player data: {e.Message}",
+                    Context = "Yes2SDK.Player.SetDataAsync"
+                });
+            }
 #endif
         }
 
         /// <summary>
         /// Flush (persist) all pending player data changes.
-        /// On Poki, returns FeatureNotSupported.
+        /// A no-op where writes already persist immediately (local web storage).
         /// </summary>
         public void FlushDataAsync(Action onSuccess = null, Action<Error> onError = null)
         {
@@ -123,8 +158,9 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_FlushDataAsyncJS();
 #else
-            Yes2Log.Log("Mock: FlushDataAsync() — FeatureNotSupported");
-            InvokeFlushDataError(FeatureNotSupportedError("Yes2SDK.Player.FlushDataAsync"));
+            Yes2Log.Log("Mock: FlushDataAsync() — persisting PlayerPrefs store");
+            PlayerPrefs.Save();
+            InvokeFlushDataSuccess();
 #endif
         }
 
@@ -197,23 +233,27 @@ namespace Yes2SDK
 
         /// <summary>
         /// Whether player data persistence is supported on the current platform.
+        /// Delegates to the JS SDK so capability tracks the active platform adapter.
         /// </summary>
         public bool IsDataSupported()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            return Yes2SDK.CurrentPlatform == Platform.CrazyGames;
+            return Yes2SDK_IsDataSupportedJS() == 1;
 #else
-            return false;
+            // Editor/standalone mock persists via PlayerPrefs, mirroring the
+            // SDK's runtime guarantee that data is always persistable.
+            return true;
 #endif
         }
 
         /// <summary>
         /// Whether connected players are supported on the current platform.
+        /// Delegates to the JS SDK so capability tracks the active platform adapter.
         /// </summary>
         public bool IsConnectedPlayersSupported()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            return Yes2SDK.CurrentPlatform == Platform.CrazyGames;
+            return Yes2SDK_IsConnectedPlayersSupportedJS() == 1;
 #else
             return false;
 #endif
@@ -337,6 +377,31 @@ namespace Yes2SDK
                 Context = context
             };
         }
+
+#if !(UNITY_WEBGL && !UNITY_EDITOR)
+        // PlayerPrefs-backed store for the editor/standalone mock. Mirrors the
+        // WebGL behaviour (single merged JSON blob) so save/load can be tested
+        // in the editor instead of returning FeatureNotSupported.
+        private const string MockDataKey = "Yes2SDK.Player.MockData";
+
+        private static JObject LoadMockStore()
+        {
+            var raw = PlayerPrefs.GetString(MockDataKey, "{}");
+            try
+            {
+                return JObject.Parse(raw);
+            }
+            catch
+            {
+                return new JObject();
+            }
+        }
+
+        private static void SaveMockStore(JObject store)
+        {
+            PlayerPrefs.SetString(MockDataKey, store.ToString(Formatting.None));
+        }
+#endif
 
         #endregion
     }
