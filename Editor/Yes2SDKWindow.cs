@@ -62,6 +62,9 @@ namespace Yes2SDK.Editor
             DrawStatus();
             EditorGUILayout.Space(10);
 
+            DrawPipelineToggle();
+            EditorGUILayout.Space(10);
+
             if (!_isSetupComplete)
             {
                 DrawSetup();
@@ -135,6 +138,28 @@ namespace Yes2SDK.Editor
             GUILayout.Label(ok ? "●" : "●", dotStyle);
             GUILayout.Label(ok ? okText : warnText, EditorStyles.label);
             EditorGUILayout.EndHorizontal();
+        }
+
+        private void DrawPipelineToggle()
+        {
+            EditorGUI.BeginChangeCheck();
+            bool enabled = EditorGUILayout.ToggleLeft(
+                new GUIContent("Use Yes2SDK build pipeline (enforce WebGL template & build mode)",
+                    "On: Yes2SDK enforces its WebGL template on every build (recommended for Yes2Games builds). " +
+                    "Off: the template guard and build-mode override are skipped so another platform's pipeline " +
+                    "(with its own WebGL template) can build without being blocked. The SDK stays installed either way."),
+                Yes2SDKPipeline.Enabled);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKPipeline.Enabled = enabled;
+
+            if (!Yes2SDKPipeline.Enabled)
+            {
+                EditorGUILayout.HelpBox(
+                    "Yes2SDK build management is OFF. The template guard is skipped — " +
+                    "use this when building for a non-Yes2SDK platform. Turn it back on " +
+                    "before building for Yes2Games platforms.",
+                    MessageType.Warning);
+            }
         }
 
         private void DrawSetup()

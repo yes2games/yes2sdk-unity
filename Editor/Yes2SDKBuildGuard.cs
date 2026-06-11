@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using UnityEngine;
 
 namespace Yes2SDK.Editor
 {
@@ -9,6 +10,10 @@ namespace Yes2SDK.Editor
     /// not selected in PlayerSettings. Without this guard, Unity silently falls
     /// back to its default WebGL template — the build "succeeds" but the JS
     /// bridge is never wired up, shipping a broken game.
+    ///
+    /// Skipped entirely when Yes2SDKPipeline.Enabled is false, so a non-Yes2SDK
+    /// platform can drive a WebGL build (with its own template) without being
+    /// blocked by this guard.
     /// </summary>
     public class Yes2SDKBuildGuard : IPreprocessBuildWithReport
     {
@@ -19,6 +24,15 @@ namespace Yes2SDK.Editor
         public void OnPreprocessBuild(BuildReport report)
         {
             if (report.summary.platform != BuildTarget.WebGL) return;
+
+            if (!Yes2SDKPipeline.Enabled)
+            {
+                Debug.Log(
+                    "[Yes2SDK] Build pipeline disabled — skipping template guard. " +
+                    "Building for a non-Yes2SDK platform. Re-enable in " +
+                    "Yes2SDK > Build Window for Yes2Games builds.");
+                return;
+            }
 
             if (!Yes2SDKInstaller.IsSetupComplete())
             {

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.3] - 2026-06-11
+
+### Added
+- **"Use Yes2SDK build pipeline" toggle in the Build Window.** Yes2SDK's build guard runs on every WebGL build in the project, so a build driven by another platform's pipeline — using its own WebGL template — was failed by the template check (`expected 'PROJECT:Yes2SDK-SuperSDK'`). The new toggle (default **on**, so existing projects are unchanged) lets you turn off Yes2SDK build management when building for a non-Yes2SDK platform: the template guard and build-mode override are skipped and the build proceeds with that platform's template. The SDK stays installed; turn the toggle back on for Yes2Games builds.
+
+### Fixed
+- **`Yes2SDK.Version` now reports the real package version.** The runtime constant was stuck at `2.4.0` and had drifted behind `package.json`, so the Build Window header and any game code reading `Yes2SDK.Version` showed the wrong number. It now tracks the package version.
+
 ## [2.4.2] - 2026-06-10
 
 ### Fixed

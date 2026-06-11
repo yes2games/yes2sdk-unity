@@ -96,6 +96,11 @@ namespace Yes2SDK.Editor
         {
             if (report.summary.platform != BuildTarget.WebGL) return;
 
+            // When the Yes2SDK pipeline is disabled, another platform owns this
+            // build — don't touch its Player Settings. The guard already logged
+            // the skip; stay silent here.
+            if (!Yes2SDKPipeline.Enabled) return;
+
             var mode = Yes2SDKBuildMode.Current;
             if (mode == Yes2SDKBuildMode.Mode.Production) return;
 
