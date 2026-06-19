@@ -107,6 +107,10 @@ namespace Yes2SDK
             ["OnPurchaseSuccess"] = Yes2SDKIAP.InvokePurchaseSuccess,
             ["OnGetPurchasesSuccess"] = Yes2SDKIAP.InvokeGetPurchasesSuccess,
             ["OnConsumePurchaseSuccess"] = _ => Yes2SDKIAP.InvokeConsumePurchaseSuccess(),
+
+            // Data (async durable saves)
+            ["OnDataSetStringSuccess"] = Yes2SDKData.InvokeSetStringAsyncSuccess,
+            ["OnDataFlushSuccess"] = Yes2SDKData.InvokeFlushSuccess,
         };
 
         // Error handlers — receive parsed Error struct
@@ -153,6 +157,10 @@ namespace Yes2SDK
             ["OnPurchaseError"] = Yes2SDKIAP.InvokePurchaseError,
             ["OnGetPurchasesError"] = Yes2SDKIAP.InvokeGetPurchasesError,
             ["OnConsumePurchaseError"] = Yes2SDKIAP.InvokeConsumePurchaseError,
+
+            // Data (async durable saves)
+            ["OnDataSetStringError"] = Yes2SDKData.InvokeSetStringAsyncError,
+            ["OnDataFlushError"] = Yes2SDKData.InvokeFlushError,
         };
 
         #endregion
@@ -243,6 +251,12 @@ namespace Yes2SDK
         public void OnGetPurchasesError(string msg) => Handle(msg);
         public void OnConsumePurchaseSuccess(string msg) => Handle(msg);
         public void OnConsumePurchaseError(string msg) => Handle(msg);
+
+        // Data (async durable saves)
+        public void OnDataSetStringSuccess(string msg) => Handle(msg);
+        public void OnDataSetStringError(string msg) => Handle(msg);
+        public void OnDataFlushSuccess(string msg) => Handle(msg);
+        public void OnDataFlushError(string msg) => Handle(msg);
 
         #endregion
 
