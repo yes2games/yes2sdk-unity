@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.5.0] - 2026-06-19
+## [2.4.5] - 2026-06-19
 
 ### Added
 - **In-app purchases.** `Yes2SDK.IAP` is now functional (previously a stub). `GetCatalogAsync`, `PurchaseAsync`, `GetPurchasesAsync`, and `ConsumePurchaseAsync` are wired through the SDK bridge to the platform payments API; results are delivered to the success callback as JSON. Call `GetPurchasesAsync` on launch so a returning player keeps the items they own. Supported on Yandex; `IsSupported()` reports availability for the active platform.
