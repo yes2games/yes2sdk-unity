@@ -1,26 +1,212 @@
 using System;
+using System.Runtime.InteropServices;
 
 namespace Yes2SDK
 {
     /// <summary>
     /// In-App Purchase API for Yes2SDK.
-    /// Currently a stub — returns FeatureNotSupported on all platforms.
+    /// Backed by the platform payments API via the Core SDK (window.Yes2SDK.iap).
+    /// On Yandex this maps to the Yandex Payments API (catalog, purchase, restore,
+    /// consume). Result payloads are delivered to onSuccess as JSON strings.
     /// </summary>
-    public class Yes2SDKIAP : Yes2SDKStubModule
+    public class Yes2SDKIAP
     {
-        protected override string FeatureName => "IAP";
-        protected override string ModuleName => "IAP";
+        #region Static Callback Fields
 
+        private static Action<string> _getCatalogSuccessCallback;
+        private static Action<Error> _getCatalogErrorCallback;
+        private static Action<string> _purchaseSuccessCallback;
+        private static Action<Error> _purchaseErrorCallback;
+        private static Action<string> _getPurchasesSuccessCallback;
+        private static Action<Error> _getPurchasesErrorCallback;
+        private static Action _consumeSuccessCallback;
+        private static Action<Error> _consumeErrorCallback;
+
+        #endregion
+
+        #region JavaScript Imports
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_IAP_IsSupportedJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_IAP_GetCatalogAsyncJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_IAP_PurchaseAsyncJS(string productId, string developerPayload);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_IAP_GetPurchasesAsyncJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_IAP_ConsumePurchaseAsyncJS(string purchaseToken);
+#endif
+
+        #endregion
+
+        #region Public API
+
+        /// <summary>
+        /// Whether in-app purchases are supported on the current platform.
+        /// </summary>
+        public bool IsSupported()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_IAP_IsSupportedJS();
+#else
+            Yes2Log.Log("Mock: IAP.IsSupported() — returning false");
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// Get the product catalog. onSuccess receives a JSON array of products.
+        /// </summary>
         public void GetCatalogAsync(Action<string> onSuccess = null, Action<Error> onError = null)
-            => Stub(onError, nameof(GetCatalogAsync));
+        {
+            _getCatalogSuccessCallback = onSuccess;
+            _getCatalogErrorCallback = onError;
 
-        public void PurchaseAsync(string productId, Action<string> onSuccess = null, Action<Error> onError = null)
-            => Stub(onError, nameof(PurchaseAsync), productId);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_IAP_GetCatalogAsyncJS();
+#else
+            Yes2Log.Log("Mock: IAP.GetCatalogAsync() — returning empty catalog");
+            InvokeGetCatalogSuccess("[]");
+#endif
+        }
 
+        /// <summary>
+        /// Initiate a purchase. onSuccess receives the purchase as a JSON object.
+        /// </summary>
+        /// <param name="productId">Product identifier to purchase.</param>
+        /// <param name="onSuccess">Called with the purchase JSON on success.</param>
+        /// <param name="onError">Called with an error on failure or cancellation.</param>
+        /// <param name="developerPayload">Optional payload echoed back on the purchase.</param>
+        public void PurchaseAsync(
+            string productId,
+            Action<string> onSuccess = null,
+            Action<Error> onError = null,
+            string developerPayload = null)
+        {
+            _purchaseSuccessCallback = onSuccess;
+            _purchaseErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_IAP_PurchaseAsyncJS(productId, developerPayload ?? string.Empty);
+#else
+            Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — FeatureNotSupported");
+            InvokePurchaseError(FeatureNotSupportedError("Yes2SDK.IAP.PurchaseAsync"));
+#endif
+        }
+
+        /// <summary>
+        /// Restore the player's purchases. onSuccess receives a JSON array of
+        /// purchases — call this on launch so returning players keep what they own.
+        /// </summary>
         public void GetPurchasesAsync(Action<string> onSuccess = null, Action<Error> onError = null)
-            => Stub(onError, nameof(GetPurchasesAsync));
+        {
+            _getPurchasesSuccessCallback = onSuccess;
+            _getPurchasesErrorCallback = onError;
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_IAP_GetPurchasesAsyncJS();
+#else
+            Yes2Log.Log("Mock: IAP.GetPurchasesAsync() — returning empty list");
+            InvokeGetPurchasesSuccess("[]");
+#endif
+        }
+
+        /// <summary>
+        /// Consume a purchase (for consumable products) so it can be bought again.
+        /// </summary>
         public void ConsumePurchaseAsync(string purchaseToken, Action onSuccess = null, Action<Error> onError = null)
-            => Stub(onError, nameof(ConsumePurchaseAsync), purchaseToken);
+        {
+            _consumeSuccessCallback = onSuccess;
+            _consumeErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_IAP_ConsumePurchaseAsyncJS(purchaseToken);
+#else
+            Yes2Log.Log($"Mock: IAP.ConsumePurchaseAsync('{purchaseToken}') — success");
+            InvokeConsumePurchaseSuccess();
+#endif
+        }
+
+        #endregion
+
+        #region Internal Callback Invocations (called by Bridge)
+
+        internal static void InvokeGetCatalogSuccess(string catalogJson)
+        {
+            _getCatalogSuccessCallback?.Invoke(catalogJson);
+            _getCatalogSuccessCallback = null;
+            _getCatalogErrorCallback = null;
+        }
+
+        internal static void InvokeGetCatalogError(Error error)
+        {
+            _getCatalogErrorCallback?.Invoke(error);
+            _getCatalogSuccessCallback = null;
+            _getCatalogErrorCallback = null;
+        }
+
+        internal static void InvokePurchaseSuccess(string purchaseJson)
+        {
+            _purchaseSuccessCallback?.Invoke(purchaseJson);
+            _purchaseSuccessCallback = null;
+            _purchaseErrorCallback = null;
+        }
+
+        internal static void InvokePurchaseError(Error error)
+        {
+            _purchaseErrorCallback?.Invoke(error);
+            _purchaseSuccessCallback = null;
+            _purchaseErrorCallback = null;
+        }
+
+        internal static void InvokeGetPurchasesSuccess(string purchasesJson)
+        {
+            _getPurchasesSuccessCallback?.Invoke(purchasesJson);
+            _getPurchasesSuccessCallback = null;
+            _getPurchasesErrorCallback = null;
+        }
+
+        internal static void InvokeGetPurchasesError(Error error)
+        {
+            _getPurchasesErrorCallback?.Invoke(error);
+            _getPurchasesSuccessCallback = null;
+            _getPurchasesErrorCallback = null;
+        }
+
+        internal static void InvokeConsumePurchaseSuccess()
+        {
+            _consumeSuccessCallback?.Invoke();
+            _consumeSuccessCallback = null;
+            _consumeErrorCallback = null;
+        }
+
+        internal static void InvokeConsumePurchaseError(Error error)
+        {
+            _consumeErrorCallback?.Invoke(error);
+            _consumeSuccessCallback = null;
+            _consumeErrorCallback = null;
+        }
+
+        #endregion
+
+        #region Private Helpers
+
+        private static Error FeatureNotSupportedError(string context)
+        {
+            return new Error
+            {
+                Code = "FeatureNotSupported",
+                Message = "This feature is not supported on the current platform",
+                Context = context
+            };
+        }
+
+        #endregion
     }
 }

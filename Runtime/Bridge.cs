@@ -101,6 +101,12 @@ namespace Yes2SDK
 
             // Friends
             ["OnListFriendsSuccess"] = Yes2SDKFriends.InvokeListFriendsSuccess,
+
+            // IAP
+            ["OnGetCatalogSuccess"] = Yes2SDKIAP.InvokeGetCatalogSuccess,
+            ["OnPurchaseSuccess"] = Yes2SDKIAP.InvokePurchaseSuccess,
+            ["OnGetPurchasesSuccess"] = Yes2SDKIAP.InvokeGetPurchasesSuccess,
+            ["OnConsumePurchaseSuccess"] = _ => Yes2SDKIAP.InvokeConsumePurchaseSuccess(),
         };
 
         // Error handlers — receive parsed Error struct
@@ -141,6 +147,12 @@ namespace Yes2SDK
 
             // Friends
             ["OnListFriendsError"] = Yes2SDKFriends.InvokeListFriendsError,
+
+            // IAP
+            ["OnGetCatalogError"] = Yes2SDKIAP.InvokeGetCatalogError,
+            ["OnPurchaseError"] = Yes2SDKIAP.InvokePurchaseError,
+            ["OnGetPurchasesError"] = Yes2SDKIAP.InvokeGetPurchasesError,
+            ["OnConsumePurchaseError"] = Yes2SDKIAP.InvokeConsumePurchaseError,
         };
 
         #endregion
@@ -221,6 +233,16 @@ namespace Yes2SDK
         // Friends
         public void OnListFriendsSuccess(string msg) => Handle(msg);
         public void OnListFriendsError(string msg) => Handle(msg);
+
+        // IAP
+        public void OnGetCatalogSuccess(string msg) => Handle(msg);
+        public void OnGetCatalogError(string msg) => Handle(msg);
+        public void OnPurchaseSuccess(string msg) => Handle(msg);
+        public void OnPurchaseError(string msg) => Handle(msg);
+        public void OnGetPurchasesSuccess(string msg) => Handle(msg);
+        public void OnGetPurchasesError(string msg) => Handle(msg);
+        public void OnConsumePurchaseSuccess(string msg) => Handle(msg);
+        public void OnConsumePurchaseError(string msg) => Handle(msg);
 
         #endregion
 
