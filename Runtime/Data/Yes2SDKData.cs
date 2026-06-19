@@ -1,4 +1,7 @@
+using System;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Yes2SDK
@@ -39,7 +42,22 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_Data_DeleteAllJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Data_SetStringAsyncJS(string key, string value);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Data_FlushAsyncJS();
 #endif
+
+        #endregion
+
+        #region Async Callback Fields
+
+        private static Action<bool> _setStringAsyncSuccessCallback;
+        private static Action<Error> _setStringAsyncErrorCallback;
+        private static Action<bool> _flushSuccessCallback;
+        private static Action<Error> _flushErrorCallback;
 
         #endregion
 
@@ -156,6 +174,93 @@ namespace Yes2SDK
             PlayerPrefs.DeleteAll();
             PlayerPrefs.Save();
 #endif
+        }
+
+        #endregion
+
+        #region Async Public API (durable saves)
+
+        /// <summary>
+        /// Set a string value and await platform confirmation. On cloud-backed
+        /// platforms (e.g. Yandex) onSuccess fires only after the write is
+        /// confirmed; the bool reports success.
+        /// </summary>
+        public void SetStringAsync(string key, string value, Action<bool> onSuccess = null, Action<Error> onError = null)
+        {
+            _setStringAsyncSuccessCallback = onSuccess;
+            _setStringAsyncErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Data_SetStringAsyncJS(key, value);
+#else
+            PlayerPrefs.SetString(key, value);
+            PlayerPrefs.Save();
+            InvokeSetStringAsyncSuccess("true");
+#endif
+        }
+
+        /// <summary>
+        /// Force any pending/batched writes to the platform's backing store and
+        /// await confirmation. Synchronous setters may be batched (Yandex
+        /// debounces cloud writes), so call this at a checkpoint — or before the
+        /// game may close — to guarantee progress is persisted.
+        /// </summary>
+        public void FlushAsync(Action<bool> onSuccess = null, Action<Error> onError = null)
+        {
+            _flushSuccessCallback = onSuccess;
+            _flushErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Data_FlushAsyncJS();
+#else
+            // PlayerPrefs writes are already durable in the editor.
+            PlayerPrefs.Save();
+            InvokeFlushSuccess("true");
+#endif
+        }
+
+        /// <summary>Task overload of <see cref="SetStringAsync(string,string,Action{bool},Action{Error})"/>.</summary>
+        public Task<bool> SetStringAsync(string key, string value, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<bool>(
+                (success, error) => SetStringAsync(key, value, success, error),
+                cancellationToken);
+
+        /// <summary>Task overload of <see cref="FlushAsync(Action{bool},Action{Error})"/>.</summary>
+        public Task<bool> FlushAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<bool>(
+                (success, error) => FlushAsync(success, error),
+                cancellationToken);
+
+        #endregion
+
+        #region Async Callback Invocations (called by Bridge)
+
+        internal static void InvokeSetStringAsyncSuccess(string result)
+        {
+            _setStringAsyncSuccessCallback?.Invoke(result == "true" || result == "1");
+            _setStringAsyncSuccessCallback = null;
+            _setStringAsyncErrorCallback = null;
+        }
+
+        internal static void InvokeSetStringAsyncError(Error error)
+        {
+            _setStringAsyncErrorCallback?.Invoke(error);
+            _setStringAsyncSuccessCallback = null;
+            _setStringAsyncErrorCallback = null;
+        }
+
+        internal static void InvokeFlushSuccess(string result)
+        {
+            _flushSuccessCallback?.Invoke(result == "true" || result == "1");
+            _flushSuccessCallback = null;
+            _flushErrorCallback = null;
+        }
+
+        internal static void InvokeFlushError(Error error)
+        {
+            _flushErrorCallback?.Invoke(error);
+            _flushSuccessCallback = null;
+            _flushErrorCallback = null;
         }
 
         #endregion

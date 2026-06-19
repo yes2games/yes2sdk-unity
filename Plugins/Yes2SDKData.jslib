@@ -70,6 +70,34 @@ mergeInto(LibraryManager.library, {
     Yes2SDK_Data_DeleteAllJS: function() {
         if (__y2h.has('data')) { window.Yes2SDK.data.deleteAll(); return; }
         window.__y2.warn('Data module not loaded — ignoring deleteAll');
+    },
+
+    Yes2SDK_Data_SetStringAsyncJS__deps: ['$__y2', '$__y2h'],
+    Yes2SDK_Data_SetStringAsyncJS: function(keyPtr, valuePtr) {
+        if (!__y2h.has('data')) {
+            __y2h.sendError('OnDataSetStringError', 'NotInitialized', 'Yes2SDK Data module not loaded', 'Yes2SDK.Data.SetStringAsync');
+            return;
+        }
+        var key = UTF8ToString(keyPtr);
+        var value = UTF8ToString(valuePtr);
+        window.Yes2SDK.data.setStringAsync(key, value)
+            .then(function(ok) {
+                SendMessage('Bridge', 'OnDataSetStringSuccess', ok ? 'true' : 'false');
+            })
+            .catch(__y2h.handleCatch('OnDataSetStringError', 'SetStringAsync failed', 'Yes2SDK.Data.SetStringAsync'));
+    },
+
+    Yes2SDK_Data_FlushAsyncJS__deps: ['$__y2', '$__y2h'],
+    Yes2SDK_Data_FlushAsyncJS: function() {
+        if (!__y2h.has('data')) {
+            __y2h.sendError('OnDataFlushError', 'NotInitialized', 'Yes2SDK Data module not loaded', 'Yes2SDK.Data.FlushAsync');
+            return;
+        }
+        window.Yes2SDK.data.flushAsync()
+            .then(function(ok) {
+                SendMessage('Bridge', 'OnDataFlushSuccess', ok ? 'true' : 'false');
+            })
+            .catch(__y2h.handleCatch('OnDataFlushError', 'FlushAsync failed', 'Yes2SDK.Data.FlushAsync'));
     }
 
 });

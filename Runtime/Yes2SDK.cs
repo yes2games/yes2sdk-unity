@@ -78,7 +78,7 @@ namespace Yes2SDK
         /// <summary>
         /// SDK version string.
         /// </summary>
-        public static string Version => "2.4.3";
+        public static string Version => "2.4.5";
 
         private static Yes2SDKAds _ads;
 
