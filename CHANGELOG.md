@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-06-24
+
+### Added
+- **Leaderboards.** `Yes2SDK.Leaderboard` is now functional (previously a stub). `GetLeaderboardAsync`, `SetScoreAsync`, `GetEntriesAsync`, and `GetPlayerEntryAsync` are wired through the SDK bridge; results are delivered to the success callback as JSON. Supported on Yandex; `IsSupported()` reports availability for the active platform.
+- **Player stats.** `Yes2SDK.Stats` is now functional (previously a stub). `GetStatsAsync`, `SetStatsAsync`, and `IncrementStatsAsync` manage server-side numeric counters. Supported on Yandex.
+- **Remote config: `Yes2SDK.Config`.** `GetFlagsAsync` fetches platform feature flags as a string→string map, with optional defaults; on platforms without remote config it returns the defaults you pass so the same code runs everywhere.
+- **Rating prompt: `Yes2SDK.Review`.** `CanReviewAsync` checks eligibility and `RequestReviewAsync` shows the platform's in-game rating prompt (Yandex). `RequestReviewAsync` checks eligibility internally first, so it is safe to call directly; it no-ops gracefully where unsupported.
+- **Player identity.** `Yes2SDK.Player` adds `GetUniqueIdAsync`, `GetIDsPerGameAsync`, `GetPayingStatusAsync`, `GetModeAsync`, and `GetPhotoAsync(size)`.
+- **Banner status: `Yes2SDK.Banners.GetBannerStatusAsync()`** reports whether a sticky banner is currently showing.
+- **Server time: `Yes2SDK.Game.GetServerTimeAsync()`** returns tamper-proof server time where available, falling back to local device time otherwise.
+- **Device info: `Yes2SDK.Session.GetDeviceInfo()`** returns the device type and form-factor flags (mobile / desktop / tablet / TV) synchronously.
+
+### Changed
+- **`Leaderboard.SetScoreAsync` success callback now returns the resulting entry as JSON** (rank and score after submission), previously parameterless.
+
 ## [2.4.5] - 2026-06-19
 
 ### Added

@@ -14,6 +14,8 @@ namespace Yes2SDK
 
         private static Action _bannerRequestSuccessCallback;
         private static Action<Error> _bannerRequestErrorCallback;
+        private static Action<string> _bannerStatusSuccessCallback;
+        private static Action<Error> _bannerStatusErrorCallback;
 
         #endregion
 
@@ -34,6 +36,9 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern bool Yes2SDK_Banners_IsSupportedJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Banners_GetBannerStatusAsyncJS();
 #endif
 
         #endregion
@@ -109,6 +114,23 @@ namespace Yes2SDK
 #endif
         }
 
+        /// <summary>
+        /// Get the current banner status. onSuccess receives a JSON object
+        /// { isShowing, reason? }.
+        /// </summary>
+        public void GetBannerStatusAsync(Action<string> onSuccess = null, Action<Error> onError = null)
+        {
+            _bannerStatusSuccessCallback = onSuccess;
+            _bannerStatusErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Banners_GetBannerStatusAsyncJS();
+#else
+            Yes2Log.Log("Mock: Banners.GetBannerStatusAsync() — returning isShowing=false");
+            InvokeBannerStatusSuccess("{\"isShowing\":false}");
+#endif
+        }
+
         #endregion
 
         #region Internal Callback Invocations (called by Bridge)
@@ -125,6 +147,20 @@ namespace Yes2SDK
             _bannerRequestErrorCallback?.Invoke(error);
             _bannerRequestSuccessCallback = null;
             _bannerRequestErrorCallback = null;
+        }
+
+        internal static void InvokeBannerStatusSuccess(string statusJson)
+        {
+            _bannerStatusSuccessCallback?.Invoke(statusJson);
+            _bannerStatusSuccessCallback = null;
+            _bannerStatusErrorCallback = null;
+        }
+
+        internal static void InvokeBannerStatusError(Error error)
+        {
+            _bannerStatusErrorCallback?.Invoke(error);
+            _bannerStatusSuccessCallback = null;
+            _bannerStatusErrorCallback = null;
         }
 
         #endregion

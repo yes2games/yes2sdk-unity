@@ -81,6 +81,18 @@ mergeInto(LibraryManager.library, {
             }
         } catch (e) {}
         return 1;
+    },
+
+    // Get detailed device info synchronously as a JSON string
+    Yes2SDK_GetDeviceInfoJS__deps: ['$__y2h'],
+    Yes2SDK_GetDeviceInfoJS: function() {
+        var json = '{"type":"unknown","isMobile":false,"isDesktop":false,"isTablet":false,"isTV":false}';
+        try {
+            if (__y2h.has('session') && typeof window.Yes2SDK.session.getDeviceInfo === 'function') {
+                json = JSON.stringify(window.Yes2SDK.session.getDeviceInfo());
+            }
+        } catch (e) {}
+        return __y2h.returnStr(json);
     }
 
 });
