@@ -106,6 +106,83 @@ mergeInto(LibraryManager.library, {
     Yes2SDK_IsConnectedPlayersSupportedJS__deps: ['$__y2h'],
     Yes2SDK_IsConnectedPlayersSupportedJS: function() {
         return (__y2h.has('player') && window.Yes2SDK.player.isConnectedPlayersSupported()) ? 1 : 0;
+    },
+
+    // Get a stable unique player id
+    Yes2SDK_Player_GetUniqueIdAsyncJS__deps: ['$__y2h'],
+    Yes2SDK_Player_GetUniqueIdAsyncJS: function() {
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetUniqueIdError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetUniqueIdAsync');
+            return;
+        }
+
+        window.Yes2SDK.player.getUniqueId()
+            .then(function(id) {
+                SendMessage('Bridge', 'OnGetUniqueIdSuccess', id || '');
+            })
+            .catch(__y2h.handleCatch('OnGetUniqueIdError', 'GetUniqueId failed', 'Yes2SDK.Player.GetUniqueIdAsync'));
+    },
+
+    // Get the player's cross-game identities
+    Yes2SDK_Player_GetIDsPerGameAsyncJS__deps: ['$__y2h'],
+    Yes2SDK_Player_GetIDsPerGameAsyncJS: function() {
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetIDsPerGameError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetIDsPerGameAsync');
+            return;
+        }
+
+        window.Yes2SDK.player.getIDsPerGame()
+            .then(function(ids) {
+                SendMessage('Bridge', 'OnGetIDsPerGameSuccess', JSON.stringify(ids || []));
+            })
+            .catch(__y2h.handleCatch('OnGetIDsPerGameError', 'GetIDsPerGame failed', 'Yes2SDK.Player.GetIDsPerGameAsync'));
+    },
+
+    // Get the player's paying status
+    Yes2SDK_Player_GetPayingStatusAsyncJS__deps: ['$__y2h'],
+    Yes2SDK_Player_GetPayingStatusAsyncJS: function() {
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetPayingStatusError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetPayingStatusAsync');
+            return;
+        }
+
+        window.Yes2SDK.player.getPayingStatus()
+            .then(function(status) {
+                SendMessage('Bridge', 'OnGetPayingStatusSuccess', status || 'unknown');
+            })
+            .catch(__y2h.handleCatch('OnGetPayingStatusError', 'GetPayingStatus failed', 'Yes2SDK.Player.GetPayingStatusAsync'));
+    },
+
+    // Get the player's session mode
+    Yes2SDK_Player_GetModeAsyncJS__deps: ['$__y2h'],
+    Yes2SDK_Player_GetModeAsyncJS: function() {
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetModeError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetModeAsync');
+            return;
+        }
+
+        window.Yes2SDK.player.getMode()
+            .then(function(mode) {
+                SendMessage('Bridge', 'OnGetModeSuccess', mode || 'unknown');
+            })
+            .catch(__y2h.handleCatch('OnGetModeError', 'GetMode failed', 'Yes2SDK.Player.GetModeAsync'));
+    },
+
+    // Get the player's avatar URL for the requested size
+    Yes2SDK_Player_GetPhotoAsyncJS__deps: ['$__y2h'],
+    Yes2SDK_Player_GetPhotoAsyncJS: function(sizePtr) {
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetPhotoError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetPhotoAsync');
+            return;
+        }
+
+        var size = UTF8ToString(sizePtr);
+
+        window.Yes2SDK.player.getPhoto(size || undefined)
+            .then(function(photo) {
+                SendMessage('Bridge', 'OnGetPhotoSuccess', (photo === null || photo === undefined) ? 'null' : photo);
+            })
+            .catch(__y2h.handleCatch('OnGetPhotoError', 'GetPhoto failed', 'Yes2SDK.Player.GetPhotoAsync'));
     }
 
 });

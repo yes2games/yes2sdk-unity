@@ -32,6 +32,16 @@ namespace Yes2SDK
         private static Action<Error> _getConnectedPlayersErrorCallback;
         private static Action<string> _getSignedPlayerInfoSuccessCallback;
         private static Action<Error> _getSignedPlayerInfoErrorCallback;
+        private static Action<string> _getUniqueIdSuccessCallback;
+        private static Action<Error> _getUniqueIdErrorCallback;
+        private static Action<string> _getIDsPerGameSuccessCallback;
+        private static Action<Error> _getIDsPerGameErrorCallback;
+        private static Action<string> _getPayingStatusSuccessCallback;
+        private static Action<Error> _getPayingStatusErrorCallback;
+        private static Action<string> _getModeSuccessCallback;
+        private static Action<Error> _getModeErrorCallback;
+        private static Action<string> _getPhotoSuccessCallback;
+        private static Action<Error> _getPhotoErrorCallback;
 
         #endregion
 
@@ -61,6 +71,21 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern int Yes2SDK_IsConnectedPlayersSupportedJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Player_GetUniqueIdAsyncJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Player_GetIDsPerGameAsyncJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Player_GetPayingStatusAsyncJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Player_GetModeAsyncJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Player_GetPhotoAsyncJS(string size);
 #endif
 
         #endregion
@@ -199,6 +224,92 @@ namespace Yes2SDK
 #endif
         }
 
+        /// <summary>
+        /// Get a stable unique identifier for the current player.
+        /// onSuccess receives the id string.
+        /// </summary>
+        public void GetUniqueIdAsync(Action<string> onSuccess = null, Action<Error> onError = null)
+        {
+            _getUniqueIdSuccessCallback = onSuccess;
+            _getUniqueIdErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Player_GetUniqueIdAsyncJS();
+#else
+            Yes2Log.Log("Mock: GetUniqueIdAsync() — returning \"anonymous\"");
+            InvokeGetUniqueIdSuccess("anonymous");
+#endif
+        }
+
+        /// <summary>
+        /// Get the player's cross-game identities. onSuccess receives a JSON array
+        /// of { appId, userId } objects.
+        /// </summary>
+        public void GetIDsPerGameAsync(Action<string> onSuccess = null, Action<Error> onError = null)
+        {
+            _getIDsPerGameSuccessCallback = onSuccess;
+            _getIDsPerGameErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Player_GetIDsPerGameAsyncJS();
+#else
+            Yes2Log.Log("Mock: GetIDsPerGameAsync() — returning empty list");
+            InvokeGetIDsPerGameSuccess("[]");
+#endif
+        }
+
+        /// <summary>
+        /// Get the player's paying status: "paying", "partially_paying",
+        /// "not_paying", or "unknown". onSuccess receives the status string.
+        /// </summary>
+        public void GetPayingStatusAsync(Action<string> onSuccess = null, Action<Error> onError = null)
+        {
+            _getPayingStatusSuccessCallback = onSuccess;
+            _getPayingStatusErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Player_GetPayingStatusAsyncJS();
+#else
+            Yes2Log.Log("Mock: GetPayingStatusAsync() — returning \"unknown\"");
+            InvokeGetPayingStatusSuccess("unknown");
+#endif
+        }
+
+        /// <summary>
+        /// Get the player's session mode: "lite", "authorized", or "unknown".
+        /// onSuccess receives the mode string.
+        /// </summary>
+        public void GetModeAsync(Action<string> onSuccess = null, Action<Error> onError = null)
+        {
+            _getModeSuccessCallback = onSuccess;
+            _getModeErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Player_GetModeAsyncJS();
+#else
+            Yes2Log.Log("Mock: GetModeAsync() — returning \"unknown\"");
+            InvokeGetModeSuccess("unknown");
+#endif
+        }
+
+        /// <summary>
+        /// Get the player's avatar URL for the requested size. onSuccess receives
+        /// the URL string, or the literal "null" if no photo is available.
+        /// </summary>
+        /// <param name="size">Requested photo size (platform-defined, e.g. "medium").</param>
+        public void GetPhotoAsync(string size, Action<string> onSuccess = null, Action<Error> onError = null)
+        {
+            _getPhotoSuccessCallback = onSuccess;
+            _getPhotoErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Player_GetPhotoAsyncJS(size ?? string.Empty);
+#else
+            Yes2Log.Log($"Mock: GetPhotoAsync('{size}') — returning null");
+            InvokeGetPhotoSuccess("null");
+#endif
+        }
+
         // Task-returning overloads.
 
         public Task<PlayerInfo> GetPlayerAsync(CancellationToken cancellationToken)
@@ -229,6 +340,31 @@ namespace Yes2SDK
         public Task<string> GetSignedPlayerInfoAsync(string payload, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<string>(
                 (success, error) => GetSignedPlayerInfoAsync(payload, success, error),
+                cancellationToken);
+
+        public Task<string> GetUniqueIdAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetUniqueIdAsync(success, error),
+                cancellationToken);
+
+        public Task<string> GetIDsPerGameAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetIDsPerGameAsync(success, error),
+                cancellationToken);
+
+        public Task<string> GetPayingStatusAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetPayingStatusAsync(success, error),
+                cancellationToken);
+
+        public Task<string> GetModeAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetModeAsync(success, error),
+                cancellationToken);
+
+        public Task<string> GetPhotoAsync(string size, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetPhotoAsync(size, success, error),
                 cancellationToken);
 
         /// <summary>
@@ -362,6 +498,76 @@ namespace Yes2SDK
             _getSignedPlayerInfoErrorCallback?.Invoke(error);
             _getSignedPlayerInfoSuccessCallback = null;
             _getSignedPlayerInfoErrorCallback = null;
+        }
+
+        internal static void InvokeGetUniqueIdSuccess(string id)
+        {
+            _getUniqueIdSuccessCallback?.Invoke(id);
+            _getUniqueIdSuccessCallback = null;
+            _getUniqueIdErrorCallback = null;
+        }
+
+        internal static void InvokeGetUniqueIdError(Error error)
+        {
+            _getUniqueIdErrorCallback?.Invoke(error);
+            _getUniqueIdSuccessCallback = null;
+            _getUniqueIdErrorCallback = null;
+        }
+
+        internal static void InvokeGetIDsPerGameSuccess(string identitiesJson)
+        {
+            _getIDsPerGameSuccessCallback?.Invoke(identitiesJson);
+            _getIDsPerGameSuccessCallback = null;
+            _getIDsPerGameErrorCallback = null;
+        }
+
+        internal static void InvokeGetIDsPerGameError(Error error)
+        {
+            _getIDsPerGameErrorCallback?.Invoke(error);
+            _getIDsPerGameSuccessCallback = null;
+            _getIDsPerGameErrorCallback = null;
+        }
+
+        internal static void InvokeGetPayingStatusSuccess(string status)
+        {
+            _getPayingStatusSuccessCallback?.Invoke(status);
+            _getPayingStatusSuccessCallback = null;
+            _getPayingStatusErrorCallback = null;
+        }
+
+        internal static void InvokeGetPayingStatusError(Error error)
+        {
+            _getPayingStatusErrorCallback?.Invoke(error);
+            _getPayingStatusSuccessCallback = null;
+            _getPayingStatusErrorCallback = null;
+        }
+
+        internal static void InvokeGetModeSuccess(string mode)
+        {
+            _getModeSuccessCallback?.Invoke(mode);
+            _getModeSuccessCallback = null;
+            _getModeErrorCallback = null;
+        }
+
+        internal static void InvokeGetModeError(Error error)
+        {
+            _getModeErrorCallback?.Invoke(error);
+            _getModeSuccessCallback = null;
+            _getModeErrorCallback = null;
+        }
+
+        internal static void InvokeGetPhotoSuccess(string photoUrl)
+        {
+            _getPhotoSuccessCallback?.Invoke(photoUrl);
+            _getPhotoSuccessCallback = null;
+            _getPhotoErrorCallback = null;
+        }
+
+        internal static void InvokeGetPhotoError(Error error)
+        {
+            _getPhotoErrorCallback?.Invoke(error);
+            _getPhotoSuccessCallback = null;
+            _getPhotoErrorCallback = null;
         }
 
         #endregion

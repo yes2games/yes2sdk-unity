@@ -78,7 +78,7 @@ namespace Yes2SDK
         /// <summary>
         /// SDK version string.
         /// </summary>
-        public static string Version => "2.4.5";
+        public static string Version => "2.5.0";
 
         private static Yes2SDKAds _ads;
 
@@ -139,7 +139,8 @@ namespace Yes2SDK
         private static Yes2SDKLeaderboard _leaderboard;
 
         /// <summary>
-        /// Leaderboard API. Stub — returns FeatureNotSupported on Poki.
+        /// Leaderboard API for scores, entries, and player ranking. Backed by the
+        /// platform leaderboard API where available; reports FeatureNotSupported otherwise.
         /// </summary>
         public static Yes2SDKLeaderboard Leaderboard
         {
@@ -223,7 +224,8 @@ namespace Yes2SDK
         private static Yes2SDKStats _stats;
 
         /// <summary>
-        /// Stats API. Stub — returns FeatureNotSupported on Poki.
+        /// Stats API for name-value counters. Backed by the platform stats API
+        /// where available; reports FeatureNotSupported otherwise.
         /// </summary>
         public static Yes2SDKStats Stats
         {
@@ -315,6 +317,36 @@ namespace Yes2SDK
             {
                 _score ??= new Yes2SDKScore();
                 return _score;
+            }
+        }
+
+        private static Yes2SDKConfig _config;
+
+        /// <summary>
+        /// Config API for remote feature flags. Backed by the platform config API
+        /// where available; returns caller-provided defaults otherwise.
+        /// </summary>
+        public static Yes2SDKConfig Config
+        {
+            get
+            {
+                _config ??= new Yes2SDKConfig();
+                return _config;
+            }
+        }
+
+        private static Yes2SDKReview _review;
+
+        /// <summary>
+        /// Review API for the in-game rating / feedback prompt. Backed by the
+        /// platform review API where available; reports ineligibility otherwise.
+        /// </summary>
+        public static Yes2SDKReview Review
+        {
+            get
+            {
+                _review ??= new Yes2SDKReview();
+                return _review;
             }
         }
 

@@ -85,6 +85,11 @@ namespace Yes2SDK
             ["OnFlushDataSuccess"] = _ => Yes2SDKPlayer.InvokeFlushDataSuccess(),
             ["OnGetConnectedPlayersSuccess"] = Yes2SDKPlayer.InvokeGetConnectedPlayersSuccess,
             ["OnGetSignedPlayerInfoSuccess"] = Yes2SDKPlayer.InvokeGetSignedPlayerInfoSuccess,
+            ["OnGetUniqueIdSuccess"] = Yes2SDKPlayer.InvokeGetUniqueIdSuccess,
+            ["OnGetIDsPerGameSuccess"] = Yes2SDKPlayer.InvokeGetIDsPerGameSuccess,
+            ["OnGetPayingStatusSuccess"] = Yes2SDKPlayer.InvokeGetPayingStatusSuccess,
+            ["OnGetModeSuccess"] = Yes2SDKPlayer.InvokeGetModeSuccess,
+            ["OnGetPhotoSuccess"] = Yes2SDKPlayer.InvokeGetPhotoSuccess,
 
             // Auth
             ["OnGetCurrentUserSuccess"] = Yes2SDKAuth.InvokeGetCurrentUserSuccess,
@@ -95,9 +100,11 @@ namespace Yes2SDK
             // Game
             ["OnInviteLinkSuccess"] = Yes2SDKGame.InvokeInviteLinkSuccess,
             ["OnSettingsChanged"] = Yes2SDKGame.InvokeSettingsChanged,
+            ["OnGetServerTimeSuccess"] = Yes2SDKGame.InvokeGetServerTimeSuccess,
 
             // Banners
             ["OnBannerRequestSuccess"] = _ => Yes2SDKBanners.InvokeBannerRequestSuccess(),
+            ["OnGetBannerStatusSuccess"] = Yes2SDKBanners.InvokeBannerStatusSuccess,
 
             // Friends
             ["OnListFriendsSuccess"] = Yes2SDKFriends.InvokeListFriendsSuccess,
@@ -111,6 +118,25 @@ namespace Yes2SDK
             // Data (async durable saves)
             ["OnDataSetStringSuccess"] = Yes2SDKData.InvokeSetStringAsyncSuccess,
             ["OnDataFlushSuccess"] = Yes2SDKData.InvokeFlushSuccess,
+
+            // Leaderboard
+            ["OnGetLeaderboardSuccess"] = Yes2SDKLeaderboard.InvokeGetLeaderboardSuccess,
+            ["OnSetScoreSuccess"] = Yes2SDKLeaderboard.InvokeSetScoreSuccess,
+            ["OnGetEntriesSuccess"] = Yes2SDKLeaderboard.InvokeGetEntriesSuccess,
+            ["OnGetPlayerEntrySuccess"] = Yes2SDKLeaderboard.InvokeGetPlayerEntrySuccess,
+            ["OnGetConnectedPlayerEntriesSuccess"] = Yes2SDKLeaderboard.InvokeGetConnectedPlayerEntriesSuccess,
+
+            // Stats
+            ["OnGetStatsSuccess"] = Yes2SDKStats.InvokeGetStatsSuccess,
+            ["OnSetStatsSuccess"] = _ => Yes2SDKStats.InvokeSetStatsSuccess(),
+            ["OnIncrementStatsSuccess"] = Yes2SDKStats.InvokeIncrementStatsSuccess,
+
+            // Config
+            ["OnGetFlagsSuccess"] = Yes2SDKConfig.InvokeGetFlagsSuccess,
+
+            // Review
+            ["OnCanReviewSuccess"] = Yes2SDKReview.InvokeCanReviewSuccess,
+            ["OnRequestReviewSuccess"] = Yes2SDKReview.InvokeRequestReviewSuccess,
         };
 
         // Error handlers — receive parsed Error struct
@@ -136,6 +162,11 @@ namespace Yes2SDK
             ["OnFlushDataError"] = Yes2SDKPlayer.InvokeFlushDataError,
             ["OnGetConnectedPlayersError"] = Yes2SDKPlayer.InvokeGetConnectedPlayersError,
             ["OnGetSignedPlayerInfoError"] = Yes2SDKPlayer.InvokeGetSignedPlayerInfoError,
+            ["OnGetUniqueIdError"] = Yes2SDKPlayer.InvokeGetUniqueIdError,
+            ["OnGetIDsPerGameError"] = Yes2SDKPlayer.InvokeGetIDsPerGameError,
+            ["OnGetPayingStatusError"] = Yes2SDKPlayer.InvokeGetPayingStatusError,
+            ["OnGetModeError"] = Yes2SDKPlayer.InvokeGetModeError,
+            ["OnGetPhotoError"] = Yes2SDKPlayer.InvokeGetPhotoError,
 
             // Auth
             ["OnGetCurrentUserError"] = Yes2SDKAuth.InvokeGetCurrentUserError,
@@ -145,9 +176,11 @@ namespace Yes2SDK
 
             // Game
             ["OnInviteLinkError"] = Yes2SDKGame.InvokeInviteLinkError,
+            ["OnGetServerTimeError"] = Yes2SDKGame.InvokeGetServerTimeError,
 
             // Banners
             ["OnBannerRequestError"] = Yes2SDKBanners.InvokeBannerRequestError,
+            ["OnGetBannerStatusError"] = Yes2SDKBanners.InvokeBannerStatusError,
 
             // Friends
             ["OnListFriendsError"] = Yes2SDKFriends.InvokeListFriendsError,
@@ -161,6 +194,25 @@ namespace Yes2SDK
             // Data (async durable saves)
             ["OnDataSetStringError"] = Yes2SDKData.InvokeSetStringAsyncError,
             ["OnDataFlushError"] = Yes2SDKData.InvokeFlushError,
+
+            // Leaderboard
+            ["OnGetLeaderboardError"] = Yes2SDKLeaderboard.InvokeGetLeaderboardError,
+            ["OnSetScoreError"] = Yes2SDKLeaderboard.InvokeSetScoreError,
+            ["OnGetEntriesError"] = Yes2SDKLeaderboard.InvokeGetEntriesError,
+            ["OnGetPlayerEntryError"] = Yes2SDKLeaderboard.InvokeGetPlayerEntryError,
+            ["OnGetConnectedPlayerEntriesError"] = Yes2SDKLeaderboard.InvokeGetConnectedPlayerEntriesError,
+
+            // Stats
+            ["OnGetStatsError"] = Yes2SDKStats.InvokeGetStatsError,
+            ["OnSetStatsError"] = Yes2SDKStats.InvokeSetStatsError,
+            ["OnIncrementStatsError"] = Yes2SDKStats.InvokeIncrementStatsError,
+
+            // Config
+            ["OnGetFlagsError"] = Yes2SDKConfig.InvokeGetFlagsError,
+
+            // Review
+            ["OnCanReviewError"] = Yes2SDKReview.InvokeCanReviewError,
+            ["OnRequestReviewError"] = Yes2SDKReview.InvokeRequestReviewError,
         };
 
         #endregion
@@ -218,6 +270,16 @@ namespace Yes2SDK
         public void OnGetConnectedPlayersError(string msg) => Handle(msg);
         public void OnGetSignedPlayerInfoSuccess(string msg) => Handle(msg);
         public void OnGetSignedPlayerInfoError(string msg) => Handle(msg);
+        public void OnGetUniqueIdSuccess(string msg) => Handle(msg);
+        public void OnGetUniqueIdError(string msg) => Handle(msg);
+        public void OnGetIDsPerGameSuccess(string msg) => Handle(msg);
+        public void OnGetIDsPerGameError(string msg) => Handle(msg);
+        public void OnGetPayingStatusSuccess(string msg) => Handle(msg);
+        public void OnGetPayingStatusError(string msg) => Handle(msg);
+        public void OnGetModeSuccess(string msg) => Handle(msg);
+        public void OnGetModeError(string msg) => Handle(msg);
+        public void OnGetPhotoSuccess(string msg) => Handle(msg);
+        public void OnGetPhotoError(string msg) => Handle(msg);
 
         // Auth
         public void OnGetCurrentUserSuccess(string msg) => Handle(msg);
@@ -233,10 +295,14 @@ namespace Yes2SDK
         public void OnInviteLinkSuccess(string msg) => Handle(msg);
         public void OnInviteLinkError(string msg) => Handle(msg);
         public void OnSettingsChanged(string msg) => Handle(msg);
+        public void OnGetServerTimeSuccess(string msg) => Handle(msg);
+        public void OnGetServerTimeError(string msg) => Handle(msg);
 
         // Banners
         public void OnBannerRequestSuccess(string msg) => Handle(msg);
         public void OnBannerRequestError(string msg) => Handle(msg);
+        public void OnGetBannerStatusSuccess(string msg) => Handle(msg);
+        public void OnGetBannerStatusError(string msg) => Handle(msg);
 
         // Friends
         public void OnListFriendsSuccess(string msg) => Handle(msg);
@@ -257,6 +323,36 @@ namespace Yes2SDK
         public void OnDataSetStringError(string msg) => Handle(msg);
         public void OnDataFlushSuccess(string msg) => Handle(msg);
         public void OnDataFlushError(string msg) => Handle(msg);
+
+        // Leaderboard
+        public void OnGetLeaderboardSuccess(string msg) => Handle(msg);
+        public void OnGetLeaderboardError(string msg) => Handle(msg);
+        public void OnSetScoreSuccess(string msg) => Handle(msg);
+        public void OnSetScoreError(string msg) => Handle(msg);
+        public void OnGetEntriesSuccess(string msg) => Handle(msg);
+        public void OnGetEntriesError(string msg) => Handle(msg);
+        public void OnGetPlayerEntrySuccess(string msg) => Handle(msg);
+        public void OnGetPlayerEntryError(string msg) => Handle(msg);
+        public void OnGetConnectedPlayerEntriesSuccess(string msg) => Handle(msg);
+        public void OnGetConnectedPlayerEntriesError(string msg) => Handle(msg);
+
+        // Stats
+        public void OnGetStatsSuccess(string msg) => Handle(msg);
+        public void OnGetStatsError(string msg) => Handle(msg);
+        public void OnSetStatsSuccess(string msg) => Handle(msg);
+        public void OnSetStatsError(string msg) => Handle(msg);
+        public void OnIncrementStatsSuccess(string msg) => Handle(msg);
+        public void OnIncrementStatsError(string msg) => Handle(msg);
+
+        // Config
+        public void OnGetFlagsSuccess(string msg) => Handle(msg);
+        public void OnGetFlagsError(string msg) => Handle(msg);
+
+        // Review
+        public void OnCanReviewSuccess(string msg) => Handle(msg);
+        public void OnCanReviewError(string msg) => Handle(msg);
+        public void OnRequestReviewSuccess(string msg) => Handle(msg);
+        public void OnRequestReviewError(string msg) => Handle(msg);
 
         #endregion
 

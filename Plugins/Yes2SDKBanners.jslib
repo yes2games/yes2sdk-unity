@@ -38,6 +38,20 @@ mergeInto(LibraryManager.library, {
         if (!__y2h.has('banners')) return false;
         try { return window.Yes2SDK.banners.isSupported() ? 1 : 0; }
         catch (e) { return 0; }
+    },
+
+    Yes2SDK_Banners_GetBannerStatusAsyncJS__deps: ['$__y2h'],
+    Yes2SDK_Banners_GetBannerStatusAsyncJS: function() {
+        if (!__y2h.has('banners')) {
+            __y2h.sendError('OnGetBannerStatusError', 'NotInitialized', 'Yes2SDK Banners module not loaded', 'Yes2SDK.Banners.GetBannerStatusAsync');
+            return;
+        }
+
+        window.Yes2SDK.banners.getBannerStatusAsync()
+            .then(function(status) {
+                SendMessage('Bridge', 'OnGetBannerStatusSuccess', JSON.stringify(status || { isShowing: false }));
+            })
+            .catch(__y2h.handleCatch('OnGetBannerStatusError', 'GetBannerStatus failed', 'Yes2SDK.Banners.GetBannerStatusAsync'));
     }
 
 });

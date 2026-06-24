@@ -61,6 +61,20 @@ mergeInto(LibraryManager.library, {
     Yes2SDK_Game_CopyToClipboardJS: function(textPtr) {
         var text = UTF8ToString(textPtr);
         if (__y2h.has('game')) window.Yes2SDK.game.copyToClipboard(text);
+    },
+
+    Yes2SDK_Game_GetServerTimeAsyncJS__deps: ['$__y2h'],
+    Yes2SDK_Game_GetServerTimeAsyncJS: function() {
+        if (!__y2h.has('game')) {
+            __y2h.sendError('OnGetServerTimeError', 'NotInitialized', 'Yes2SDK Game module not loaded', 'Yes2SDK.Game.GetServerTimeAsync');
+            return;
+        }
+
+        window.Yes2SDK.game.getServerTimeAsync()
+            .then(function(time) {
+                SendMessage('Bridge', 'OnGetServerTimeSuccess', String(time));
+            })
+            .catch(__y2h.handleCatch('OnGetServerTimeError', 'GetServerTime failed', 'Yes2SDK.Game.GetServerTimeAsync'));
     }
 
 });

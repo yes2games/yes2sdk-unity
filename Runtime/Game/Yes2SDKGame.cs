@@ -19,6 +19,8 @@ namespace Yes2SDK
 
         private static Action<string> _inviteLinkSuccessCallback;
         private static Action<Error> _inviteLinkErrorCallback;
+        private static Action<long> _serverTimeSuccessCallback;
+        private static Action<Error> _serverTimeErrorCallback;
 
         #endregion
 
@@ -60,6 +62,9 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_Game_CopyToClipboardJS(string text);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Game_GetServerTimeAsyncJS();
 #endif
 
         #endregion
@@ -196,6 +201,29 @@ namespace Yes2SDK
 #endif
         }
 
+        /// <summary>
+        /// Get the platform server time as Unix epoch milliseconds. onSuccess
+        /// receives the timestamp. Falls back to local time where the platform
+        /// has no server-time API.
+        /// </summary>
+        public void GetServerTimeAsync(Action<long> onSuccess = null, Action<Error> onError = null)
+        {
+            _serverTimeSuccessCallback = onSuccess;
+            _serverTimeErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Game_GetServerTimeAsyncJS();
+#else
+            Yes2Log.Log("Mock: Game.GetServerTimeAsync() — returning local time");
+            InvokeGetServerTimeSuccess(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString());
+#endif
+        }
+
+        public Task<long> GetServerTimeAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<long>(
+                (success, error) => GetServerTimeAsync(success, error),
+                cancellationToken);
+
         #endregion
 
         #region Internal Callback Invocations (called by Bridge)
@@ -212,6 +240,35 @@ namespace Yes2SDK
             _inviteLinkErrorCallback?.Invoke(error);
             _inviteLinkSuccessCallback = null;
             _inviteLinkErrorCallback = null;
+        }
+
+        internal static void InvokeGetServerTimeSuccess(string timestamp)
+        {
+            if (_serverTimeSuccessCallback != null)
+            {
+                if (long.TryParse(timestamp, out var ms))
+                {
+                    _serverTimeSuccessCallback.Invoke(ms);
+                }
+                else
+                {
+                    _serverTimeErrorCallback?.Invoke(new Error
+                    {
+                        Code = "Unknown",
+                        Message = $"Failed to parse server time: {timestamp}",
+                        Context = "Yes2SDK.Game.GetServerTimeAsync"
+                    });
+                }
+            }
+            _serverTimeSuccessCallback = null;
+            _serverTimeErrorCallback = null;
+        }
+
+        internal static void InvokeGetServerTimeError(Error error)
+        {
+            _serverTimeErrorCallback?.Invoke(error);
+            _serverTimeSuccessCallback = null;
+            _serverTimeErrorCallback = null;
         }
 
         internal static void InvokeSettingsChanged(string settingsJson)

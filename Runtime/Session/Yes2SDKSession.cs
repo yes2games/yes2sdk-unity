@@ -46,6 +46,9 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern int Yes2SDK_IsAudioEnabledJS();
+
+        [DllImport("__Internal")]
+        private static extern string Yes2SDK_GetDeviceInfoJS();
 #endif
 
         #endregion
@@ -188,6 +191,20 @@ namespace Yes2SDK
 #else
             Yes2Log.Log("Mock: IsAudioEnabled() — returning true");
             return true;
+#endif
+        }
+
+        /// <summary>
+        /// Get detailed device information synchronously as a JSON string of
+        /// shape { type, isMobile, isDesktop, isTablet, isTV }.
+        /// </summary>
+        public string GetDeviceInfo()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_GetDeviceInfoJS();
+#else
+            Yes2Log.Log("Mock: GetDeviceInfo() — returning desktop");
+            return "{\"type\":\"desktop\",\"isMobile\":false,\"isDesktop\":true,\"isTablet\":false,\"isTV\":false}";
 #endif
         }
 
