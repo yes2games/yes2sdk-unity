@@ -2,7 +2,9 @@ mergeInto(LibraryManager.library, {
 
     Yes2SDK_Review_IsSupportedJS__deps: ['$__y2h'],
     Yes2SDK_Review_IsSupportedJS: function() {
-        return __y2h.has('review') && window.Yes2SDK.review.isSupported() ? 1 : 0;
+        if (!__y2h.has('review')) return false;
+        try { return window.Yes2SDK.review.isSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     },
 
     Yes2SDK_Review_CanReviewAsyncJS__deps: ['$__y2h'],
