@@ -1,0 +1,14 @@
+name: wrapper-parity
+on:
+  push:
+  pull_request:
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check wrapper module parity
+        run: node scripts/check-wrapper-parity.mjs

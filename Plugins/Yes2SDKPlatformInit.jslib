@@ -53,6 +53,12 @@ mergeInto(LibraryManager.library, {
         // ===================================================================
         // CrazyGames wrapper — mirrors Yes2SDK-CrazyGames/index.html exactly
         // ===================================================================
+        // Core's CrazyGames strategies reject unsupported features with this exact shape
+        // (code matches yes2sdk-core FEATURE_NOT_SUPPORTED). Keep in sync with Core semantics.
+        function __y2fns(feature) {
+            return { code: 'FEATURE_NOT_SUPPORTED', message: feature + ' is not supported on the current platform.' };
+        }
+
         window.Yes2SDK = {
             _initialized: false,
             _platform: 'crazygames',
@@ -678,6 +684,46 @@ mergeInto(LibraryManager.library, {
                         window.__y2.log('SubmitScore:', encryptedScore);
                     }
                 }
+            },
+
+            // Leaderboard module - unsupported on CrazyGames (mirrors Core crazygames-leaderboard-strategy)
+            leaderboard: {
+                getLeaderboardAsync: function(name) { return Promise.reject(__y2fns('Leaderboard.getLeaderboardAsync')); },
+                setScoreAsync: function(name, score, metadata) { return Promise.reject(__y2fns('Leaderboard.setScoreAsync')); },
+                getEntriesAsync: function(name, count, offset) { return Promise.reject(__y2fns('Leaderboard.getEntriesAsync')); },
+                getPlayerEntryAsync: function(name) { return Promise.reject(__y2fns('Leaderboard.getPlayerEntryAsync')); },
+                getConnectedPlayerEntriesAsync: function(name, count, offset) { return Promise.reject(__y2fns('Leaderboard.getConnectedPlayerEntriesAsync')); },
+                isSupported: function() { return false; }
+            },
+
+            // Stats module - unsupported on CrazyGames (mirrors Core crazygames-stats-strategy)
+            stats: {
+                getStatsAsync: function(keys) { return Promise.reject(__y2fns('Stats.getStatsAsync')); },
+                setStatsAsync: function(stats) { return Promise.reject(__y2fns('Stats.setStatsAsync')); },
+                incrementStatsAsync: function(increments) { return Promise.reject(__y2fns('Stats.incrementStatsAsync')); },
+                isSupported: function() { return false; }
+            },
+
+            // Config module - graceful degradation: resolve provided defaults (mirrors Core crazygames-config-strategy)
+            config: {
+                getFlagsAsync: function(options) { return Promise.resolve((options && options.defaults) || {}); },
+                isSupported: function() { return false; }
+            },
+
+            // Review module - graceful degradation: resolve unsupported result (mirrors Core crazygames-review-strategy)
+            review: {
+                canReviewAsync: function() { return Promise.resolve({ canReview: false, reason: 'FEATURE_NOT_SUPPORTED' }); },
+                requestReviewAsync: function() { return Promise.resolve({ feedbackSent: false }); },
+                isSupported: function() { return false; }
+            },
+
+            // IAP module - unsupported on CrazyGames (mirrors Core crazygames-iap-strategy; IAP only functions on Yandex)
+            iap: {
+                getCatalogAsync: function() { return Promise.reject(__y2fns('IAP.getCatalogAsync')); },
+                purchaseAsync: function(config) { return Promise.reject(__y2fns('IAP.purchaseAsync')); },
+                getPurchasesAsync: function() { return Promise.reject(__y2fns('IAP.getPurchasesAsync')); },
+                consumePurchaseAsync: function(purchaseToken) { return Promise.reject(__y2fns('IAP.consumePurchaseAsync')); },
+                isSupported: function() { return false; }
             }
         };
 
