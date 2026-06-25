@@ -205,6 +205,13 @@ mergeInto(LibraryManager.library, {
 
                 isAdBlocked: function() {
                     return false;
+                },
+
+                // Best-effort readiness — CG has no explicit signal; ad module present => may be available
+                // (mirrors Core crazygames-ads-strategy.isRewardedAdAvailable).
+                isRewardedAdAvailable: function() {
+                    var sdk = window.Yes2SDK._sdk;
+                    return !!(sdk && sdk.ad);
                 }
             },
 
@@ -318,6 +325,25 @@ mergeInto(LibraryManager.library, {
                         }
                     } catch(e) {}
                     return Promise.resolve(source);
+                },
+
+                // CrazyGames has no native audio-enabled signal; assume enabled
+                // (mirrors Core crazygames-session-strategy.isAudioEnabled).
+                isAudioEnabled: function() {
+                    return true;
+                },
+
+                // Detailed device info. CrazyGames has no TV class, so isTV is always false
+                // (mirrors Core crazygames-session-strategy.getDeviceInfo shape).
+                getDeviceInfo: function() {
+                    var type = this.getDevice();
+                    return {
+                        type: type,
+                        isMobile: type === 'mobile',
+                        isDesktop: type === 'desktop',
+                        isTablet: type === 'tablet',
+                        isTV: false
+                    };
                 }
             },
 
@@ -395,6 +421,53 @@ mergeInto(LibraryManager.library, {
                         message: 'Signed player info is not supported on CrazyGames',
                         context: 'player.getSignedPlayerInfoAsync'
                     });
+                },
+
+                // Stable unique id — CrazyGames uses the username (or 'anonymous').
+                // Mirrors Core crazygames-player-strategy.getUniqueId (= getPlayer().id).
+                getUniqueId: function() {
+                    return this.getPlayerAsync().then(function(player) {
+                        return player.id;
+                    });
+                },
+
+                // CrazyGames has no cross-game identity API (Core returns []).
+                getIDsPerGame: function() {
+                    return Promise.resolve([]);
+                },
+
+                // CrazyGames does not expose a paying status (Core returns 'unknown').
+                getPayingStatus: function() {
+                    return Promise.resolve('unknown');
+                },
+
+                // Logged-in users are 'authorized', guests 'lite' (Core: getUser()).
+                getMode: function() {
+                    var sdk = window.Yes2SDK._sdk;
+                    if (!sdk || !sdk.user) return Promise.resolve('lite');
+                    return sdk.user.getUser().then(function(user) {
+                        return user ? 'authorized' : 'lite';
+                    }).catch(function() {
+                        return 'unknown';
+                    });
+                },
+
+                // CrazyGames exposes one profile picture URL, no size variants
+                // (Core crazygames-player-strategy.getPhoto = getPlayer().photo).
+                getPhoto: function(size) {
+                    return this.getPlayerAsync().then(function(player) {
+                        return player.photo;
+                    });
+                },
+
+                // CrazyGames syncs player data for logged-in users (Core: isDataSupported = true).
+                isDataSupported: function() {
+                    return true;
+                },
+
+                // Connected players are not a CrazyGames feature (Core: isConnectedPlayersSupported = false).
+                isConnectedPlayersSupported: function() {
+                    return false;
                 }
             },
 
@@ -462,6 +535,27 @@ mergeInto(LibraryManager.library, {
                 deleteAll: function() {
                     var sdk = window.Yes2SDK._sdk;
                     if (sdk && sdk.data) sdk.data.clear();
+                },
+
+                // Durable string write. CG data.setItem is synchronous; resolve true on
+                // success, false on throw (mirrors Core crazygames-data-strategy.setItemAsync).
+                setStringAsync: function(key, value) {
+                    var sdk = window.Yes2SDK._sdk;
+                    if (!sdk || !sdk.data) return Promise.resolve(false);
+                    try {
+                        var result = sdk.data.setItem(key, value);
+                        if (result && typeof result.then === 'function') {
+                            return result.then(function() { return true; }).catch(function() { return false; });
+                        }
+                        return Promise.resolve(true);
+                    } catch(e) {
+                        return Promise.resolve(false);
+                    }
+                },
+
+                // CrazyGames auto-flushes (debounced); no explicit flush needed.
+                flushAsync: function() {
+                    return Promise.resolve(true);
                 }
             },
 
@@ -599,6 +693,12 @@ mergeInto(LibraryManager.library, {
                     if (sdk && sdk.game && sdk.game.copyToClipboard) {
                         sdk.game.copyToClipboard(text);
                     }
+                },
+
+                // CrazyGames has no server-time API; fall back to local clock
+                // (mirrors Core crazygames-game-strategy.getServerTimeAsync).
+                getServerTimeAsync: function() {
+                    return Promise.resolve(Date.now());
                 }
             },
 
@@ -634,6 +734,17 @@ mergeInto(LibraryManager.library, {
                 refreshBanners: function() {
                     var sdk = window.Yes2SDK._sdk;
                     if (sdk && sdk.banner && sdk.banner.refreshBanners) sdk.banner.refreshBanners();
+                },
+
+                // CrazyGames has no banner status query — banners are fire-and-forget
+                // (mirrors Core crazygames-banners-strategy.getBannerStatusAsync).
+                getBannerStatusAsync: function() {
+                    return Promise.resolve({ isShowing: false, reason: 'STATUS_QUERY_NOT_SUPPORTED' });
+                },
+
+                // Banners work on CrazyGames (Core crazygames-banners-strategy.isSupported = true).
+                isSupported: function() {
+                    return true;
                 }
             },
 
@@ -662,6 +773,11 @@ mergeInto(LibraryManager.library, {
                             total: (friends || []).length
                         };
                     });
+                },
+
+                // Friends work on CrazyGames (Core crazygames-friends-strategy.isSupported = true).
+                isSupported: function() {
+                    return true;
                 }
             },
 
@@ -683,6 +799,11 @@ mergeInto(LibraryManager.library, {
                     } else {
                         window.__y2.log('SubmitScore:', encryptedScore);
                     }
+                },
+
+                // Score submission works on CrazyGames (Core crazygames-score-strategy.isSupported = true).
+                isSupported: function() {
+                    return true;
                 }
             },
 

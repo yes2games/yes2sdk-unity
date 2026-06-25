@@ -11,5 +11,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Check wrapper module parity
+      - name: Check wrapper method parity
         run: node scripts/check-wrapper-parity.mjs
