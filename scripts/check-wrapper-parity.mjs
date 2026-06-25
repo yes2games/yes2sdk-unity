@@ -18,6 +18,8 @@ const moduleRe = /window\.Yes2SDK\.([a-z][a-zA-Z0-9]*)\.([a-zA-Z0-9]+)\s*\(/g;
 const required = new Map(); // module -> Set(methods)
 for (const f of bridges) {
   const src = readFileSync(join(pluginsDir, f), 'utf8');
+  // Fix #3: reset lastIndex before each file scan so no stale state leaks between inputs.
+  moduleRe.lastIndex = 0;
   let m;
   while ((m = moduleRe.exec(src)) !== null) {
     const [, mod, method] = m;
@@ -27,15 +29,42 @@ for (const f of bridges) {
 }
 
 const wrapperSrc = readFileSync(join(pluginsDir, WRAPPER), 'utf8');
-const hasModule = (mod) => new RegExp('(^|[^\\w.])' + mod + '\\s*:\\s*\\{', 'm').test(wrapperSrc);
-const hasMethod = (method) => new RegExp('(^|[^\\w.])' + method + '\\s*:\\s*function', 'm').test(wrapperSrc);
+
+// Fix #1: append (?!\w) so "ad" does not prefix-match "ads:" — the module name must end at a
+// non-word boundary before the key separator.
+const hasModule = (mod) =>
+  new RegExp('(^|[^\\w.])' + mod + '(?!\\w)\\s*:\\s*\\{', 'm').test(wrapperSrc);
+
+// Fix #2: scope the method search to the specific module's object-literal body so a method
+// present in a *different* module does not satisfy the check for this one.
+// Extract the module block by counting braces from the opening '{' of "<mod>: {".
+const extractModuleBlock = (mod) => {
+  // Use the same word-boundary pattern as hasModule to find the block start.
+  const keyRe = new RegExp('(?:^|[^\\w.])' + mod + '(?!\\w)\\s*:\\s*\\{', 'm');
+  const keyMatch = keyRe.exec(wrapperSrc);
+  if (!keyMatch) return '';
+  // Walk forward counting braces; the opening '{' is the last char of the match.
+  const openPos = keyMatch.index + keyMatch[0].length - 1;
+  let depth = 0;
+  let end = openPos;
+  for (let i = openPos; i < wrapperSrc.length; i++) {
+    if (wrapperSrc[i] === '{') depth++;
+    else if (wrapperSrc[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  return wrapperSrc.slice(openPos, end + 1);
+};
+const hasMethod = (mod, method) => {
+  const block = extractModuleBlock(mod);
+  if (!block) return false;
+  return new RegExp('(^|[^\\w.])' + method + '\\s*:\\s*function', 'm').test(block);
+};
 
 const missingModules = [];
 const missingMethods = [];
 for (const [mod, methods] of required) {
   if (!hasModule(mod)) { missingModules.push(mod); continue; }
   for (const method of methods) {
-    if (!hasMethod(method)) missingMethods.push(mod + '.' + method);
+    if (!hasMethod(mod, method)) missingMethods.push(mod + '.' + method);
   }
 }
 
