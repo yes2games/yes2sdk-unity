@@ -99,13 +99,13 @@ mergeInto(LibraryManager.library, {
     // Whether player data persistence is supported on the current platform
     Yes2SDK_IsDataSupportedJS__deps: ['$__y2h'],
     Yes2SDK_IsDataSupportedJS: function() {
-        return (__y2h.has('player') && window.Yes2SDK.player.isDataSupported()) ? 1 : 0;
+        return (__y2h.has('player') && typeof window.Yes2SDK.player.isDataSupported === 'function' && window.Yes2SDK.player.isDataSupported()) ? 1 : 0;
     },
 
     // Whether connected players are supported on the current platform
     Yes2SDK_IsConnectedPlayersSupportedJS__deps: ['$__y2h'],
     Yes2SDK_IsConnectedPlayersSupportedJS: function() {
-        return (__y2h.has('player') && window.Yes2SDK.player.isConnectedPlayersSupported()) ? 1 : 0;
+        return (__y2h.has('player') && typeof window.Yes2SDK.player.isConnectedPlayersSupported === 'function' && window.Yes2SDK.player.isConnectedPlayersSupported()) ? 1 : 0;
     },
 
     // Get a stable unique player id
