@@ -2,7 +2,9 @@ mergeInto(LibraryManager.library, {
 
     Yes2SDK_Stats_IsSupportedJS__deps: ['$__y2h'],
     Yes2SDK_Stats_IsSupportedJS: function() {
-        return __y2h.has('stats') && window.Yes2SDK.stats.isSupported() ? 1 : 0;
+        if (!__y2h.has('stats')) return false;
+        try { return window.Yes2SDK.stats.isSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     },
 
     Yes2SDK_Stats_GetStatsAsyncJS__deps: ['$__y2h'],

@@ -2,7 +2,9 @@ mergeInto(LibraryManager.library, {
 
     Yes2SDK_Leaderboard_IsSupportedJS__deps: ['$__y2h'],
     Yes2SDK_Leaderboard_IsSupportedJS: function() {
-        return __y2h.has('leaderboard') && window.Yes2SDK.leaderboard.isSupported() ? 1 : 0;
+        if (!__y2h.has('leaderboard')) return false;
+        try { return window.Yes2SDK.leaderboard.isSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     },
 
     Yes2SDK_Leaderboard_GetLeaderboardAsyncJS__deps: ['$__y2h'],

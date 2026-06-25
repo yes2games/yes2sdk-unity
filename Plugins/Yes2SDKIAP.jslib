@@ -2,7 +2,9 @@ mergeInto(LibraryManager.library, {
 
     Yes2SDK_IAP_IsSupportedJS__deps: ['$__y2h'],
     Yes2SDK_IAP_IsSupportedJS: function() {
-        return __y2h.has('iap') && window.Yes2SDK.iap.isSupported() ? 1 : 0;
+        if (!__y2h.has('iap')) return false;
+        try { return window.Yes2SDK.iap.isSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     },
 
     Yes2SDK_IAP_GetCatalogAsyncJS__deps: ['$__y2h'],

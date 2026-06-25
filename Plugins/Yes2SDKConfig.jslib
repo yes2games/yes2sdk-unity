@@ -2,7 +2,9 @@ mergeInto(LibraryManager.library, {
 
     Yes2SDK_Config_IsSupportedJS__deps: ['$__y2h'],
     Yes2SDK_Config_IsSupportedJS: function() {
-        return __y2h.has('config') && window.Yes2SDK.config.isSupported() ? 1 : 0;
+        if (!__y2h.has('config')) return false;
+        try { return window.Yes2SDK.config.isSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     },
 
     Yes2SDK_Config_GetFlagsAsyncJS__deps: ['$__y2h'],

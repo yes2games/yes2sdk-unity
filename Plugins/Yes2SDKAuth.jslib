@@ -2,7 +2,9 @@ mergeInto(LibraryManager.library, {
 
     Yes2SDK_Auth_IsSupportedJS__deps: ['$__y2h'],
     Yes2SDK_Auth_IsSupportedJS: function() {
-        return __y2h.has('auth') && window.Yes2SDK.auth.isSupported() ? 1 : 0;
+        if (!__y2h.has('auth')) return false;
+        try { return window.Yes2SDK.auth.isSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     },
 
     Yes2SDK_Auth_GetCurrentUserAsyncJS__deps: ['$__y2h'],
