@@ -57,6 +57,19 @@ namespace Yes2SDK
         public static event Action<bool> OnAudioEnabledChange;
 
         /// <summary>
+        /// Called when the platform's account-selection dialog is opened (Yandex only).
+        /// Pause gameplay and audio while the dialog is open, then resume on
+        /// <see cref="OnAccountDialogClose"/>.
+        /// </summary>
+        public static event Action OnAccountDialogOpen;
+
+        /// <summary>
+        /// Called when the platform's account-selection dialog is closed (Yandex only).
+        /// Resume gameplay and audio that were paused on <see cref="OnAccountDialogOpen"/>.
+        /// </summary>
+        public static event Action OnAccountDialogClose;
+
+        /// <summary>
         /// Called when an SDK error occurs.
         /// </summary>
         public static event Action<Error> OnError;
@@ -535,6 +548,24 @@ namespace Yes2SDK
         {
             Yes2Log.Log("Game resumed");
             OnResume?.Invoke();
+        }
+
+        /// <summary>
+        /// Invokes the OnAccountDialogOpen event. Called internally by the bridge.
+        /// </summary>
+        internal static void InvokeAccountDialogOpen()
+        {
+            Yes2Log.Log("Account dialog opened");
+            OnAccountDialogOpen?.Invoke();
+        }
+
+        /// <summary>
+        /// Invokes the OnAccountDialogClose event. Called internally by the bridge.
+        /// </summary>
+        internal static void InvokeAccountDialogClose()
+        {
+            Yes2Log.Log("Account dialog closed");
+            OnAccountDialogClose?.Invoke();
         }
 
         /// <summary>

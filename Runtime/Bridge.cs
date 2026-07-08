@@ -64,6 +64,8 @@ namespace Yes2SDK
             ["OnPause"] = _ => Callbacks.InvokePause(),
             ["OnResume"] = _ => Callbacks.InvokeResume(),
             ["OnAudioEnabledChange"] = data => Callbacks.InvokeAudioEnabledChange(data),
+            ["OnAccountDialogOpen"] = _ => Callbacks.InvokeAccountDialogOpen(),
+            ["OnAccountDialogClose"] = _ => Callbacks.InvokeAccountDialogClose(),
 
             // Ads
             ["OnInterstitialBeforeAd"] = _ => Yes2SDKAds.InvokeInterstitialBeforeAd(),
@@ -238,6 +240,8 @@ namespace Yes2SDK
         public void OnPause(string msg) => Handle(msg);
         public void OnResume(string msg) => Handle(msg);
         public void OnAudioEnabledChange(string msg) => Handle(msg);
+        public void OnAccountDialogOpen(string msg) => Handle(msg);
+        public void OnAccountDialogClose(string msg) => Handle(msg);
 
         // Ads
         public void OnInterstitialBeforeAd(string msg) => Handle(msg);
@@ -431,6 +435,16 @@ namespace Yes2SDK
         internal static void InvokeResume()
         {
             Yes2SDK.InvokeResume();
+        }
+
+        internal static void InvokeAccountDialogOpen()
+        {
+            Yes2SDK.InvokeAccountDialogOpen();
+        }
+
+        internal static void InvokeAccountDialogClose()
+        {
+            Yes2SDK.InvokeAccountDialogClose();
         }
 
         internal static void InvokeAudioEnabledChange(string dataJson)
