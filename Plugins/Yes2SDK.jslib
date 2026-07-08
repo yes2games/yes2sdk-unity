@@ -75,7 +75,13 @@ mergeInto(LibraryManager.library, {
                     var enabled = (data && data.enabled) === true;
                     SendMessage('Bridge', 'OnAudioEnabledChange', JSON.stringify({ enabled: enabled }));
                 });
-                window.__y2.log('[Lifecycle] pause/resume/audioEnabledChange wired to Bridge');
+                window.Yes2SDK.on('accountDialogOpen', function() {
+                    SendMessage('Bridge', 'OnAccountDialogOpen', '');
+                });
+                window.Yes2SDK.on('accountDialogClose', function() {
+                    SendMessage('Bridge', 'OnAccountDialogClose', '');
+                });
+                window.__y2.log('[Lifecycle] pause/resume/audioEnabledChange/accountDialogOpen/accountDialogClose wired to Bridge');
             } catch(error) {
                 window.__y2.error('[Lifecycle] failed to wire lifecycle events:', error);
             }

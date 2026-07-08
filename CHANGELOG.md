@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Account-selection dialog events (Yandex).** `Yes2SDK.OnAccountDialogOpen` and `Yes2SDK.OnAccountDialogClose` fire when the platform's account-selection dialog opens and closes; pause gameplay and audio while it is open.
+
 ## [2.5.0] - 2026-06-24
 
 ### Added
