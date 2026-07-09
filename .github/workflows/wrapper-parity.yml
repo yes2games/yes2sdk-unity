@@ -12,4 +12,4 @@ jobs:
         with:
           node-version: '20'
       - name: Check wrapper method parity
-        run: node scripts/check-wrapper-parity.mjs
+        run: node scripts~/check-wrapper-parity.mjs
