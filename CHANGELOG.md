@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.2] - 2026-07-09
+
+### Fixed
+- **Package no longer emits "has no meta file … the asset will be ignored" on install.** A repo-only tooling folder shipped without Unity `.meta` files, which Unity flags when the package is installed as an immutable dependency. The folder is now hidden from Unity (Unity ignores `~`-suffixed folders) so it is excluded from import entirely.
+- **`Yes2SDK.Version` now reports the real package version** (was stuck at `2.5.0`), so support-ticket logs and the Build Window header show the correct number again.
+
 ## [2.5.1] - 2026-07-08
 
 ### Added
