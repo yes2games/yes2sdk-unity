@@ -65,6 +65,14 @@ namespace Yes2SDK
         private GUIStyle _hintStyle;
         private GUIStyle _buttonStyle;
 
+        // Popup scale for the current game view resolution. IMGUI draws in
+        // raw pixels, so without this the popup renders tiny on QHD/4K game
+        // views. Reference size 1280x720 = the layout constants at scale 1;
+        // never scaled below 1 so small Free Aspect windows keep the base
+        // size. Styles are rebuilt when the scale changes (view resized).
+        private float _uiScale = 1f;
+        private float _stylesScale = -1f;
+
         #region Static entry points (called from Yes2SDKAds / Yes2SDKIAP)
 
         /// <summary>True while any mock popup is on screen.</summary>
@@ -269,7 +277,9 @@ namespace Yes2SDK
             if (_kind == Kind.None) return;
 
             GUI.depth = -1000;
-            EnsureStyles();
+
+            _uiScale = Mathf.Max(1f, Mathf.Min(Screen.width / 1280f, Screen.height / 720f));
+            EnsureStyles(_uiScale);
 
             // Dim the whole screen.
             var previousColor = GUI.color;
@@ -277,8 +287,8 @@ namespace Yes2SDK
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
             GUI.color = previousColor;
 
-            float cardWidth = Mathf.Min(440f, Screen.width - 40f);
-            float cardHeight = _kind == Kind.Purchase ? 240f : 280f;
+            float cardWidth = Mathf.Min(440f * _uiScale, Screen.width - 40f);
+            float cardHeight = (_kind == Kind.Purchase ? 240f : 280f) * _uiScale;
             var cardRect = new Rect(
                 (Screen.width - cardWidth) / 2f,
                 (Screen.height - cardHeight) / 2f,
@@ -286,7 +296,11 @@ namespace Yes2SDK
                 cardHeight);
 
             GUI.Box(cardRect, GUIContent.none);
-            var inner = new Rect(cardRect.x + 16f, cardRect.y + 14f, cardRect.width - 32f, cardRect.height - 28f);
+            var inner = new Rect(
+                cardRect.x + 16f * _uiScale,
+                cardRect.y + 14f * _uiScale,
+                cardRect.width - 32f * _uiScale,
+                cardRect.height - 28f * _uiScale);
             GUILayout.BeginArea(inner);
 
             if (_kind == Kind.Purchase)
@@ -318,28 +332,29 @@ namespace Yes2SDK
 
             GUILayout.Label(rewarded ? "MOCK REWARDED AD" : "MOCK INTERSTITIAL AD", _badgeStyle);
             GUILayout.Label($"placement: {_placement}", _hintStyle);
-            GUILayout.Space(10f);
+            GUILayout.Space(10f * _uiScale);
 
             GUILayout.Label(rewarded ? "Watch this ad to earn a reward" : "Advertisement", _titleStyle);
             GUILayout.Label("This is a mock ad from Yes2SDK. Real ads only show on platform builds.", _bodyStyle);
 
             GUILayout.FlexibleSpace();
 
+            float buttonHeight = 34f * _uiScale;
             float remaining = _canCloseAt - Time.realtimeSinceStartup;
             if (remaining > 0f)
             {
                 GUI.enabled = false;
-                GUILayout.Button($"Ad playing... {Mathf.CeilToInt(remaining)}s", _buttonStyle, GUILayout.Height(34f));
+                GUILayout.Button($"Ad playing... {Mathf.CeilToInt(remaining)}s", _buttonStyle, GUILayout.Height(buttonHeight));
                 GUI.enabled = true;
             }
             else if (rewarded)
             {
                 GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Claim Reward (adViewed)", _buttonStyle, GUILayout.Height(34f)))
+                if (GUILayout.Button("Claim Reward (adViewed)", _buttonStyle, GUILayout.Height(buttonHeight)))
                 {
                     CompleteRewarded(viewed: true);
                 }
-                if (GUILayout.Button("Skip (adDismissed)", _buttonStyle, GUILayout.Height(34f)))
+                if (GUILayout.Button("Skip (adDismissed)", _buttonStyle, GUILayout.Height(buttonHeight)))
                 {
                     CompleteRewarded(viewed: false);
                 }
@@ -347,13 +362,13 @@ namespace Yes2SDK
             }
             else
             {
-                if (GUILayout.Button("Close Ad (afterAd)", _buttonStyle, GUILayout.Height(34f)))
+                if (GUILayout.Button("Close Ad (afterAd)", _buttonStyle, GUILayout.Height(buttonHeight)))
                 {
                     CompleteInterstitial();
                 }
             }
 
-            GUILayout.Space(6f);
+            GUILayout.Space(6f * _uiScale);
             GUILayout.Label(
                 rewarded
                     ? "Claim fires afterAd then adViewed (grant the reward). Skip fires afterAd then adDismissed."
@@ -364,7 +379,7 @@ namespace Yes2SDK
         private void DrawPurchase()
         {
             GUILayout.Label("MOCK PURCHASE", _badgeStyle);
-            GUILayout.Space(10f);
+            GUILayout.Space(10f * _uiScale);
 
             GUILayout.Label(_productTitle, _titleStyle);
             GUILayout.Label($"Product id: {_productId}", _bodyStyle);
@@ -377,52 +392,55 @@ namespace Yes2SDK
             GUILayout.FlexibleSpace();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Buy", _buttonStyle, GUILayout.Height(34f)))
+            if (GUILayout.Button("Buy", _buttonStyle, GUILayout.Height(34f * _uiScale)))
             {
                 CompletePurchase(confirmed: true);
             }
-            if (GUILayout.Button("Cancel (UserCancelled)", _buttonStyle, GUILayout.Height(34f)))
+            if (GUILayout.Button("Cancel (UserCancelled)", _buttonStyle, GUILayout.Height(34f * _uiScale)))
             {
                 CompletePurchase(confirmed: false);
             }
             GUILayout.EndHorizontal();
 
-            GUILayout.Space(6f);
+            GUILayout.Space(6f * _uiScale);
             GUILayout.Label("Mock purchases last for this play session only.", _hintStyle);
         }
 
-        private void EnsureStyles()
+        private void EnsureStyles(float scale)
         {
-            if (_badgeStyle != null) return;
+            if (_badgeStyle != null && Mathf.Approximately(scale, _stylesScale)) return;
+            _stylesScale = scale;
 
+            // Fonts are scaled directly (rather than via GUI.matrix) so text
+            // rasterizes at the target size and stays crisp on 4K views.
             _badgeStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 11,
+                fontSize = Mathf.RoundToInt(11f * scale),
                 fontStyle = FontStyle.Bold,
                 normal = { textColor = new Color(1f, 0.85f, 0.4f) }
             };
             _titleStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 16,
+                fontSize = Mathf.RoundToInt(16f * scale),
                 fontStyle = FontStyle.Bold,
                 wordWrap = true,
                 normal = { textColor = Color.white }
             };
             _bodyStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 12,
+                fontSize = Mathf.RoundToInt(12f * scale),
                 wordWrap = true,
                 normal = { textColor = new Color(0.85f, 0.85f, 0.85f) }
             };
             _hintStyle = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 10,
+                fontSize = Mathf.RoundToInt(10f * scale),
                 wordWrap = true,
                 normal = { textColor = new Color(0.6f, 0.6f, 0.6f) }
             };
             _buttonStyle = new GUIStyle(GUI.skin.button)
             {
-                fontSize = 13
+                fontSize = Mathf.RoundToInt(13f * scale)
             };
         }
 
