@@ -64,6 +64,9 @@ namespace Yes2SDK
         private GUIStyle _bodyStyle;
         private GUIStyle _hintStyle;
         private GUIStyle _buttonStyle;
+        private GUIStyle _adTitleStyle;
+        private GUIStyle _adBodyStyle;
+        private GUIStyle _adHintStyle;
 
         // Popup scale for the current game view resolution. IMGUI draws in
         // raw pixels, so without this the popup renders tiny on QHD/4K game
@@ -278,7 +281,9 @@ namespace Yes2SDK
 
             GUI.depth = -1000;
 
-            _uiScale = Mathf.Max(1f, Mathf.Min(Screen.width / 1280f, Screen.height / 720f));
+            // Scale from the view's short edge so portrait views scale up
+            // the same way landscape ones do (720 short-edge = scale 1).
+            _uiScale = Mathf.Max(1f, Mathf.Min(Screen.width, Screen.height) / 720f);
             EnsureStyles(_uiScale);
 
             // Dim the whole screen.
@@ -287,20 +292,38 @@ namespace Yes2SDK
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
             GUI.color = previousColor;
 
-            float cardWidth = Mathf.Min(440f * _uiScale, Screen.width - 40f);
-            float cardHeight = (_kind == Kind.Purchase ? 240f : 280f) * _uiScale;
-            var cardRect = new Rect(
-                (Screen.width - cardWidth) / 2f,
-                (Screen.height - cardHeight) / 2f,
-                cardWidth,
-                cardHeight);
+            Rect cardRect;
+            if (_kind == Kind.Purchase)
+            {
+                // Purchase prompts are dialogs on real platforms; keep a
+                // centered modal.
+                float cardWidth = Mathf.Min(480f * _uiScale, Screen.width - 32f * _uiScale);
+                float cardHeight = 260f * _uiScale;
+                cardRect = new Rect(
+                    (Screen.width - cardWidth) / 2f,
+                    (Screen.height - cardHeight) / 2f,
+                    cardWidth,
+                    cardHeight);
+            }
+            else
+            {
+                // Real interstitials are fullscreen; fill the view minus a
+                // slim margin, whatever the aspect ratio or orientation.
+                float margin = 16f * _uiScale;
+                cardRect = new Rect(
+                    margin,
+                    margin,
+                    Screen.width - margin * 2f,
+                    Screen.height - margin * 2f);
+            }
 
             GUI.Box(cardRect, GUIContent.none);
+            float pad = 20f * _uiScale;
             var inner = new Rect(
-                cardRect.x + 16f * _uiScale,
-                cardRect.y + 14f * _uiScale,
-                cardRect.width - 32f * _uiScale,
-                cardRect.height - 28f * _uiScale);
+                cardRect.x + pad,
+                cardRect.y + pad * 0.75f,
+                cardRect.width - pad * 2f,
+                cardRect.height - pad * 1.5f);
             GUILayout.BeginArea(inner);
 
             if (_kind == Kind.Purchase)
@@ -332,48 +355,62 @@ namespace Yes2SDK
 
             GUILayout.Label(rewarded ? "MOCK REWARDED AD" : "MOCK INTERSTITIAL AD", _badgeStyle);
             GUILayout.Label($"placement: {_placement}", _hintStyle);
-            GUILayout.Space(10f * _uiScale);
 
-            GUILayout.Label(rewarded ? "Watch this ad to earn a reward" : "Advertisement", _titleStyle);
-            GUILayout.Label("This is a mock ad from Yes2SDK. Real ads only show on platform builds.", _bodyStyle);
-
+            // Centered "creative" in the middle of the fullscreen ad.
+            GUILayout.FlexibleSpace();
+            GUILayout.Label(rewarded ? "Watch this ad to earn a reward" : "Advertisement", _adTitleStyle);
+            GUILayout.Space(6f * _uiScale);
+            GUILayout.Label("This is a mock ad from Yes2SDK. Real ads only show on platform builds.", _adBodyStyle);
             GUILayout.FlexibleSpace();
 
-            float buttonHeight = 34f * _uiScale;
+            float buttonHeight = 40f * _uiScale;
+            // Cap button widths so they stay button-sized on wide views but
+            // still fit two-abreast in narrow portrait ones.
+            float availableWidth = Screen.width - 80f * _uiScale;
+            float pairWidth = Mathf.Min(220f * _uiScale, (availableWidth - 8f * _uiScale) / 2f);
+            float singleWidth = Mathf.Min(320f * _uiScale, availableWidth);
+
             float remaining = _canCloseAt - Time.realtimeSinceStartup;
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
             if (remaining > 0f)
             {
                 GUI.enabled = false;
-                GUILayout.Button($"Ad playing... {Mathf.CeilToInt(remaining)}s", _buttonStyle, GUILayout.Height(buttonHeight));
+                GUILayout.Button($"Ad playing... {Mathf.CeilToInt(remaining)}s", _buttonStyle,
+                    GUILayout.Width(singleWidth), GUILayout.Height(buttonHeight));
                 GUI.enabled = true;
             }
             else if (rewarded)
             {
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Claim Reward (adViewed)", _buttonStyle, GUILayout.Height(buttonHeight)))
+                if (GUILayout.Button("Claim Reward (adViewed)", _buttonStyle,
+                    GUILayout.Width(pairWidth), GUILayout.Height(buttonHeight)))
                 {
                     CompleteRewarded(viewed: true);
                 }
-                if (GUILayout.Button("Skip (adDismissed)", _buttonStyle, GUILayout.Height(buttonHeight)))
+                GUILayout.Space(8f * _uiScale);
+                if (GUILayout.Button("Skip (adDismissed)", _buttonStyle,
+                    GUILayout.Width(pairWidth), GUILayout.Height(buttonHeight)))
                 {
                     CompleteRewarded(viewed: false);
                 }
-                GUILayout.EndHorizontal();
             }
             else
             {
-                if (GUILayout.Button("Close Ad (afterAd)", _buttonStyle, GUILayout.Height(buttonHeight)))
+                if (GUILayout.Button("Close Ad (afterAd)", _buttonStyle,
+                    GUILayout.Width(singleWidth), GUILayout.Height(buttonHeight)))
                 {
                     CompleteInterstitial();
                 }
             }
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
-            GUILayout.Space(6f * _uiScale);
+            GUILayout.Space(8f * _uiScale);
             GUILayout.Label(
                 rewarded
                     ? "Claim fires afterAd then adViewed (grant the reward). Skip fires afterAd then adDismissed."
                     : "Close fires afterAd. Pause your game in beforeAd, resume in afterAd.",
-                _hintStyle);
+                _adHintStyle);
         }
 
         private void DrawPurchase()
@@ -441,6 +478,22 @@ namespace Yes2SDK
             _buttonStyle = new GUIStyle(GUI.skin.button)
             {
                 fontSize = Mathf.RoundToInt(13f * scale)
+            };
+
+            // Centered variants for the fullscreen ad layout.
+            _adTitleStyle = new GUIStyle(_titleStyle)
+            {
+                fontSize = Mathf.RoundToInt(22f * scale),
+                alignment = TextAnchor.UpperCenter
+            };
+            _adBodyStyle = new GUIStyle(_bodyStyle)
+            {
+                fontSize = Mathf.RoundToInt(13f * scale),
+                alignment = TextAnchor.UpperCenter
+            };
+            _adHintStyle = new GUIStyle(_hintStyle)
+            {
+                alignment = TextAnchor.UpperCenter
             };
         }
 
