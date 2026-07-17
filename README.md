@@ -419,6 +419,7 @@ In the Unity Editor, SDK calls run against mock implementations:
 - `InitializeAsync` / `StartGameAsync` succeed immediately
 - **Ads show a fullscreen mock ad in Play Mode**: a countdown (3s interstitial, 5s rewarded), then **Close Ad** (fires `afterAd`), or **Claim Reward** (fires `adViewed`) / **Skip** (fires `adDismissed`) for rewarded ads. This lets you verify pause-resume wiring and both reward outcomes by clicking. The ad fills the game view and scales with its resolution, landscape or portrait. While the popup is up, input to the game behind it is blocked (uGUI clicks, legacy `Input` axis/button polling), matching how a real ad overlay behaves. Direct new Input System device polling (e.g. `Keyboard.current`) is not suppressed.
 - **IAP is mocked in Play Mode**: `IsSupported()` returns true, `GetCatalogAsync` returns a sample catalog, and `PurchaseAsync` opens a Buy / Cancel dialog. Any product id is accepted, so you can test with your real ids. Purchases last for the current play session.
+- **Failures can be simulated**: the Ad result dropdown (No fill / Ad blocked / Error) makes ad calls fire `onError` with platform-shaped error codes, and Fail purchases makes `PurchaseAsync` fail, so error handling is testable without a platform build.
 - `Data` uses `PlayerPrefs`
 - Other optional APIs return `FeatureNotSupported`
 

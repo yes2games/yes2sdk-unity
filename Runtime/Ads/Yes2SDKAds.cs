@@ -107,13 +107,27 @@ namespace Yes2SDK
 #else
             Yes2Log.Log($"Mock: ShowInterstitial(placement: {placement}, description: {description})");
 #if UNITY_EDITOR
-            // Interactive popup path: callbacks fire from the popup's buttons
-            // so pause/resume wiring can be exercised. Falls through to the
-            // synchronous flow when the popup is disabled or unavailable.
-            if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKEditorMock.CanShowPopups
-                && Yes2SDKMockOverlay.ShowInterstitial(placement))
+            if (Yes2SDKEditorMock.CanShowPopups)
             {
-                return;
+                // Failure simulation (Ad result dropdown in the Build Window):
+                // fires onError immediately, no popup, applies even with the
+                // popup toggle off. A real no-fill/blocked ad never reaches
+                // beforeAd, so neither does the simulated one.
+                if (Yes2SDKEditorMock.TryGetSimulatedAdError("interstitial", "Yes2SDK.Ads.ShowInterstitial", out var simulatedError))
+                {
+                    Yes2Log.Log($"Mock: simulated interstitial failure ({simulatedError.Code})");
+                    InvokeInterstitialError(simulatedError);
+                    return;
+                }
+
+                // Interactive popup path: callbacks fire from the popup's
+                // buttons so pause/resume wiring can be exercised. Falls
+                // through to the synchronous flow when the popup is disabled
+                // or unavailable.
+                if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKMockOverlay.ShowInterstitial(placement))
+                {
+                    return;
+                }
             }
 #endif
             // Simulate ad flow in Editor
@@ -183,14 +197,24 @@ namespace Yes2SDK
 #else
             Yes2Log.Log($"Mock: ShowRewarded(placement: {placement}, description: {description})");
 #if UNITY_EDITOR
-            // Interactive popup path: Claim Reward fires adViewed, Skip fires
-            // adDismissed, so both outcomes are testable without the "dismiss"
-            // description convention. Falls through to the synchronous flow
-            // when the popup is disabled or unavailable.
-            if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKEditorMock.CanShowPopups
-                && Yes2SDKMockOverlay.ShowRewarded(placement))
+            if (Yes2SDKEditorMock.CanShowPopups)
             {
-                return;
+                // Failure simulation, same shape as the interstitial path.
+                if (Yes2SDKEditorMock.TryGetSimulatedAdError("rewarded", "Yes2SDK.Ads.ShowRewarded", out var simulatedError))
+                {
+                    Yes2Log.Log($"Mock: simulated rewarded failure ({simulatedError.Code})");
+                    InvokeRewardedError(simulatedError);
+                    return;
+                }
+
+                // Interactive popup path: Claim Reward fires adViewed, Skip
+                // fires adDismissed, so both outcomes are testable without
+                // the "dismiss" description convention. Falls through to the
+                // synchronous flow when the popup is disabled or unavailable.
+                if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKMockOverlay.ShowRewarded(placement))
+                {
+                    return;
+                }
             }
 #endif
             // Simulate ad flow in Editor
@@ -283,6 +307,16 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_IsAdBlockedJS();
 #else
+#if UNITY_EDITOR
+            // Matches the Ad result failure simulation: while "Ad blocked" is
+            // selected, report blocked so alternative-flow UI can be tested.
+            if (Yes2SDKEditorMock.CanShowPopups
+                && Yes2SDKEditorMock.AdResult == Yes2SDKEditorMock.AdOutcome.AdBlocked)
+            {
+                Yes2Log.Log("Mock: IsAdBlocked() - returning true (simulated)");
+                return true;
+            }
+#endif
             Yes2Log.Log("Mock: IsAdBlocked() - returning false");
             return false;
 #endif

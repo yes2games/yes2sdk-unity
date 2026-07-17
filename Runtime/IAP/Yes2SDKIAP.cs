@@ -130,11 +130,27 @@ namespace Yes2SDK
             Yes2SDK_IAP_PurchaseAsyncJS(productId, developerPayload ?? string.Empty);
 #else
 #if UNITY_EDITOR
-            if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups
-                && Yes2SDKMockOverlay.ShowPurchase(productId, developerPayload))
+            if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
             {
-                Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — showing purchase dialog");
-                return;
+                // Failure simulation (Fail purchases toggle): resolve with a
+                // platform-style error instead of showing the dialog.
+                if (Yes2SDKEditorMock.IAPFailPurchases)
+                {
+                    Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — simulated failure");
+                    InvokePurchaseError(new Error
+                    {
+                        Code = "PlatformError",
+                        Message = "Simulated purchase failure (mock)",
+                        Context = "Yes2SDK.IAP.PurchaseAsync"
+                    });
+                    return;
+                }
+
+                if (Yes2SDKMockOverlay.ShowPurchase(productId, developerPayload))
+                {
+                    Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — showing purchase dialog");
+                    return;
+                }
             }
 #endif
             Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — FeatureNotSupported");
