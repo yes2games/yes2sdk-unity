@@ -1,4 +1,6 @@
 #if UNITY_EDITOR
+using System;
+using System.Reflection;
 using UnityEngine;
 
 namespace Yes2SDK
@@ -19,7 +21,18 @@ namespace Yes2SDK
     /// Drawn with IMGUI so the Runtime assembly needs no uGUI reference.
     /// The countdown uses realtime, not scaled time, because games typically
     /// pause (Time.timeScale = 0) in beforeAd.
+    ///
+    /// While a popup is visible the game behind it is shielded from input,
+    /// like a platform's DOM ad overlay: the EventSystem is disabled (uGUI /
+    /// Input System UI clicks), legacy Input polling is reset before game
+    /// scripts run each frame, and unused IMGUI events are consumed. Direct
+    /// new-Input-System device polling (e.g. Keyboard.current) is the one
+    /// path that cannot be suppressed without a hard Input System dependency.
     /// </summary>
+    // Execution order far ahead of game scripts so Update/FixedUpdate can
+    // clear legacy input before anything else polls it, and OnGUI sees
+    // events first.
+    [DefaultExecutionOrder(-32000)]
     internal class Yes2SDKMockOverlay : MonoBehaviour
     {
         private enum Kind { None, Interstitial, Rewarded, Purchase }
@@ -37,6 +50,14 @@ namespace Yes2SDK
         private string _productTitle;
         private string _productPrice;
         private string _developerPayload;
+
+        // Input shield state. _suppressInputUntilFrame keeps swallowing
+        // legacy input for one frame after the popup closes so the dismissing
+        // click can't leak into the game as a fire/jump/etc.
+        private Behaviour _disabledEventSystem;
+        private CursorLockMode _restoreCursorLock;
+        private bool _restoreCursorVisible;
+        private int _suppressInputUntilFrame = -1;
 
         private GUIStyle _badgeStyle;
         private GUIStyle _titleStyle;
@@ -58,6 +79,7 @@ namespace Yes2SDK
             overlay._kind = Kind.Interstitial;
             overlay._placement = placement;
             overlay._canCloseAt = Time.realtimeSinceStartup + InterstitialSeconds;
+            overlay.AcquireInputShield();
             Yes2SDKAds.InvokeInterstitialBeforeAd();
             return true;
         }
@@ -71,6 +93,7 @@ namespace Yes2SDK
             overlay._kind = Kind.Rewarded;
             overlay._placement = placement;
             overlay._canCloseAt = Time.realtimeSinceStartup + RewardedSeconds;
+            overlay.AcquireInputShield();
             Yes2SDKAds.InvokeRewardedBeforeAd();
             return true;
         }
@@ -87,6 +110,7 @@ namespace Yes2SDK
             overlay._productTitle = product?.Title ?? productId;
             overlay._productPrice = product?.Price ?? "$0.99 (mock price)";
             overlay._developerPayload = developerPayload;
+            overlay.AcquireInputShield();
             return true;
         }
 
@@ -107,15 +131,25 @@ namespace Yes2SDK
 
         #region Completion
 
-        private void CompleteInterstitial()
+        // Clear state and release the input shield BEFORE invoking user
+        // callbacks, so a callback that immediately shows another popup
+        // starts from a clean slate.
+        private void Hide()
         {
             _kind = Kind.None;
+            ReleaseInputShield();
+            _suppressInputUntilFrame = Time.frameCount + 1;
+        }
+
+        private void CompleteInterstitial()
+        {
+            Hide();
             Yes2SDKAds.InvokeInterstitialAfterAd();
         }
 
         private void CompleteRewarded(bool viewed)
         {
-            _kind = Kind.None;
+            Hide();
             // Same ordering as the platform flow: afterAd (resume the game),
             // then the reward outcome.
             Yes2SDKAds.InvokeRewardedAfterAd();
@@ -133,7 +167,7 @@ namespace Yes2SDK
         {
             string productId = _productId;
             string payload = _developerPayload;
-            _kind = Kind.None;
+            Hide();
 
             if (confirmed)
             {
@@ -147,6 +181,82 @@ namespace Yes2SDK
                     Message = "Purchase cancelled by user (mock)",
                     Context = "Yes2SDK.IAP.PurchaseAsync"
                 });
+            }
+        }
+
+        #endregion
+
+        #region Input shield
+
+        private void AcquireInputShield()
+        {
+            // uGUI and Input System UI clicks route through the EventSystem;
+            // disabling it makes game buttons behind the overlay inert, the
+            // same way a platform's DOM ad overlay swallows pointer events.
+            // Looked up via reflection so the SDK takes no hard uGUI
+            // dependency (EventSystem derives from Behaviour, so the returned
+            // instance can be driven without referencing its type).
+            _disabledEventSystem = FindActiveEventSystem();
+            if (_disabledEventSystem != null)
+            {
+                _disabledEventSystem.enabled = false;
+            }
+
+            // Games that lock the cursor (FPS controls) could never click the
+            // popup buttons; unlock while the popup is up, restore after.
+            _restoreCursorLock = Cursor.lockState;
+            _restoreCursorVisible = Cursor.visible;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
+        private void ReleaseInputShield()
+        {
+            // Destroyed-while-open (scene change) leaves this fake-null;
+            // nothing to restore then.
+            if (_disabledEventSystem != null)
+            {
+                _disabledEventSystem.enabled = true;
+            }
+            _disabledEventSystem = null;
+
+            Cursor.lockState = _restoreCursorLock;
+            Cursor.visible = _restoreCursorVisible;
+        }
+
+        private static Behaviour FindActiveEventSystem()
+        {
+            var type = Type.GetType("UnityEngine.EventSystems.EventSystem, UnityEngine.UI");
+            var currentProperty = type?.GetProperty("current", BindingFlags.Public | BindingFlags.Static);
+            var current = currentProperty?.GetValue(null) as Behaviour;
+            return current != null && current.enabled ? current : null;
+        }
+
+        // DefaultExecutionOrder(-32000) runs these before game scripts, so
+        // legacy Input polling (GetAxis / GetButton / GetKey / mouse buttons)
+        // reads as idle everywhere behind the popup for the whole frame.
+        // FixedUpdate too: physics-rate scripts poll before Update runs.
+        private void Update()
+        {
+            if (_kind != Kind.None || Time.frameCount <= _suppressInputUntilFrame)
+            {
+                Input.ResetInputAxes();
+            }
+        }
+
+        private void FixedUpdate()
+        {
+            if (_kind != Kind.None || Time.frameCount <= _suppressInputUntilFrame)
+            {
+                Input.ResetInputAxes();
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_kind != Kind.None)
+            {
+                ReleaseInputShield();
             }
         }
 
@@ -189,6 +299,17 @@ namespace Yes2SDK
             }
 
             GUILayout.EndArea();
+
+            // Consume any input event our controls didn't use, so other
+            // OnGUI-based game UI behind the popup stays inert (this script's
+            // OnGUI runs first thanks to DefaultExecutionOrder).
+            var e = Event.current;
+            if (e.type == EventType.MouseDown || e.type == EventType.MouseUp
+                || e.type == EventType.MouseDrag || e.type == EventType.ScrollWheel
+                || e.type == EventType.KeyDown || e.type == EventType.KeyUp)
+            {
+                e.Use();
+            }
         }
 
         private void DrawAd()
