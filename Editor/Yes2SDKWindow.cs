@@ -65,6 +65,9 @@ namespace Yes2SDK.Editor
             DrawPipelineToggle();
             EditorGUILayout.Space(10);
 
+            DrawPlayModeMocks();
+            EditorGUILayout.Space(10);
+
             if (!_isSetupComplete)
             {
                 DrawSetup();
@@ -160,6 +163,73 @@ namespace Yes2SDK.Editor
                     "before building for Yes2Games platforms.",
                     MessageType.Warning);
             }
+        }
+
+        private void DrawPlayModeMocks()
+        {
+            EditorGUILayout.LabelField("Play Mode Testing", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUI.BeginChangeCheck();
+            bool adPopup = EditorGUILayout.ToggleLeft(
+                new GUIContent("Mock ad popup",
+                    "On: ShowInterstitial / ShowRewarded display a mock ad overlay in Play Mode with a " +
+                    "countdown and Close / Claim Reward / Skip buttons, so pause-resume wiring and both " +
+                    "reward outcomes can be tested by clicking. " +
+                    "Off: ad callbacks fire instantly with no UI (legacy behavior)."),
+                Yes2SDKEditorMock.AdPopupEnabled);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.AdPopupEnabled = adPopup;
+
+            // Failure simulation: anything other than Normal makes ad calls
+            // fire onError immediately (popup skipped), so error handling
+            // paths can be tested. Applies even with the popup toggle off.
+            EditorGUI.BeginChangeCheck();
+            var adResult = (Yes2SDKEditorMock.AdOutcome)EditorGUILayout.Popup(
+                new GUIContent("Ad result",
+                    "Normal: ads succeed (popup shown when enabled). " +
+                    "No fill: onError fires with code NoFill, like a platform with no ad inventory. " +
+                    "Ad blocked: onError fires with code ADS_BLOCKED and IsAdBlocked() returns true. " +
+                    "Error: onError fires with a generic PlatformError. " +
+                    "Failures fire immediately without showing the popup."),
+                (int)Yes2SDKEditorMock.AdResult,
+                new[]
+                {
+                    new GUIContent("Normal"),
+                    new GUIContent("No fill"),
+                    new GUIContent("Ad blocked"),
+                    new GUIContent("Error")
+                });
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.AdResult = adResult;
+
+            EditorGUILayout.Space(4);
+
+            EditorGUI.BeginChangeCheck();
+            bool iapMock = EditorGUILayout.ToggleLeft(
+                new GUIContent("Mock in-app purchases",
+                    "On: IAP.IsSupported() returns true in Play Mode, GetCatalogAsync returns a sample " +
+                    "catalog, and PurchaseAsync shows a Buy / Cancel dialog (any product id is accepted). " +
+                    "Purchases last for the current play session only. " +
+                    "Off: IAP reports unsupported (legacy behavior)."),
+                Yes2SDKEditorMock.IAPEnabled);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.IAPEnabled = iapMock;
+
+            EditorGUI.BeginChangeCheck();
+            bool iapFail = EditorGUILayout.ToggleLeft(
+                new GUIContent("Fail purchases",
+                    "On: PurchaseAsync fails with a PlatformError instead of showing the " +
+                    "Buy / Cancel dialog, so shop error handling can be tested."),
+                Yes2SDKEditorMock.IAPFailPurchases);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.IAPFailPurchases = iapFail;
+
+            EditorGUILayout.LabelField(
+                "Editor Play Mode only. Platform builds always use the real platform SDK.",
+                EditorStyles.wordWrappedMiniLabel);
+
+            EditorGUILayout.EndVertical();
         }
 
         private void DrawSetup()

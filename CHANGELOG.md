@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-07-17
+
+### Added
+- **Mock ad popup in Play Mode.** `ShowInterstitial` and `ShowRewarded` now display a fullscreen mock ad in the Unity Editor with a countdown (3s interstitial, 5s rewarded) followed by Close / Claim Reward / Skip buttons, so pause-resume wiring and both reward outcomes can be tested by clicking instead of relying on instant callbacks. The ad fills the game view in both landscape and portrait, and text and buttons scale with the view resolution so they stay readable on Full HD, QHD, and 4K views. Toggle it under Play Mode Testing in the Build Window (on by default). Batch mode always uses the instant legacy flow so CI test runs never block, and disabling the toggle restores the previous behavior including the `"dismiss"` description convention.
+- **Game input is blocked behind mock popups.** While a popup is visible the game is shielded like a real ad overlay: uGUI / Input System UI clicks are blocked (EventSystem disabled), legacy `Input` axis and button polling is suppressed, unused IMGUI events are consumed, and a locked cursor is temporarily unlocked so the popup buttons are clickable, then restored. Games polling new Input System devices directly (for example `Keyboard.current`) are not suppressed.
+- **Mock in-app purchases in Play Mode.** With the Play Mode Testing toggle on (default), `IAP.IsSupported()` returns true in the Editor, `GetCatalogAsync` returns a sample catalog, and `PurchaseAsync` opens a Buy / Cancel confirmation dialog that resolves with a realistic purchase payload (Buy) or a `UserCancelled` error (Cancel). Any product id is accepted, purchases persist for the current play session, and `GetPurchasesAsync` / `ConsumePurchaseAsync` operate on the session's purchase list.
+- **Failure simulation in Play Mode.** An Ad result dropdown in the Play Mode Testing section (Normal / No fill / Ad blocked / Error) makes ad calls fire `onError` immediately with the same error shapes the WebGL bridge delivers (`NoFill`, `ADS_BLOCKED`, `PlatformError`), and `IsAdBlocked()` returns true while Ad blocked is selected. A Fail purchases toggle makes `PurchaseAsync` fail with a `PlatformError` instead of showing the dialog. Together these make error handling paths testable in the Editor.
+- **`IsRewardedAdAvailable()` returns true in Play Mode** while the mock ad popup is enabled, so "watch ad" buttons gated on availability can be tested in the Editor.
+
 ## [2.5.2] - 2026-07-09
 
 ### Fixed

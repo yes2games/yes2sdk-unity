@@ -55,6 +55,15 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_IAP_IsSupportedJS();
 #else
+#if UNITY_EDITOR
+            // With the IAP mock enabled, report supported so shop UI gated on
+            // this can be tested in Play Mode.
+            if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
+            {
+                Yes2Log.Log("Mock: IAP.IsSupported() — returning true (IAP mock enabled)");
+                return true;
+            }
+#endif
             Yes2Log.Log("Mock: IAP.IsSupported() — returning false");
             return false;
 #endif
@@ -71,6 +80,14 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_IAP_GetCatalogAsyncJS();
 #else
+#if UNITY_EDITOR
+            if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
+            {
+                Yes2Log.Log("Mock: IAP.GetCatalogAsync() — returning mock catalog");
+                InvokeGetCatalogSuccess(Yes2SDKMockIAP.CatalogJson);
+                return;
+            }
+#endif
             Yes2Log.Log("Mock: IAP.GetCatalogAsync() — returning empty catalog");
             InvokeGetCatalogSuccess("[]");
 #endif
@@ -89,12 +106,53 @@ namespace Yes2SDK
             Action<Error> onError = null,
             string developerPayload = null)
         {
+#if UNITY_EDITOR
+            // Reject overlapping mock purchases BEFORE storing the new
+            // callbacks — overwriting them here would silently orphan the
+            // purchase dialog still waiting on screen.
+            if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups
+                && Yes2SDKMockOverlay.IsBusy)
+            {
+                Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — rejected, another mock popup is open");
+                onError?.Invoke(new Error
+                {
+                    Code = "PlatformError",
+                    Message = "Another mock popup is already open",
+                    Context = "Yes2SDK.IAP.PurchaseAsync"
+                });
+                return;
+            }
+#endif
             _purchaseSuccessCallback = onSuccess;
             _purchaseErrorCallback = onError;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_IAP_PurchaseAsyncJS(productId, developerPayload ?? string.Empty);
 #else
+#if UNITY_EDITOR
+            if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
+            {
+                // Failure simulation (Fail purchases toggle): resolve with a
+                // platform-style error instead of showing the dialog.
+                if (Yes2SDKEditorMock.IAPFailPurchases)
+                {
+                    Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — simulated failure");
+                    InvokePurchaseError(new Error
+                    {
+                        Code = "PlatformError",
+                        Message = "Simulated purchase failure (mock)",
+                        Context = "Yes2SDK.IAP.PurchaseAsync"
+                    });
+                    return;
+                }
+
+                if (Yes2SDKMockOverlay.ShowPurchase(productId, developerPayload))
+                {
+                    Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — showing purchase dialog");
+                    return;
+                }
+            }
+#endif
             Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — FeatureNotSupported");
             InvokePurchaseError(FeatureNotSupportedError("Yes2SDK.IAP.PurchaseAsync"));
 #endif
@@ -112,6 +170,14 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_IAP_GetPurchasesAsyncJS();
 #else
+#if UNITY_EDITOR
+            if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
+            {
+                Yes2Log.Log("Mock: IAP.GetPurchasesAsync() — returning mock purchases");
+                InvokeGetPurchasesSuccess(Yes2SDKMockIAP.PurchasesJson);
+                return;
+            }
+#endif
             Yes2Log.Log("Mock: IAP.GetPurchasesAsync() — returning empty list");
             InvokeGetPurchasesSuccess("[]");
 #endif
@@ -128,6 +194,14 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_IAP_ConsumePurchaseAsyncJS(purchaseToken);
 #else
+#if UNITY_EDITOR
+            // Remove the purchase from the mock session list so a consumable
+            // bought via the mock dialog can be bought again.
+            if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
+            {
+                Yes2SDKMockIAP.Consume(purchaseToken);
+            }
+#endif
             Yes2Log.Log($"Mock: IAP.ConsumePurchaseAsync('{purchaseToken}') — success");
             InvokeConsumePurchaseSuccess();
 #endif
@@ -196,6 +270,25 @@ namespace Yes2SDK
         #endregion
 
         #region Private Helpers
+
+#if UNITY_EDITOR
+        // The mock purchase dialog (Yes2SDKMockOverlay) can leave a purchase
+        // pending when Play Mode is stopped mid-dialog. With Domain Reload
+        // disabled statics survive into the next play, so clear the stored
+        // callbacks explicitly on each play.
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetEditorState()
+        {
+            _getCatalogSuccessCallback = null;
+            _getCatalogErrorCallback = null;
+            _purchaseSuccessCallback = null;
+            _purchaseErrorCallback = null;
+            _getPurchasesSuccessCallback = null;
+            _getPurchasesErrorCallback = null;
+            _consumeSuccessCallback = null;
+            _consumeErrorCallback = null;
+        }
+#endif
 
         private static Error FeatureNotSupportedError(string context)
         {
