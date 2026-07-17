@@ -106,6 +106,16 @@ namespace Yes2SDK
             Yes2SDK_ShowInterstitialJS(placement, description);
 #else
             Yes2Log.Log($"Mock: ShowInterstitial(placement: {placement}, description: {description})");
+#if UNITY_EDITOR
+            // Interactive popup path: callbacks fire from the popup's buttons
+            // so pause/resume wiring can be exercised. Falls through to the
+            // synchronous flow when the popup is disabled or unavailable.
+            if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKEditorMock.CanShowPopups
+                && Yes2SDKMockOverlay.ShowInterstitial(placement))
+            {
+                return;
+            }
+#endif
             // Simulate ad flow in Editor
             _interstitialBeforeAdCallback?.Invoke();
             _interstitialAfterAdCallback?.Invoke();
@@ -126,8 +136,11 @@ namespace Yes2SDK
         /// <param name="adViewed">Called when the player successfully watched the ad. Grant the reward here.</param>
         /// <param name="onError">Called if an error occurs while showing the ad.</param>
         /// <remarks>
-        /// In the Unity Editor, passing "dismiss" as the description will trigger the adDismissed callback
-        /// for testing purposes. Any other description will trigger adViewed.
+        /// In the Unity Editor, a mock ad popup is shown by default (toggle it in
+        /// Yes2SDK > Build Window > Play Mode Testing): Claim Reward triggers adViewed,
+        /// Skip triggers adDismissed. With the popup disabled, callbacks fire instantly
+        /// and passing "dismiss" as the description triggers adDismissed for testing;
+        /// any other description triggers adViewed.
         /// </remarks>
         /// <example><code>
         /// Yes2SDK.Ads.ShowRewarded("extra-life", "Watch ad for extra life",
@@ -169,6 +182,17 @@ namespace Yes2SDK
             Yes2SDK_ShowRewardedJS(placement, description);
 #else
             Yes2Log.Log($"Mock: ShowRewarded(placement: {placement}, description: {description})");
+#if UNITY_EDITOR
+            // Interactive popup path: Claim Reward fires adViewed, Skip fires
+            // adDismissed, so both outcomes are testable without the "dismiss"
+            // description convention. Falls through to the synchronous flow
+            // when the popup is disabled or unavailable.
+            if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKEditorMock.CanShowPopups
+                && Yes2SDKMockOverlay.ShowRewarded(placement))
+            {
+                return;
+            }
+#endif
             // Simulate ad flow in Editor
             _rewardedBeforeAdCallback?.Invoke();
             _rewardedAfterAdCallback?.Invoke();
@@ -286,6 +310,14 @@ namespace Yes2SDK
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_IsRewardedAdAvailableJS();
 #else
+#if UNITY_EDITOR
+            // With the mock ad popup enabled, report available so "watch ad"
+            // buttons gated on this can be tested in Play Mode.
+            if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKEditorMock.CanShowPopups)
+            {
+                return true;
+            }
+#endif
             return false;
 #endif
         }
@@ -411,6 +443,21 @@ namespace Yes2SDK
         #endregion
 
         #region Private Helper Methods
+
+#if UNITY_EDITOR
+        // The interactive mock popup (Yes2SDKMockOverlay) can leave an ad
+        // pending when Play Mode is stopped mid-ad. With Domain Reload
+        // disabled (Enter Play Mode Options) statics survive into the next
+        // play, so a stuck _adInFlight would reject every ad call. Reset
+        // explicitly on each play.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetEditorState()
+        {
+            _adInFlight = false;
+            ClearInterstitialCallbacks();
+            ClearRewardedCallbacks();
+        }
+#endif
 
         private static void ClearInterstitialCallbacks()
         {

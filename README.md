@@ -19,10 +19,10 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 
 1. Open **Window > Package Manager**
 2. Click **+** > **Add package from git URL...**
-3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.5.2`
+3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.6.0`
 4. Click **Add**
 
-> Pinning the URL with `#v2.5.2` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
+> Pinning the URL with `#v2.6.0` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
 
 ### Via Local Folder
 
@@ -417,9 +417,12 @@ The override saves and restores Player Settings around each build, so it never l
 In the Unity Editor, SDK calls run against mock implementations:
 
 - `InitializeAsync` / `StartGameAsync` succeed immediately
-- Ads simulate the full callback flow (`beforeAd` → `afterAd` → `adViewed`)
+- **Ads show a mock ad popup in Play Mode**: a countdown (3s interstitial, 5s rewarded), then **Close Ad** (fires `afterAd`), or **Claim Reward** (fires `adViewed`) / **Skip** (fires `adDismissed`) for rewarded ads. This lets you verify pause-resume wiring and both reward outcomes by clicking.
+- **IAP is mocked in Play Mode**: `IsSupported()` returns true, `GetCatalogAsync` returns a sample catalog, and `PurchaseAsync` opens a Buy / Cancel dialog. Any product id is accepted, so you can test with your real ids. Purchases last for the current play session.
 - `Data` uses `PlayerPrefs`
-- Optional APIs return `FeatureNotSupported`
+- Other optional APIs return `FeatureNotSupported`
+
+Both mocks can be turned off under **Yes2SDK > Build Window > Play Mode Testing**. With the ad popup off, ad callbacks fire instantly with no UI (pass `"dismiss"` as the rewarded description to trigger `adDismissed`). Batch-mode runs (CI) always use the instant flow.
 
 For richer simulation — forced errors, specific locales, ad failure modes — use the **QA Inspector** in the Yes2Games Dashboard.
 

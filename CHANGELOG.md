@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-07-17
+
+### Added
+- **Mock ad popup in Play Mode.** `ShowInterstitial` and `ShowRewarded` now display a mock ad overlay in the Unity Editor with a countdown (3s interstitial, 5s rewarded) followed by Close / Claim Reward / Skip buttons, so pause-resume wiring and both reward outcomes can be tested by clicking instead of relying on instant callbacks. Toggle it under Play Mode Testing in the Build Window (on by default). Batch mode always uses the instant legacy flow so CI test runs never block, and disabling the toggle restores the previous behavior including the `"dismiss"` description convention.
+- **Mock in-app purchases in Play Mode.** With the Play Mode Testing toggle on (default), `IAP.IsSupported()` returns true in the Editor, `GetCatalogAsync` returns a sample catalog, and `PurchaseAsync` opens a Buy / Cancel confirmation dialog that resolves with a realistic purchase payload (Buy) or a `UserCancelled` error (Cancel). Any product id is accepted, purchases persist for the current play session, and `GetPurchasesAsync` / `ConsumePurchaseAsync` operate on the session's purchase list.
+- **`IsRewardedAdAvailable()` returns true in Play Mode** while the mock ad popup is enabled, so "watch ad" buttons gated on availability can be tested in the Editor.
+
 ## [2.5.2] - 2026-07-09
 
 ### Fixed

@@ -65,6 +65,9 @@ namespace Yes2SDK.Editor
             DrawPipelineToggle();
             EditorGUILayout.Space(10);
 
+            DrawPlayModeMocks();
+            EditorGUILayout.Space(10);
+
             if (!_isSetupComplete)
             {
                 DrawSetup();
@@ -160,6 +163,40 @@ namespace Yes2SDK.Editor
                     "before building for Yes2Games platforms.",
                     MessageType.Warning);
             }
+        }
+
+        private void DrawPlayModeMocks()
+        {
+            EditorGUILayout.LabelField("Play Mode Testing", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUI.BeginChangeCheck();
+            bool adPopup = EditorGUILayout.ToggleLeft(
+                new GUIContent("Mock ad popup",
+                    "On: ShowInterstitial / ShowRewarded display a mock ad overlay in Play Mode with a " +
+                    "countdown and Close / Claim Reward / Skip buttons, so pause-resume wiring and both " +
+                    "reward outcomes can be tested by clicking. " +
+                    "Off: ad callbacks fire instantly with no UI (legacy behavior)."),
+                Yes2SDKEditorMock.AdPopupEnabled);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.AdPopupEnabled = adPopup;
+
+            EditorGUI.BeginChangeCheck();
+            bool iapMock = EditorGUILayout.ToggleLeft(
+                new GUIContent("Mock in-app purchases",
+                    "On: IAP.IsSupported() returns true in Play Mode, GetCatalogAsync returns a sample " +
+                    "catalog, and PurchaseAsync shows a Buy / Cancel dialog (any product id is accepted). " +
+                    "Purchases last for the current play session only. " +
+                    "Off: IAP reports unsupported (legacy behavior)."),
+                Yes2SDKEditorMock.IAPEnabled);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.IAPEnabled = iapMock;
+
+            EditorGUILayout.LabelField(
+                "Editor Play Mode only. Platform builds always use the real platform SDK.",
+                EditorStyles.wordWrappedMiniLabel);
+
+            EditorGUILayout.EndVertical();
         }
 
         private void DrawSetup()
