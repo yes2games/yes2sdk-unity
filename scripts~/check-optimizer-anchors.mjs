@@ -37,7 +37,15 @@ function slugify(heading) {
 }
 
 async function readPageAnchors() {
-  const res = await fetch(DOCS_RAW_URL);
+  let res;
+  try {
+    res = await fetch(DOCS_RAW_URL);
+  } catch {
+    // Unreachable is unreachable, whether the host answers with an error status or not at all. A DNS
+    // or network failure has to take the same soft-pass path, or one blip fails every pull request.
+    return null;
+  }
+
   if (!res.ok) return null;
   const md = await res.text();
   const anchors = new Set();
