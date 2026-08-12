@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEngine;
 
 namespace Yes2SDK.Editor
 {
@@ -23,9 +24,29 @@ namespace Yes2SDK.Editor
             {
                 if (_all == null)
                 {
-                    _all = TypeCache.GetTypesDerivedFrom<IYes2SDKOptimizationCheck>()
-                        .Where(t => !t.IsAbstract && !t.IsInterface && t.GetConstructor(Type.EmptyTypes) != null)
-                        .Select(t => (IYes2SDKOptimizationCheck)Activator.CreateInstance(t))
+                    var discovered = new List<IYes2SDKOptimizationCheck>();
+
+                    foreach (var type in TypeCache.GetTypesDerivedFrom<IYes2SDKOptimizationCheck>())
+                    {
+                        if (type.IsAbstract || type.IsInterface || type.GetConstructor(Type.EmptyTypes) == null)
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            discovered.Add((IYes2SDKOptimizationCheck)Activator.CreateInstance(type));
+                        }
+                        catch (Exception e)
+                        {
+                            // Constructing one check must not throw out of this property: that would
+                            // leave the cache null and make every working check unreachable too.
+                            Debug.LogWarning("Yes2SDK Optimizer skipped a check that threw while being constructed: "
+                                + type.FullName + ". " + e.Message);
+                        }
+                    }
+
+                    _all = discovered
                         .OrderBy(c => c.Category)
                         .ThenBy(c => c.Title)
                         .ToList();
@@ -38,10 +59,14 @@ namespace Yes2SDK.Editor
         /// <summary>Drops the cached check list so a domain reload picks up newly added checks.</summary>
         public static void Invalidate() => _all = null;
 
-        /// <summary>True when the user has muted this check for this project.</summary>
+        /// <summary>
+        /// True when the user has muted this check. The preference is stored per Editor
+        /// installation, the same store the build settings use, so it is shared by every
+        /// project opened with this Editor rather than travelling with one project.
+        /// </summary>
         public static bool IsMuted(string checkId) => EditorPrefs.GetBool(MutePrefixPref + checkId, false);
 
-        /// <summary>Mutes or unmutes a check for this project.</summary>
+        /// <summary>Mutes or unmutes a check for this Editor installation.</summary>
         public static void SetMuted(string checkId, bool muted) => EditorPrefs.SetBool(MutePrefixPref + checkId, muted);
 
         /// <summary>Deep link to the section of the optimization docs that explains this check.</summary>

@@ -16,14 +16,23 @@ namespace Yes2SDK.Editor
     /// <summary>Grouping used by the Optimizer window's category filter.</summary>
     public enum Yes2SDKOptimizationCategory
     {
+        /// <summary>Texture import settings, compression, and atlasing.</summary>
         Textures,
+        /// <summary>Audio clip import settings, compression, and load type.</summary>
         Audio,
+        /// <summary>Mesh and model import settings.</summary>
         Meshes,
+        /// <summary>Shader variants, keywords, and stripping.</summary>
         Shaders,
+        /// <summary>Managed code size: stripping level, exception support, generated code.</summary>
         Code,
+        /// <summary>Installed packages and assembly definitions that pull weight into the build.</summary>
         Packages,
+        /// <summary>Addressable group layout, compression, and what stays in the initial download.</summary>
         Addressables,
+        /// <summary>Player and build settings that decide how the build is produced.</summary>
         Build,
+        /// <summary>Behaviour after the build ships: heap use, allocation, frame cost.</summary>
         Runtime,
     }
 
