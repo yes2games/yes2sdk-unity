@@ -18,6 +18,7 @@ namespace Yes2SDK.Editor
         private Vector2 _scroll;
         private bool _hasRun;
 
+        /// <summary>Opens the Optimizer window, or focuses it when it is already open.</summary>
         [MenuItem("Yes2SDK/Optimizer", false, 1)]
         public static void ShowWindow()
         {
