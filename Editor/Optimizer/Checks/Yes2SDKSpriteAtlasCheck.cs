@@ -55,7 +55,12 @@ namespace Yes2SDK.Editor
                 new Yes2SDKSpriteAtlasTool.Settings(),
                 AtlasOutputDirectory);
 
-            RegisterCreatedForUndo(reports.Where(r => r.created).Select(r => r.outputPath), "Create Sprite Atlases");
+            // Only atlases this run brought into existence. An atlas at the same output path that
+            // already existed was updated, not created, and registering it as created would let one
+            // Ctrl+Z delete an asset that predates the run.
+            RegisterCreatedForUndo(
+                reports.Where(r => r.created && !r.alreadyExisted).Select(r => r.outputPath),
+                "Create Sprite Atlases");
         }
 
         // AssetDatabase.CreateAsset does not put the new asset on the Undo stack, so register each
