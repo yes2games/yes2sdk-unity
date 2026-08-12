@@ -18,7 +18,7 @@ namespace Yes2SDK.Editor
         private const string PrefsBuildPath = "Yes2SDK_BuildPath";
         private const string PrefsSettingsExpanded = "Yes2SDK_SettingsExpanded";
         private const string DashboardUrl = "https://dashboard.yes2games.com";
-        private const string DocsUrl = "https://github.com/yes2games/yes2sdk-unity";
+        private const string DocsUrl = "https://developer.yes2games.com/docs/unity";
         private const string IssuesUrl = "https://github.com/yes2games/yes2sdk-unity/issues";
 
         private string _buildPath;
