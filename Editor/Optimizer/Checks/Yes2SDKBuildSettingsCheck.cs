@@ -51,9 +51,9 @@ namespace Yes2SDK.Editor
             return findings;
         }
 
-        // Player settings live outside Assets and are not on the Undo stack. The confirmation
-        // dialog lists each setting and its current value, so the change is reversible by hand
-        // from the same window that reported it.
+        // Player settings live outside Assets and are not on the Undo stack, so Ctrl+Z will not
+        // reverse this. Each finding names the value it found, and the confirmation dialog repeats
+        // those messages, so the previous values can be restored by hand in Player Settings.
         public void Fix(IReadOnlyList<Yes2SDKOptimizationFinding> findings)
         {
             BuildConfig.Default.ApplySettings();
