@@ -52,7 +52,9 @@ namespace Yes2SDK.Editor
 
             if (GUILayout.Button("Analyze", EditorStyles.toolbarButton, GUILayout.Width(70)))
             {
-                Analyze();
+                // Off the GUI event: a scan spawns processes and touches the asset database, and doing
+                // that with the layout stack live can start an import mid-repaint.
+                EditorApplication.delayCall += Analyze;
             }
 
             GUILayout.FlexibleSpace();
@@ -110,7 +112,8 @@ namespace Yes2SDK.Editor
         {
             var muted = Yes2SDKOptimizationRegistry.IsMuted(check.Id);
             IReadOnlyList<Yes2SDKOptimizationFinding> findings;
-            if (!_results.TryGetValue(check.Id, out findings))
+            var ran = _results.TryGetValue(check.Id, out findings);
+            if (!ran)
             {
                 findings = new List<Yes2SDKOptimizationFinding>();
             }
@@ -119,7 +122,8 @@ namespace Yes2SDK.Editor
             EditorGUILayout.BeginHorizontal();
 
             var open = _expanded.Contains(check.Id);
-            var header = string.Format("{0}  ({1})", check.Title, muted ? "muted" : findings.Count.ToString());
+            var status = muted ? "muted" : ran ? findings.Count.ToString() : "not run";
+            var header = string.Format("{0}  ({1})", check.Title, status);
             var nowOpen = EditorGUILayout.Foldout(open, header, true);
             if (nowOpen && !open)
             {
@@ -146,17 +150,19 @@ namespace Yes2SDK.Editor
 
             if (nowOpen && !muted)
             {
-                DrawFindings(check, findings);
+                DrawFindings(check, findings, ran);
             }
 
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawFindings(IYes2SDKOptimizationCheck check, IReadOnlyList<Yes2SDKOptimizationFinding> findings)
+        private void DrawFindings(IYes2SDKOptimizationCheck check, IReadOnlyList<Yes2SDKOptimizationFinding> findings, bool ran)
         {
             if (findings.Count == 0)
             {
-                EditorGUILayout.LabelField("Nothing to report.", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField(
+                    ran ? "Nothing to report." : "Not analyzed yet. Run Analyze.",
+                    EditorStyles.miniLabel);
                 return;
             }
 
@@ -205,9 +211,13 @@ namespace Yes2SDK.Editor
                 preview += string.Format("\n...and {0} more", fixable.Count - 15);
             }
 
+            var reversal = check.FixIsUndoable
+                ? "One Undo reverses the whole run."
+                : "This cannot be reversed with Undo. Check the docs for how to restore the previous state.";
+
             var proceed = EditorUtility.DisplayDialog(
                 check.Title,
-                string.Format("This will change:\n\n{0}\n\nOne Undo reverses the whole run.", preview),
+                string.Format("This will change:\n\n{0}\n\n{1}", preview, reversal),
                 "Apply",
                 "Cancel");
 
@@ -217,7 +227,7 @@ namespace Yes2SDK.Editor
             }
 
             check.Fix(fixable);
-            Analyze();
+            EditorApplication.delayCall += Analyze;
         }
 
         private static string SeverityIcon(Yes2SDKFindingSeverity severity)

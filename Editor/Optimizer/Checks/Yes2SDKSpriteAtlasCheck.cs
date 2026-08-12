@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.U2D;
 
 namespace Yes2SDK.Editor
 {
@@ -23,17 +24,71 @@ namespace Yes2SDK.Editor
 
         public bool CanFix => true;
 
+        /// <summary>The fix only ever creates atlases, and each is registered.</summary>
+        public bool FixIsUndoable => true;
+
         public IReadOnlyList<Yes2SDKOptimizationFinding> Analyze()
         {
             _lastScan = Yes2SDKSpriteAtlasTool.ScanForLooseSprites(new[] { SourceRoot });
 
-            return _lastScan.Select(r => new Yes2SDKOptimizationFinding
+            // The output name is built from the LEAF folder name in one flat directory, while the scan
+            // groups by full path, so two folders with the same name resolve to the same atlas. Packing
+            // the second would strip the first from the atlas, so neither is offered.
+            var contested = _lastScan
+                .GroupBy(OutputPathFor)
+                .Where(g => g.Count() > 1)
+                .SelectMany(g => g)
+                .Select(r => r.folderPath)
+                .ToList();
+
+            return _lastScan.Select(r =>
             {
-                Severity = Yes2SDKFindingSeverity.Warning,
-                AssetPath = r.folderPath,
-                Message = string.Format("{0} loose sprites in '{1}' are not in an atlas.", r.spritePaths.Count, r.folderName),
-                Fixable = true,
+                var outputPath = OutputPathFor(r);
+                var collides = contested.Contains(r.folderPath);
+                var occupied = !collides && AssetDatabase.LoadAssetAtPath<SpriteAtlas>(outputPath) != null;
+
+                var message = string.Format(
+                    "{0} loose sprites in '{1}' are not in an atlas.",
+                    r.spritePaths.Count,
+                    r.folderName);
+
+                if (collides)
+                {
+                    message += string.Format(
+                        " Another folder of the same name would produce '{0}' too, so pack these by hand.",
+                        outputPath);
+                }
+                else if (occupied)
+                {
+                    message += string.Format(
+                        " '{0}' already exists, so add this folder to it by hand rather than replacing it.",
+                        outputPath);
+                }
+
+                return new Yes2SDKOptimizationFinding
+                {
+                    Severity = Yes2SDKFindingSeverity.Warning,
+                    AssetPath = r.folderPath,
+                    Message = message,
+                    Fixable = !collides && !occupied,
+                };
             }).ToList();
+        }
+
+        // Mirrors how the atlas tool names its output: the leaf folder name with every character that is
+        // not a letter, a digit, or an underscore replaced. This has to stay in step with that naming.
+        private static string OutputPathFor(Yes2SDKSpriteAtlasTool.ScanResult scan)
+        {
+            var chars = scan.folderName.ToCharArray();
+            for (var i = 0; i < chars.Length; i++)
+            {
+                if (!char.IsLetterOrDigit(chars[i]) && chars[i] != '_')
+                {
+                    chars[i] = '_';
+                }
+            }
+
+            return AtlasOutputDirectory + "/Atlas_" + new string(chars) + ".spriteatlas";
         }
 
         public void Fix(IReadOnlyList<Yes2SDKOptimizationFinding> findings)

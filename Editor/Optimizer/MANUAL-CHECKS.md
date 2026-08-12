@@ -12,6 +12,7 @@ openable project of its own, so these cannot be automated here.
 - [ ] One Ctrl+Z after a fix that creates assets reverses the whole run, and leaves any asset that
       already existed at the same path untouched.
 - [ ] Report-only checks show no fix button.
+- [ ] The window compiles and runs both with and without the optional KTX2 package present.
 
 Two fixes are deliberately outside Undo, and both say so in their own source. Do not fail the
 checklist on either:
@@ -21,9 +22,8 @@ checklist on either:
   back in by hand.
 - Converting textures runs an external process that writes into `StreamingAssets` rather than creating
   assets, so there is nothing for Undo to hold. The output files can be deleted by hand.
-- [ ] The window compiles and runs both with and without the optional KTX2 package present.
 
-Before tagging, run the anchor gate in release mode from the repo root. A non-zero exit means the
-optimization docs page is not published yet, so do not tag:
+Before tagging, run the anchor gate in release mode from a checkout of the SDK repository, not from a
+consuming project. A non-zero exit means the optimization docs page is not published yet, so do not tag:
 
     node scripts~/check-optimizer-anchors.mjs --release

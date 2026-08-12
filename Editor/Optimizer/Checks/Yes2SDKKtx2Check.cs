@@ -20,6 +20,9 @@ namespace Yes2SDK.Editor
 
         public bool CanFix => true;
 
+        /// <summary>An external process writes files that Undo never saw.</summary>
+        public bool FixIsUndoable => false;
+
         public IReadOnlyList<Yes2SDKOptimizationFinding> Analyze()
         {
             var toktx = Yes2SDKKtx2Tool.FindToktx();

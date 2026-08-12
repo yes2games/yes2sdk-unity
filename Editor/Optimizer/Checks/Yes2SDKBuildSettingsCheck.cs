@@ -16,6 +16,9 @@ namespace Yes2SDK.Editor
 
         public bool CanFix => true;
 
+        /// <summary>Player settings are not on the Undo stack.</summary>
+        public bool FixIsUndoable => false;
+
         public IReadOnlyList<Yes2SDKOptimizationFinding> Analyze()
         {
             var config = BuildConfig.Default;

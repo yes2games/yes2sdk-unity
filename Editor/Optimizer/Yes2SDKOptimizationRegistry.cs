@@ -56,7 +56,7 @@ namespace Yes2SDK.Editor
             }
         }
 
-        /// <summary>Drops the cached check list so a domain reload picks up newly added checks.</summary>
+        /// <summary>Drops the cached check list so the next read rediscovers every check in the assembly.</summary>
         public static void Invalidate() => _all = null;
 
         /// <summary>

@@ -3,6 +3,9 @@
 // 1. Every check class declares the members the window renders.
 // 2. Every DocsAnchor resolves to a heading on the published optimization page.
 // Same idiom as check-wrapper-parity.mjs: no Unity, no test framework, plain node.
+//
+// Every check must live in Editor/Optimizer/Checks: the registry finds checks by reflection anywhere in
+// the assembly, so a check placed elsewhere would be shipped ungated by this script.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -19,7 +22,10 @@ function readChecks() {
   return readdirSync(CHECKS_DIR)
     .filter((f) => f.endsWith('.cs'))
     .map((file) => {
-      const source = readFileSync(join(CHECKS_DIR, file), 'utf8');
+      const source = readFileSync(join(CHECKS_DIR, file), 'utf8')
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('//'))
+        .join('\n');
       const value = (member) => {
         const m = source.match(new RegExp(`public\\s+\\S+\\s+${member}\\s*=>\\s*([^;]+);`));
         return m ? m[1].trim().replace(/^"|"$/g, '') : null;

@@ -19,6 +19,9 @@ namespace Yes2SDK.Editor
 
         public bool CanFix => false;
 
+        /// <summary>Report only, so nothing is written to reverse.</summary>
+        public bool FixIsUndoable => false;
+
         public IReadOnlyList<Yes2SDKOptimizationFinding> Analyze()
         {
             if (!Yes2SDKTextureSwapTool.IsKtx2ImageAvailable)
@@ -34,9 +37,11 @@ namespace Yes2SDK.Editor
                 };
             }
 
-            var candidates = Yes2SDKTextureSwapTool.ScanAllBuildScenes();
+            // Only the open scene. Sweeping every scene in Build Settings means force-opening each one,
+            // which discards unsaved edits without asking, and a report must never do that.
+            var candidates = Yes2SDKTextureSwapTool.ScanActiveScene();
 
-            return candidates
+            var findings = candidates
                 .Where(c => c.ktx2Exists && !c.inAtlas)
                 .Select(c => new Yes2SDKOptimizationFinding
                 {
@@ -50,6 +55,15 @@ namespace Yes2SDK.Editor
                     Fixable = false,
                 })
                 .ToList();
+
+            findings.Add(new Yes2SDKOptimizationFinding
+            {
+                Severity = Yes2SDKFindingSeverity.Info,
+                Message = "Only the open scene was scanned. Open another scene and run Analyze again to cover it.",
+                Fixable = false,
+            });
+
+            return findings;
         }
 
         // Report only. A scene or prefab rewrite is opt-in per run with a per-object diff, so it is

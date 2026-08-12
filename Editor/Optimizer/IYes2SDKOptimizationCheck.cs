@@ -5,7 +5,7 @@ namespace Yes2SDK.Editor
     /// <summary>Severity of a single optimization finding.</summary>
     public enum Yes2SDKFindingSeverity
     {
-        /// <summary>Informational. No action needed.</summary>
+        /// <summary>Context rather than a defect, including a precondition the check needs.</summary>
         Info,
         /// <summary>A missed optimization. The project works but ships more than it needs to.</summary>
         Warning,
@@ -77,12 +77,19 @@ namespace Yes2SDK.Editor
         IReadOnlyList<Yes2SDKOptimizationFinding> Analyze();
 
         /// <summary>
-        /// Apply the fix for the given findings. Null when the check is report-only.
-        /// Implementations register every change with Undo so one Ctrl+Z reverses the whole run.
+        /// Apply the fix for the given findings. Only called when <see cref="CanFix"/> is true, so a
+        /// report-only check leaves the body empty. Implementations that create assets register them with
+        /// Undo; implementations that cannot must return false from <see cref="FixIsUndoable"/>.
         /// </summary>
         void Fix(IReadOnlyList<Yes2SDKOptimizationFinding> findings);
 
         /// <summary>False when this check reports only and Fix must not be called.</summary>
         bool CanFix { get; }
+
+        /// <summary>
+        /// True when one Undo reverses everything Fix did. False when the fix writes something the Undo
+        /// stack cannot hold, in which case the check's own source states how to reverse it by hand.
+        /// </summary>
+        bool FixIsUndoable { get; }
     }
 }
