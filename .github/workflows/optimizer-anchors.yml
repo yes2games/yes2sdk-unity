@@ -1,0 +1,15 @@
+name: optimizer-anchors
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  anchors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check optimizer docs anchors
+        run: node scripts~/check-optimizer-anchors.mjs
