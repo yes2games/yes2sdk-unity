@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-08-13
+
+### Added
+- **`Yes2SDK > Optimizer` window.** A new Editor window reports project optimization findings and applies the fix a reporting check can safely make. Checks are discovered by reflection against one interface, so a future check is one new file with nothing to register. The check strip runs across the top of the window and scrolls sideways when the tabs outgrow the width; each tab carries its own finding count, and the findings list below it scrolls on its own.
+- **Five optimization checks.** WebGL build settings against the recommended config, loose sprite folders that could be atlased, textures with no KTX2 counterpart, scene and prefab references still pointing at a source texture that has one, and the optional Unity packages that cut download size. Three of them surface existing tool logic in `Editor/` that had no menu item and was unreachable.
+- **Per-finding actions and per-check mute.** A finding can carry its own button, so one row is fixable on its own and a row reporting a missing prerequisite can install it. Muting a check hides its findings and survives a domain reload.
+
+### Changed
+- **The Build Window's Documentation button points at the docs site** rather than this repository's README, so it and every Optimizer deep link share one host.
+
 ## [2.6.0] - 2026-07-17
 
 ### Added
