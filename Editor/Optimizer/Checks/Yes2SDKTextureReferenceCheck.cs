@@ -31,8 +31,11 @@ namespace Yes2SDK.Editor
                     new Yes2SDKOptimizationFinding
                     {
                         Severity = Yes2SDKFindingSeverity.Info,
-                        Message = "The KTX2 image component is not present in this project, so references cannot be checked.",
+                        Message = "The KTX2 image component is not present in this project, so references cannot be "
+                                  + "checked. Install the KTX package and re-run Analyze.",
                         Fixable = false,
+                        ActionLabel = "Install",
+                        Action = () => Yes2SDKPackages.Install(Yes2SDKPackages.Ktx2),
                     }
                 };
             }

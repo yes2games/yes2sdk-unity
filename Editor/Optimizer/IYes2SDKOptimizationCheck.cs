@@ -53,6 +53,19 @@ namespace Yes2SDK.Editor
 
         /// <summary>True when this finding is one the owning check can fix.</summary>
         public bool Fixable { get; set; }
+
+        /// <summary>
+        /// Label for a per-finding button, or null for no button. Use this for anything the owning
+        /// check cannot express as a fix: installing a package, opening a download page, revealing a
+        /// file. A finding that sets this must also set <see cref="Action"/>.
+        /// </summary>
+        public string ActionLabel { get; set; }
+
+        /// <summary>
+        /// What the per-finding button does. Runs outside the layout pass, so it may open dialogs,
+        /// write assets, or refresh the asset database. Ignored when <see cref="ActionLabel"/> is null.
+        /// </summary>
+        public System.Action Action { get; set; }
     }
 
     /// <summary>

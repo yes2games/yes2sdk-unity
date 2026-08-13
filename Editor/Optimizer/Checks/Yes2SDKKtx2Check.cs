@@ -34,8 +34,10 @@ namespace Yes2SDK.Editor
                     {
                         Severity = Yes2SDKFindingSeverity.Info,
                         Message = "The toktx command line tool was not found, so textures cannot be converted. "
-                                  + "Install it from " + Yes2SDKKtx2Tool.KtxSoftwareReleasesUrl + " and re-run Analyze.",
+                                  + "Install it, put it on PATH, then re-run Analyze.",
                         Fixable = false,
+                        ActionLabel = "Get toktx",
+                        Action = () => Application.OpenURL(Yes2SDKKtx2Tool.KtxSoftwareReleasesUrl),
                     }
                 };
             }
