@@ -25,15 +25,26 @@ openable project of its own, so these cannot be automated here.
       installed package is gone from the list.
 - [ ] Clicking an action that only opens a web page does not trigger a re-scan.
 - [ ] Severity icons render as Unity's own info, warning, and error icons rather than as blank squares.
+- [ ] Fixing a Read/Write texture, a Read/Write mesh, a mipmapped sprite, or an audio clip clears the
+      Inspector value it names, and Analyze again drops the row.
+- [ ] A clip with more than one audio problem shows one row per problem, and one fix run clears all of
+      them.
+- [ ] The Resources check lists an asset placed under `Assets/Resources`, and does not list one placed
+      under `Assets/Editor/Resources`.
+- [ ] The missing-script check finds a component whose script was deleted, both on a prefab and on an
+      object in the open scene, and names the object's path within it.
 
-Two fixes are deliberately outside Undo, and both say so in their own source. Do not fail the
-checklist on either:
+Several fixes are deliberately outside Undo, and each says so in its own source. Do not fail the
+checklist on any of them:
 
 - Applying the recommended build settings writes player settings, which live outside `Assets` and are
   not on the Undo stack. Each finding names the value it found, so the previous values can be typed
   back in by hand.
 - Converting textures runs an external process that writes into `StreamingAssets` rather than creating
   assets, so there is nothing for Undo to hold. The output files can be deleted by hand.
+- The import-setting fixes (Read/Write on textures and meshes, sprite mipmaps, audio) write the asset's
+  `.meta` file, which is not on the Undo stack. Every one of them names the asset it changed, so the
+  value can be ticked back on in the Inspector.
 
 Before tagging, run the anchor gate in release mode from a checkout of the SDK repository, not from a
 consuming project. A non-zero exit means the optimization docs page is not published yet, so do not tag:
