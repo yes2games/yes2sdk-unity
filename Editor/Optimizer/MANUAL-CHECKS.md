@@ -13,10 +13,13 @@ openable project of its own, so these cannot be automated here.
       already existed at the same path untouched.
 - [ ] Report-only checks show no fix button.
 - [ ] The window compiles and runs both with and without the optional KTX2 package present.
-- [ ] The sidebar lists every check, each with its finding count, and selecting one shows only that
+- [ ] The tab strip names every check, each with its finding count, and selecting one shows only that
       check's findings. A muted check reads `muted` and a check that has not run reads `-`.
-- [ ] The sidebar scrolls when there are more checks than fit, and the Analyze button stays reachable
-      below it.
+- [ ] Narrow the window until the tabs no longer fit. The strip scrolls sideways to reach the rest, no
+      tab title is truncated, and the Analyze button stays in place beside the strip.
+- [ ] The strip never grows a vertical scrollbar of its own, at any window width.
+- [ ] The findings list scrolls vertically on its own, and the selected check's header row stays put
+      above it while it scrolls.
 - [ ] A per-row `Fix` on an undoable check applies straight away with no dialog, and Ctrl+Z reverses
       exactly that one row.
 - [ ] A per-row `Fix` on a check that is not undoable still shows the confirmation dialog first.
