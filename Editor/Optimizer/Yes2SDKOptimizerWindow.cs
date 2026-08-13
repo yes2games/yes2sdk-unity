@@ -7,17 +7,24 @@ using UnityEngine;
 namespace Yes2SDK.Editor
 {
     /// <summary>
-    /// Project optimization report. One tab per registered check: the sidebar lists every check with
-    /// its finding count, and the body shows the selected check's findings and the actions it offers.
+    /// Project optimization report. One tab per registered check: the strip across the top names every
+    /// check with its finding count, and the body shows the selected check's findings and the actions it
+    /// offers.
     /// </summary>
     public class Yes2SDKOptimizerWindow : EditorWindow
     {
-        private const float SidebarWidth = 190f;
+        private const float TabHeight = 26f;
+
+        // Room for a row of tabs plus the horizontal scrollbar underneath it. Too short and the strip
+        // grows a vertical scrollbar of its own, which steals width from the tabs.
+        private const float TabStripHeight = 46f;
+
+        private const float AnalyzeWidth = 90f;
 
         private readonly Dictionary<string, IReadOnlyList<Yes2SDKOptimizationFinding>> _results =
             new Dictionary<string, IReadOnlyList<Yes2SDKOptimizationFinding>>();
 
-        private Vector2 _sidebarScroll;
+        private Vector2 _tabScroll;
         private Vector2 _bodyScroll;
         private string _selectedId;
         private bool _hasRun;
@@ -50,12 +57,8 @@ namespace Yes2SDK.Editor
         {
             BuildStyles();
             DrawTitleBar();
-
-            EditorGUILayout.BeginHorizontal();
-            DrawSidebar();
+            DrawTabStrip();
             DrawBody();
-            EditorGUILayout.EndHorizontal();
-
             RunPending();
         }
 
@@ -74,9 +77,9 @@ namespace Yes2SDK.Editor
 
             _tabStyle = new GUIStyle(EditorStyles.miniButton)
             {
-                alignment = TextAnchor.MiddleLeft,
-                fixedHeight = 26,
-                padding = new RectOffset(8, 8, 4, 4),
+                alignment = TextAnchor.MiddleCenter,
+                fixedHeight = TabHeight,
+                padding = new RectOffset(10, 10, 4, 4),
             };
         }
 
@@ -117,28 +120,35 @@ namespace Yes2SDK.Editor
                 : string.Format("{0} findings", total);
         }
 
-        private void DrawSidebar()
+        private void DrawTabStrip()
         {
-            EditorGUILayout.BeginVertical(GUILayout.Width(SidebarWidth));
+            EditorGUILayout.BeginHorizontal();
 
-            _sidebarScroll = EditorGUILayout.BeginScrollView(_sidebarScroll, GUILayout.Width(SidebarWidth));
+            _tabScroll = EditorGUILayout.BeginScrollView(_tabScroll, false, false,
+                GUILayout.Height(TabStripHeight));
+
+            // No flexible space inside the scroll view. It would expand the content to the viewport
+            // width, so the strip could never be wider than the window and would never scroll.
+            EditorGUILayout.BeginHorizontal();
 
             foreach (var check in Yes2SDKOptimizationRegistry.All)
             {
-                DrawSidebarEntry(check);
+                DrawTab(check);
             }
 
+            EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndScrollView();
 
-            if (GUILayout.Button(_hasRun ? "Re-analyze" : "Analyze", GUILayout.Height(28)))
+            if (GUILayout.Button(_hasRun ? "Re-analyze" : "Analyze",
+                    GUILayout.Width(AnalyzeWidth), GUILayout.Height(TabHeight)))
             {
                 Defer(() => { }, true);
             }
 
-            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndHorizontal();
         }
 
-        private void DrawSidebarEntry(IYes2SDKOptimizationCheck check)
+        private void DrawTab(IYes2SDKOptimizationCheck check)
         {
             var muted = Yes2SDKOptimizationRegistry.IsMuted(check.Id);
             IReadOnlyList<Yes2SDKOptimizationFinding> findings;
@@ -148,7 +158,7 @@ namespace Yes2SDK.Editor
             var label = string.Format("{0}   {1}", check.Title, badge);
 
             // One shared style, so the colour is assigned on every path rather than inherited from
-            // whichever entry was drawn last.
+            // whichever tab was drawn last.
             if (muted)
             {
                 _tabStyle.normal.textColor = new Color(0.55f, 0.55f, 0.55f);
@@ -162,8 +172,10 @@ namespace Yes2SDK.Editor
                 _tabStyle.normal.textColor = EditorStyles.miniButton.normal.textColor;
             }
 
+            // Content width, not stretched. A stretched tab in a horizontal group would divide the strip
+            // evenly and truncate every longer title.
             var selected = check.Id == _selectedId;
-            if (GUILayout.Toggle(selected, label, _tabStyle) && !selected)
+            if (GUILayout.Toggle(selected, label, _tabStyle, GUILayout.ExpandWidth(false)) && !selected)
             {
                 _selectedId = check.Id;
                 _bodyScroll = Vector2.zero;
