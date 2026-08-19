@@ -57,6 +57,12 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern bool Yes2SDK_IsRewardedAdAvailableJS();
+
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_IsInterstitialSupportedJS();
+
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_IsRewardedSupportedJS();
 #endif
 
         #endregion
@@ -352,6 +358,61 @@ namespace Yes2SDK
                 return true;
             }
 #endif
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// Whether the current platform serves interstitial ads at all. Use this
+        /// to feature-gate ad UI up front, rather than hard-coding which
+        /// platforms have the format.
+        /// </summary>
+        /// <remarks>
+        /// This asks whether the format exists on the platform, not whether an
+        /// ad is ready right now. For readiness of a rewarded ad, see
+        /// <see cref="IsRewardedAdAvailable"/>.
+        /// </remarks>
+        /// <example><code>
+        /// if (!Yes2SDK.Ads.IsInterstitialSupported())
+        /// {
+        ///     // Skip the between-levels ad break entirely on this platform.
+        /// }
+        /// </code></example>
+        public bool IsInterstitialSupported()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_IsInterstitialSupportedJS();
+#elif UNITY_EDITOR
+            // The editor mock serves both ad formats, through the popup when it
+            // is enabled and synchronously when it is not, so gated ad UI stays
+            // reachable in Play Mode.
+            return true;
+#else
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// Whether the current platform serves rewarded ads at all. Use this to
+        /// feature-gate reward offers up front, rather than hard-coding which
+        /// platforms have the format.
+        /// </summary>
+        /// <remarks>
+        /// This asks whether the format exists on the platform, not whether an
+        /// ad is ready right now. For readiness, see
+        /// <see cref="IsRewardedAdAvailable"/>.
+        /// </remarks>
+        /// <example><code>
+        /// // Hide the whole "double your coins" offer where the format is absent.
+        /// doubleCoinsButton.gameObject.SetActive(Yes2SDK.Ads.IsRewardedSupported());
+        /// </code></example>
+        public bool IsRewardedSupported()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_IsRewardedSupportedJS();
+#elif UNITY_EDITOR
+            return true;
+#else
             return false;
 #endif
         }
