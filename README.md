@@ -291,15 +291,44 @@ if (Yes2SDK.Friends.IsSupported())
 
 ### Banners
 
-Container-based display ads. Different from `Ads.ShowBanner`.
+There are two banner surfaces and they are not interchangeable. Pick by the
+shape of banner the platform actually offers:
+
+| Surface | Shape | Use when |
+|---|---|---|
+| `Ads.ShowBanner(BannerPosition)` | One banner, placed top or bottom by the platform. No id, no size. | The platform offers a single sticky banner and accepts no container or size. |
+| `Banners.ShowBanner(id, BannerSize)` | Many banners, each in a named container at a size you choose. | The platform renders display ads into containers you lay out yourself. |
+
+They are separate end to end: separate callbacks, separate platform mappings,
+and no shared state. That last part is why mixing them breaks rather than merely
+duplicating: hiding on one surface can clear banners the other surface placed,
+and a refresh can miss one, because each surface tracks only what it placed
+itself. Pick one surface per game.
+
+Support for either surface varies by platform, and passing a container or size
+to a platform that has neither means those arguments are ignored. Check the
+per-method support tables before you commit to one:
+[Ads](https://developer.yes2games.com/docs/api/ads),
+[Banners](https://developer.yes2games.com/docs/api/banners).
+
+Only the container surface has a support probe. `Banners.IsSupported()` answers
+before you call; the position-based surface has no equivalent, so an unsupported
+platform reports itself through `onError` after the fact.
 
 ```csharp
+// Container-based: many banners, explicit sizes.
 if (Yes2SDK.Banners.IsSupported())
 {
     Yes2SDK.Banners.ShowBanner("sidebar-left", BannerSize.Medium_300x250);
     Yes2SDK.Banners.HideBanner("sidebar-left");
     Yes2SDK.Banners.HideAllBanners();
 }
+
+// Position-based: one sticky banner, platform picks the size.
+Yes2SDK.Ads.ShowBanner(BannerPosition.Bottom,
+    onShown: () => Debug.Log("Banner shown"),
+    onError: err => Debug.LogError(err));
+Yes2SDK.Ads.HideBanner();
 ```
 
 ### Game Extras

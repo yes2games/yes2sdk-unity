@@ -237,6 +237,10 @@ namespace Yes2SDK
         /// <summary>
         /// Shows a banner ad at the specified position.
         /// These are small ads typically shown on menus or non-gameplay screens.
+        /// This is the single sticky banner surface: the platform owns the size and
+        /// only the edge is yours to pick. For several banners at sizes you choose,
+        /// use <see cref="Yes2SDKBanners.ShowBanner"/> instead. The two surfaces are
+        /// separate end to end, so driving both at once is not supported.
         /// </summary>
         /// <param name="position">Position of the banner on screen (Top or Bottom).</param>
         /// <param name="onShown">Called when the banner is successfully displayed.</param>
