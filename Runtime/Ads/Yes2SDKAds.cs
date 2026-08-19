@@ -365,6 +365,21 @@ namespace Yes2SDK
         #region Internal Callback Invocations (called by Bridge)
 
         /// <summary>
+        /// Drops all stored callbacks and clears the in-flight flag.
+        /// </summary>
+        /// <remarks>
+        /// The ad state is static, so it outlives a single test. Nothing in the
+        /// public API can clear a latched-on ad, which is the point of the latch,
+        /// so tests reset through here instead of leaking state into each other.
+        /// </remarks>
+        internal static void ResetAdStateForTests()
+        {
+            ClearInterstitialCallbacks();
+            ClearRewardedCallbacks();
+            _adInFlight = false;
+        }
+
+        /// <summary>
         /// Called by Bridge when interstitial beforeAd callback is received from JS.
         /// </summary>
         internal static void InvokeInterstitialBeforeAd()

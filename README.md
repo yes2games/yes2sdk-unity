@@ -429,6 +429,28 @@ Both mocks can be turned off under **Yes2SDK > Build Window > Play Mode Testing*
 
 For richer simulation (specific locales, network conditions, event log capture), use the **QA Inspector** in the Yes2Games Dashboard.
 
+### Automated tests
+
+The package ships EditMode tests covering the ad callback contract: callback order, and the in-flight teardown that keeps one bad ad from blocking every later one. They run on the instant flow, so they need no rendering and work in batch mode.
+
+To see them in a consuming project, add the package to `testables` in that project's `Packages/manifest.json`:
+
+```json
+{
+  "testables": [
+    "com.yes2games.yes2sdk"
+  ]
+}
+```
+
+They then appear under **Window > General > Test Runner > EditMode**. Headless:
+
+```bash
+Unity -batchmode -nographics -projectPath <project>   -runTests -testPlatform EditMode -testResults results.xml
+```
+
+`testables` is a project-manifest field, so a package cannot opt itself in; each consuming project adds the line.
+
 ---
 
 ## Error Handling
