@@ -184,13 +184,15 @@ The callbacks fire in this order. Pay attention — getting it wrong silently br
 ```text
 beforeAd      → pause game (always)
 (ad shown)
-afterAd       → resume game (always — fires whether the player watched or dismissed)
 adViewed      → grant reward (ONLY fires if the player watched the full ad)
    — or —
 adDismissed   → no reward (fires if the player skipped/closed early)
+afterAd       → resume game (always — fires whether the player watched or dismissed)
 ```
 
 > ⚠️ **Do NOT grant rewards in `afterAd`.** `afterAd` fires for both completion *and* dismissal — granting rewards there gives them away on skip. Always grant in `adViewed`.
+
+> `afterAd` is **last**, and it is what completes the ad: the outcome arrives first, then `afterAd`. A new ad can be started from `afterAd`, but not from `adViewed` or `adDismissed`, because the previous ad is still in flight there.
 
 #### Concurrent ad guard + readiness
 
