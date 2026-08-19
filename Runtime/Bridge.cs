@@ -223,9 +223,21 @@ namespace Yes2SDK
 
         private void Handle(string data, [CallerMemberName] string name = null)
         {
-            if (_handlers.TryGetValue(name, out var h)) { h(data); return; }
-            if (_errorHandlers.TryGetValue(name, out var eh)) { eh(ParseError(data)); return; }
-            Yes2Log.Warning($"Bridge: unhandled callback '{name}'");
+            // Every JS callback lands here through SendMessage, which discards any
+            // exception that escapes its target. An unhandled throw from game code
+            // in a callback would otherwise vanish with no log line and no stack.
+            // Catch and report it instead; rethrowing would hand it straight back
+            // to the caller that discards it.
+            try
+            {
+                if (_handlers.TryGetValue(name, out var h)) { h(data); return; }
+                if (_errorHandlers.TryGetValue(name, out var eh)) { eh(ParseError(data)); return; }
+                Yes2Log.Warning($"Bridge: unhandled callback '{name}'");
+            }
+            catch (Exception e)
+            {
+                Yes2Log.Error($"Bridge: callback '{name}' threw {e.GetType().Name}: {e.Message}\n{e.StackTrace}");
+            }
         }
 
         #endregion
