@@ -410,7 +410,7 @@ namespace Yes2SDK
             GUILayout.Space(8f * _uiScale);
             GUILayout.Label(
                 rewarded
-                    ? "Claim fires afterAd then adViewed (grant the reward). Skip fires afterAd then adDismissed."
+                    ? "Claim fires adViewed (grant the reward) then afterAd. Skip fires adDismissed then afterAd."
                     : "Close fires afterAd. Pause your game in beforeAd, resume in afterAd.",
                 _adHintStyle);
         }
