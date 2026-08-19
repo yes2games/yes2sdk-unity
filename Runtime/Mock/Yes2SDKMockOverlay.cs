@@ -161,9 +161,9 @@ namespace Yes2SDK
         private void CompleteRewarded(bool viewed)
         {
             Hide();
-            // Same ordering as the platform flow: afterAd (resume the game),
-            // then the reward outcome.
-            Yes2SDKAds.InvokeRewardedAfterAd();
+            // Same ordering as the platform flow: the reward outcome first, then
+            // afterAd (resume the game) last. afterAd completes the ad and clears
+            // the callbacks, so an outcome fired after it would be dropped.
             if (viewed)
             {
                 Yes2SDKAds.InvokeRewardedAdViewed();
@@ -172,6 +172,8 @@ namespace Yes2SDK
             {
                 Yes2SDKAds.InvokeRewardedAdDismissed();
             }
+
+            Yes2SDKAds.InvokeRewardedAfterAd();
         }
 
         private void CompletePurchase(bool confirmed)

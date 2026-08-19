@@ -130,10 +130,11 @@ namespace Yes2SDK
                 }
             }
 #endif
-            // Simulate ad flow in Editor
-            _interstitialBeforeAdCallback?.Invoke();
-            _interstitialAfterAdCallback?.Invoke();
-            _adInFlight = false;
+            // Simulate ad flow in Editor. Routed through the same entry points the
+            // real callbacks arrive on, so callback ordering and ad teardown have a
+            // single definition instead of one per path.
+            InvokeInterstitialBeforeAd();
+            InvokeInterstitialAfterAd();
 #endif
         }
 
@@ -217,20 +218,23 @@ namespace Yes2SDK
                 }
             }
 #endif
-            // Simulate ad flow in Editor
-            _rewardedBeforeAdCallback?.Invoke();
-            _rewardedAfterAdCallback?.Invoke();
+            // Simulate ad flow in Editor. Routed through the same entry points the
+            // real callbacks arrive on, so callback ordering and ad teardown have a
+            // single definition instead of one per path. The reward outcome comes
+            // before afterAd, matching the platform flow.
+            InvokeRewardedBeforeAd();
 
             // For testing: "dismiss" description triggers dismissed callback
             if (description == "dismiss")
             {
-                _rewardedAdDismissedCallback?.Invoke();
+                InvokeRewardedAdDismissed();
             }
             else
             {
-                _rewardedAdViewedCallback?.Invoke();
+                InvokeRewardedAdViewed();
             }
-            _adInFlight = false;
+
+            InvokeRewardedAfterAd();
 #endif
         }
 
@@ -370,22 +374,31 @@ namespace Yes2SDK
 
         /// <summary>
         /// Called by Bridge when interstitial afterAd callback is received from JS.
+        /// Completes the ad: releases the in-flight latch and clears the callbacks.
         /// </summary>
         internal static void InvokeInterstitialAfterAd()
         {
-            _interstitialAfterAdCallback?.Invoke();
+            // Tear down before invoking. A game callback that throws escapes into
+            // the SendMessage caller, which discards it, so any teardown placed
+            // after the invoke would be skipped and _adInFlight would latch on,
+            // rejecting every later ad call. Releasing first also lets a callback
+            // start a new ad re-entrantly.
+            var afterAd = _interstitialAfterAdCallback;
             ClearInterstitialCallbacks();
             _adInFlight = false;
+            afterAd?.Invoke();
         }
 
         /// <summary>
         /// Called by Bridge when interstitial error callback is received from JS.
+        /// Completes the ad: releases the in-flight latch and clears the callbacks.
         /// </summary>
         internal static void InvokeInterstitialError(Error error)
         {
-            _interstitialErrorCallback?.Invoke(error);
+            var onError = _interstitialErrorCallback;
             ClearInterstitialCallbacks();
             _adInFlight = false;
+            onError?.Invoke(error);
         }
 
         /// <summary>
@@ -398,40 +411,47 @@ namespace Yes2SDK
 
         /// <summary>
         /// Called by Bridge when rewarded afterAd callback is received from JS.
+        /// Completes the ad: releases the in-flight latch and clears the callbacks.
+        /// Arrives after adViewed or adDismissed, so it is the last callback of a
+        /// successful rewarded ad and the one that tears the ad down.
         /// </summary>
         internal static void InvokeRewardedAfterAd()
         {
-            _rewardedAfterAdCallback?.Invoke();
+            var afterAd = _rewardedAfterAdCallback;
+            ClearRewardedCallbacks();
+            _adInFlight = false;
+            afterAd?.Invoke();
         }
 
         /// <summary>
         /// Called by Bridge when rewarded adDismissed callback is received from JS.
+        /// Does not complete the ad: afterAd still follows and tears it down.
         /// </summary>
         internal static void InvokeRewardedAdDismissed()
         {
             _rewardedAdDismissedCallback?.Invoke();
-            ClearRewardedCallbacks();
-            _adInFlight = false;
         }
 
         /// <summary>
         /// Called by Bridge when rewarded adViewed callback is received from JS.
+        /// Does not complete the ad: afterAd still follows and tears it down.
         /// </summary>
         internal static void InvokeRewardedAdViewed()
         {
             _rewardedAdViewedCallback?.Invoke();
-            ClearRewardedCallbacks();
-            _adInFlight = false;
         }
 
         /// <summary>
         /// Called by Bridge when rewarded error callback is received from JS.
+        /// Completes the ad: releases the in-flight latch and clears the callbacks.
+        /// The error path delivers no afterAd, so this is the terminal callback.
         /// </summary>
         internal static void InvokeRewardedError(Error error)
         {
-            _rewardedErrorCallback?.Invoke(error);
+            var onError = _rewardedErrorCallback;
             ClearRewardedCallbacks();
             _adInFlight = false;
+            onError?.Invoke(error);
         }
 
         /// <summary>
