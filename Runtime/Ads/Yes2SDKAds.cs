@@ -133,8 +133,22 @@ namespace Yes2SDK
             // Simulate ad flow in Editor. Routed through the same entry points the
             // real callbacks arrive on, so callback ordering and ad teardown have a
             // single definition instead of one per path.
-            InvokeInterstitialBeforeAd();
-            InvokeInterstitialAfterAd();
+            //
+            // Both invokes share one managed call stack here, unlike WebGL where
+            // each callback arrives on its own SendMessage. A throwing beforeAd
+            // would otherwise skip the teardown and leave the ad in flight for the
+            // rest of the session, rejecting every later ad call. The finally keeps
+            // the throw visible to game code while still completing the ad, and it
+            // cannot stomp an ad started from beforeAd, because
+            // InvokeInterstitialAfterAd tears down before it invokes.
+            try
+            {
+                InvokeInterstitialBeforeAd();
+            }
+            finally
+            {
+                InvokeInterstitialAfterAd();
+            }
 #endif
         }
 
@@ -222,19 +236,32 @@ namespace Yes2SDK
             // real callbacks arrive on, so callback ordering and ad teardown have a
             // single definition instead of one per path. The reward outcome comes
             // before afterAd, matching the platform flow.
-            InvokeRewardedBeforeAd();
-
-            // For testing: "dismiss" description triggers dismissed callback
-            if (description == "dismiss")
+            //
+            // Every invoke below shares one managed call stack, unlike WebGL where
+            // each callback arrives on its own SendMessage. A throwing beforeAd or
+            // outcome callback would otherwise skip the teardown and leave the ad in
+            // flight for the rest of the session, rejecting every later ad call. The
+            // finally keeps the throw visible to game code while still completing the
+            // ad, and it cannot stomp an ad started re-entrantly, because
+            // InvokeRewardedAfterAd tears down before it invokes.
+            try
             {
-                InvokeRewardedAdDismissed();
-            }
-            else
-            {
-                InvokeRewardedAdViewed();
-            }
+                InvokeRewardedBeforeAd();
 
-            InvokeRewardedAfterAd();
+                // For testing: "dismiss" description triggers dismissed callback
+                if (description == "dismiss")
+                {
+                    InvokeRewardedAdDismissed();
+                }
+                else
+                {
+                    InvokeRewardedAdViewed();
+                }
+            }
+            finally
+            {
+                InvokeRewardedAfterAd();
+            }
 #endif
         }
 

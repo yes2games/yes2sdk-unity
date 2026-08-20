@@ -164,16 +164,26 @@ namespace Yes2SDK
             // Same ordering as the platform flow: the reward outcome first, then
             // afterAd (resume the game) last. afterAd completes the ad and clears
             // the callbacks, so an outcome fired after it would be dropped.
-            if (viewed)
+            //
+            // Both invokes run inside this popup's GUI callback, so a throwing
+            // outcome callback would skip the teardown and leave the ad in flight
+            // with the popup already hidden. The finally completes the ad and still
+            // lets the exception reach game code.
+            try
             {
-                Yes2SDKAds.InvokeRewardedAdViewed();
+                if (viewed)
+                {
+                    Yes2SDKAds.InvokeRewardedAdViewed();
+                }
+                else
+                {
+                    Yes2SDKAds.InvokeRewardedAdDismissed();
+                }
             }
-            else
+            finally
             {
-                Yes2SDKAds.InvokeRewardedAdDismissed();
+                Yes2SDKAds.InvokeRewardedAfterAd();
             }
-
-            Yes2SDKAds.InvokeRewardedAfterAd();
         }
 
         private void CompletePurchase(bool confirmed)
