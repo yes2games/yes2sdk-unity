@@ -493,9 +493,12 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeBannerShown()
         {
-            _bannerShownCallback?.Invoke();
-            _bannerShownCallback = null;
-            _bannerShowErrorCallback = null;
+            // Tear down before invoking, for the same reason the ad callbacks do:
+            // a throwing callback must not leave a stale callback pair behind, and
+            // clearing first lets one show a banner re-entrantly.
+            var shown = _bannerShownCallback;
+            ClearBannerShowCallbacks();
+            shown?.Invoke();
         }
 
         /// <summary>
@@ -503,9 +506,9 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeBannerShowError(Error error)
         {
-            _bannerShowErrorCallback?.Invoke(error);
-            _bannerShownCallback = null;
-            _bannerShowErrorCallback = null;
+            var onError = _bannerShowErrorCallback;
+            ClearBannerShowCallbacks();
+            onError?.Invoke(error);
         }
 
         /// <summary>
@@ -513,9 +516,9 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeBannerHidden()
         {
-            _bannerHiddenCallback?.Invoke();
-            _bannerHiddenCallback = null;
-            _bannerHideErrorCallback = null;
+            var hidden = _bannerHiddenCallback;
+            ClearBannerHideCallbacks();
+            hidden?.Invoke();
         }
 
         /// <summary>
@@ -523,9 +526,9 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeBannerHideError(Error error)
         {
-            _bannerHideErrorCallback?.Invoke(error);
-            _bannerHiddenCallback = null;
-            _bannerHideErrorCallback = null;
+            var onError = _bannerHideErrorCallback;
+            ClearBannerHideCallbacks();
+            onError?.Invoke(error);
         }
 
         #endregion
@@ -552,6 +555,18 @@ namespace Yes2SDK
             _interstitialBeforeAdCallback = null;
             _interstitialAfterAdCallback = null;
             _interstitialErrorCallback = null;
+        }
+
+        private static void ClearBannerShowCallbacks()
+        {
+            _bannerShownCallback = null;
+            _bannerShowErrorCallback = null;
+        }
+
+        private static void ClearBannerHideCallbacks()
+        {
+            _bannerHiddenCallback = null;
+            _bannerHideErrorCallback = null;
         }
 
         private static void ClearRewardedCallbacks()
