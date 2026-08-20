@@ -405,11 +405,13 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeInterstitialAfterAd()
         {
-            // Tear down before invoking. A game callback that throws escapes into
-            // the SendMessage caller, which discards it, so any teardown placed
-            // after the invoke would be skipped and _adInFlight would latch on,
-            // rejecting every later ad call. Releasing first also lets a callback
-            // start a new ad re-entrantly.
+            // Tear down before invoking. A game callback that throws would skip
+            // any teardown placed after the invoke, latching _adInFlight on and
+            // rejecting every later ad call. On WebGL the throw escapes into the
+            // SendMessage caller, which discards it; on the Editor paths it
+            // propagates back into game code. Either way the teardown has already
+            // run. Releasing first also lets a callback start a new ad
+            // re-entrantly.
             var afterAd = _interstitialAfterAdCallback;
             ClearInterstitialCallbacks();
             _adInFlight = false;
@@ -419,6 +421,9 @@ namespace Yes2SDK
         /// <summary>
         /// Called by Bridge when interstitial error callback is received from JS.
         /// Completes the ad: releases the in-flight latch and clears the callbacks.
+        /// A platform afterAd may still follow a no-fill and is dropped, because
+        /// the ad is already complete by then, so resume work belongs in onError
+        /// as well as afterAd.
         /// </summary>
         internal static void InvokeInterstitialError(Error error)
         {
@@ -471,7 +476,9 @@ namespace Yes2SDK
         /// <summary>
         /// Called by Bridge when rewarded error callback is received from JS.
         /// Completes the ad: releases the in-flight latch and clears the callbacks.
-        /// The error path delivers no afterAd, so this is the terminal callback.
+        /// Whether an afterAd follows is platform dependent: a no-fill on a live
+        /// platform emits one, and it is dropped here because the ad is already
+        /// complete. Resume work therefore belongs in onError as well as afterAd.
         /// </summary>
         internal static void InvokeRewardedError(Error error)
         {
