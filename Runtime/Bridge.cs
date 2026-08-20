@@ -236,7 +236,10 @@ namespace Yes2SDK
             }
             catch (Exception e)
             {
-                Yes2Log.Error($"Bridge: callback '{name}' threw {e.GetType().Name}: {e.Message}\n{e.StackTrace}");
+                // The whole exception, not its parts: ToString carries the type,
+                // the message, the inner chain and the stack, and an inner
+                // exception is where a callback failure usually says why.
+                Yes2Log.Error($"Bridge: callback '{name}' threw: {e}");
             }
         }
 
