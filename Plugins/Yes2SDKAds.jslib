@@ -18,12 +18,17 @@ mergeInto(LibraryManager.library, {
                     SendMessage('Bridge', 'OnInterstitialBeforeAd', '');
                 },
                 afterAd: function() {
+                    __y2h.resumeAudio();
                     SendMessage('Bridge', 'OnInterstitialAfterAd', '');
                 },
                 noFill: function() {
                     __y2h.sendError('OnInterstitialError', 'NoFill', 'No interstitial ad available', 'Yes2SDK.Ads.ShowInterstitial');
                 }
-            }).catch(__y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'));
+            }).catch(__y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'))
+              // afterAd does not fire on a no-fill or an error, and a strategy
+              // whose promise never settles would leave audio dead, so resume on
+              // both the callback and the settle. resumeAudio is idempotent.
+              .then(__y2h.resumeAudio);
         } catch(error) {
             __y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial')(error);
         }
@@ -47,6 +52,7 @@ mergeInto(LibraryManager.library, {
                     SendMessage('Bridge', 'OnRewardedBeforeAd', '');
                 },
                 afterAd: function() {
+                    __y2h.resumeAudio();
                     SendMessage('Bridge', 'OnRewardedAfterAd', '');
                 },
                 adDismissed: function() {
@@ -58,7 +64,8 @@ mergeInto(LibraryManager.library, {
                 noFill: function() {
                     __y2h.sendError('OnRewardedError', 'NoFill', 'No rewarded ad available', 'Yes2SDK.Ads.ShowRewarded');
                 }
-            }).catch(__y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'));
+            }).catch(__y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'))
+              .then(__y2h.resumeAudio);
         } catch(error) {
             __y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded')(error);
         }
