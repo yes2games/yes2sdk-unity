@@ -39,6 +39,8 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 
 > After updating the SDK package, click **Reinstall Template** in the Build Window to copy changes into your project.
 
+> The package's EditMode tests stay hidden from the Test Runner until the project opts in. See [Automated tests](#automated-tests) for the one-line `testables` entry.
+
 ---
 
 ## Quick Start

@@ -139,6 +139,56 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Rewarded_AThrowingOutcomeCallbackStillCompletesTheAd()
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                Yes2SDK.Ads.ShowRewarded("test", "rewarded",
+                    afterAd: () => _calls.Add("afterAd"),
+                    adViewed: () => throw new InvalidOperationException("game code blew up")));
+
+            Assert.AreEqual(new[] { "afterAd" }, _calls, "afterAd must still run when the outcome callback throws");
+            Assert.IsFalse(Yes2SDK.Ads.IsAdShowing(), "a throwing outcome callback must not latch the ad on");
+
+            Yes2SDK.Ads.ShowRewarded("after-throw", "rewarded",
+                afterAd: () => _calls.Add("next-afterAd"));
+
+            Assert.AreEqual(new[] { "afterAd", "next-afterAd" }, _calls, "the next ad should run normally");
+        }
+
+        [Test]
+        public void Rewarded_ErrorCompletesTheAdAndDropsTheStoredAfterAd()
+        {
+            // A platform can fail an ad that has already started, so the error
+            // arrives after beforeAd. On WebGL each callback is its own
+            // SendMessage, which leaves room for that ordering; here the whole
+            // flow is one call stack, so beforeAd is the only place to reach it.
+            Yes2SDK.Ads.ShowRewarded("test", "rewarded",
+                beforeAd: () =>
+                {
+                    _calls.Add("beforeAd");
+                    Yes2SDKAds.InvokeRewardedError(new Error
+                    {
+                        Code = "NoFill",
+                        Message = "No rewarded ad available",
+                        Context = "Yes2SDK.Ads.ShowRewarded"
+                    });
+                },
+                afterAd: () => _calls.Add("afterAd"),
+                adViewed: () => _calls.Add("adViewed"),
+                onError: error => _calls.Add("onError:" + error.Code));
+
+            // The error completes the ad, so the stored afterAd is dropped rather
+            // than run late. Resume work therefore belongs in onError too.
+            Assert.AreEqual(new[] { "beforeAd", "onError:NoFill" }, _calls);
+            Assert.IsFalse(Yes2SDK.Ads.IsAdShowing(), "the error path must release the ad");
+
+            Yes2SDK.Ads.ShowRewarded("after-error", "rewarded",
+                afterAd: () => _calls.Add("next-afterAd"));
+
+            Assert.That(_calls, Does.Contain("next-afterAd"), "the next ad should run normally");
+        }
+
+        [Test]
         public void Rewarded_ReleasesInFlightWhenNoCallbacksAreSupplied()
         {
             Yes2SDK.Ads.ShowRewarded("test", "rewarded");
