@@ -39,6 +39,8 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 
 > After updating the SDK package, click **Reinstall Template** in the Build Window to copy changes into your project.
 
+> The package's EditMode tests stay hidden from the Test Runner until the project opts in. See [Automated tests](#automated-tests) for the one-line `testables` entry.
+
 ---
 
 ## Quick Start
@@ -428,6 +430,28 @@ In the Unity Editor, SDK calls run against mock implementations:
 Both mocks can be turned off under **Yes2SDK > Build Window > Play Mode Testing**. With the ad popup off, ad callbacks fire instantly with no UI (pass `"dismiss"` as the rewarded description to trigger `adDismissed`). Batch-mode runs (CI) always use the instant flow.
 
 For richer simulation (specific locales, network conditions, event log capture), use the **QA Inspector** in the Yes2Games Dashboard.
+
+### Automated tests
+
+The package ships EditMode tests covering the ad callback contract: callback order, and the in-flight teardown that keeps one bad ad from blocking every later one. They run on the instant flow, so they need no rendering and work in batch mode.
+
+To see them in a consuming project, add the package to `testables` in that project's `Packages/manifest.json`:
+
+```json
+{
+  "testables": [
+    "com.yes2games.yes2sdk"
+  ]
+}
+```
+
+They then appear under **Window > General > Test Runner > EditMode**. Headless:
+
+```bash
+Unity -batchmode -nographics -projectPath <project>   -runTests -testPlatform EditMode -testResults results.xml
+```
+
+`testables` is a project-manifest field, so a package cannot opt itself in; each consuming project adds the line.
 
 ---
 

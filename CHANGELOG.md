@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.8.0] - 2026-08-24
 
+### Added
+- **`com.unity.ugui` and `com.unity.test-framework` are declared package dependencies.** The UI code already required uGUI and had been relying on the consuming project to pull it in; the new EditMode test assembly requires the test framework. Both now resolve through the package rather than by luck.
+- **An EditMode test assembly covering the ad callback contract.** Eight NUnit cases over interstitial and rewarded callback order, the in-flight latch being released before `afterAd` runs, a second ad rejected while one is in flight, and a throwing `afterAd` that must not leave the ad latched on. A consuming project opts in through `testables`.
+
 ### Fixed
 - **Rewarded ads dropped the game's afterAd callback on every platform.** The reward outcome callback tore the ad down, which cleared the stored callbacks before the platform's `afterAd` arrived, so a game that resumed audio or gameplay in `afterAd` never resumed after a claimed reward. Teardown now happens on `afterAd`, the callback that actually ends a rewarded ad, and the outcome callbacks pass through. Games resuming in `adDismissed` were unaffected, which is why skipping an ad looked fine while claiming a reward did not.
 - **An exception thrown by a game callback left the ad in flight for the rest of the session.** Teardown ran after the callback, so a throw skipped it and every later `ShowInterstitial` or `ShowRewarded` was rejected as already showing with nothing in the log to explain it. Each callback now releases the ad before invoking the game's handler, the Editor simulation and the mock popup complete the ad through a `finally`, and an exception escaping a callback is logged with its full stack and inner chain instead of vanishing.
