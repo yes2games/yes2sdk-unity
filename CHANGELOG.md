@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.7.1] - 2026-08-20
+## [2.8.0] - 2026-08-24
 
 ### Fixed
 - **Rewarded ads dropped the game's afterAd callback on every platform.** The reward outcome callback tore the ad down, which cleared the stored callbacks before the platform's `afterAd` arrived, so a game that resumed audio or gameplay in `afterAd` never resumed after a claimed reward. Teardown now happens on `afterAd`, the callback that actually ends a rewarded ad, and the outcome callbacks pass through. Games resuming in `adDismissed` were unaffected, which is why skipping an ad looked fine while claiming a reward did not.

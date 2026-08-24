@@ -19,10 +19,10 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 
 1. Open **Window > Package Manager**
 2. Click **+** > **Add package from git URL...**
-3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.7.1`
+3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.8.0`
 4. Click **Add**
 
-> Pinning the URL with `#v2.7.1` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
+> Pinning the URL with `#v2.8.0` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
 
 ### Via Local Folder
 
