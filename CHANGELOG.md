@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-08-24
+
+### Added
+- **`Ads.IsInterstitialSupported()` and `Ads.IsRewardedSupported()`.** Whether the platform serves that ad format at all, so a game can feature-gate its ad UI up front instead of hard-coding which platforms carry which format and failing on click. Both report `false` when the injected runtime predates the checks, because a false gate only hides ad UI whereas a wrong true gate sends the game into a call the platform cannot serve. In the Editor both report `true`, since the mock serves either format and gated UI has to stay reachable in Play Mode. Support is not readiness: `IsRewardedAdAvailable()` still answers whether an ad looks ready right now.
+- **`com.unity.ugui` and `com.unity.test-framework` are declared package dependencies.** The UI code already required uGUI and had been relying on the consuming project to pull it in; the new EditMode test assembly requires the test framework. Both now resolve through the package rather than by luck.
+- **An EditMode test assembly covering the ad callback contract.** Eight NUnit cases over interstitial and rewarded callback order, the in-flight latch being released before `afterAd` runs, a second ad rejected while one is in flight, and a throwing `afterAd` that must not leave the ad latched on. A consuming project opts in through `testables`.
+
+### Fixed
+- **Game audio stayed dead after an ad on WebGL.** The browser suspends the page `AudioContext` while an ad surface holds focus and nothing brought it back, so audio was silent for the rest of the session unless the player blurred and refocused the tab. Ad exit now resumes a suspended context, on both the callback and the promise settle, for interstitials and rewarded alike, since `afterAd` does not fire on a no-fill or an error. The context state is logged on every ad exit, because the autoplay policy can defer a resume that has no user gesture behind it and that is otherwise indistinguishable from a context which was never suspended.
+- **Rewarded ads dropped the game's afterAd callback on every platform.** The reward outcome callback tore the ad down, which cleared the stored callbacks before the platform's `afterAd` arrived, so a game that resumed audio or gameplay in `afterAd` never resumed after a claimed reward. Teardown now happens on `afterAd`, the callback that actually ends a rewarded ad, and the outcome callbacks pass through. Games resuming in `adDismissed` were unaffected, which is why skipping an ad looked fine while claiming a reward did not.
+- **An exception thrown by a game callback left the ad in flight for the rest of the session.** Teardown ran after the callback, so a throw skipped it and every later `ShowInterstitial` or `ShowRewarded` was rejected as already showing with nothing in the log to explain it. Each callback now releases the ad before invoking the game's handler, the Editor simulation and the mock popup complete the ad through a `finally`, and an exception escaping a callback is logged with its full stack and inner chain instead of vanishing.
+- **The Editor and the mock popup fired rewarded callbacks in a different order than the platforms do.** Both now route through the same entry points as the WebGL bridge, so the order a game sees in Play Mode is the order it gets in a build.
+- **Banner callbacks are cleared before they run**, so a throwing callback no longer leaves the previous pair in place and a banner shown from inside one keeps its own callbacks.
+
 ## [2.7.0] - 2026-08-13
 
 ### Added
