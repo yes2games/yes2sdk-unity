@@ -196,6 +196,18 @@ afterAd       → resume game (always — fires whether the player watched or di
 
 > `afterAd` is **last**, and it is what completes the ad: the outcome arrives first, then `afterAd`. A new ad can be started from `afterAd`, but not from `adViewed` or `adDismissed`, because the previous ad is still in flight there.
 
+#### Format support
+
+- `Ads.IsInterstitialSupported()` / `Ads.IsRewardedSupported()` — whether the platform serves that ad format at all. Use these to feature-gate ad UI up front instead of hard-coding which platforms have which format. Both report `false` when the injected runtime is older than the checks, so a gate never sends the game into a call the platform cannot serve. In the Editor both report `true`, because the mock serves either format.
+- Banner support is a separate check on its own module: `Banners.IsSupported()`.
+
+```csharp
+// Hide the whole offer where the format is absent, rather than failing on click.
+doubleCoinsButton.gameObject.SetActive(Yes2SDK.Ads.IsRewardedSupported());
+```
+
+Support is not readiness: these ask whether the format exists on the platform, `IsRewardedAdAvailable()` below asks whether an ad looks ready right now.
+
 #### Concurrent ad guard + readiness
 
 - `Ads.IsAdShowing()` — returns `true` while a `ShowInterstitial` or `ShowRewarded` is in flight (between the call and `afterAd`/error). Calling `Show*` again while one is already showing is rejected immediately — `onError` fires with `ErrorCode.InvalidParams` and a message starting `"Another ad is already in flight (AdAlreadyShowing)…"`.

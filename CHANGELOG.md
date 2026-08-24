@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.8.0] - 2026-08-24
 
 ### Added
+- **`Ads.IsInterstitialSupported()` and `Ads.IsRewardedSupported()`.** Whether the platform serves that ad format at all, so a game can feature-gate its ad UI up front instead of hard-coding which platforms carry which format and failing on click. Both report `false` when the injected runtime predates the checks, because a false gate only hides ad UI whereas a wrong true gate sends the game into a call the platform cannot serve. In the Editor both report `true`, since the mock serves either format and gated UI has to stay reachable in Play Mode. Support is not readiness: `IsRewardedAdAvailable()` still answers whether an ad looks ready right now.
 - **`com.unity.ugui` and `com.unity.test-framework` are declared package dependencies.** The UI code already required uGUI and had been relying on the consuming project to pull it in; the new EditMode test assembly requires the test framework. Both now resolve through the package rather than by luck.
 - **An EditMode test assembly covering the ad callback contract.** Eight NUnit cases over interstitial and rewarded callback order, the in-flight latch being released before `afterAd` runs, a second ad rejected while one is in flight, and a throwing `afterAd` that must not leave the ad latched on. A consuming project opts in through `testables`.
 

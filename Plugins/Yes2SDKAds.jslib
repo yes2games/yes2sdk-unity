@@ -137,6 +137,29 @@ mergeInto(LibraryManager.library, {
             catch (e) { return 0; }
         }
         return 0;
+    },
+
+    // Support checks report 0 when the runtime predates them rather than
+    // assuming the format works: a false gate hides ad UI, a wrong true gate
+    // sends the game into a call the platform cannot serve.
+    Yes2SDK_IsInterstitialSupportedJS__deps: ['$__y2h'],
+    Yes2SDK_IsInterstitialSupportedJS: function() {
+        if (!__y2h.has('ads')) return 0;
+        if (typeof window.Yes2SDK.ads.isInterstitialSupported === 'function') {
+            try { return window.Yes2SDK.ads.isInterstitialSupported() ? 1 : 0; }
+            catch (e) { return 0; }
+        }
+        return 0;
+    },
+
+    Yes2SDK_IsRewardedSupportedJS__deps: ['$__y2h'],
+    Yes2SDK_IsRewardedSupportedJS: function() {
+        if (!__y2h.has('ads')) return 0;
+        if (typeof window.Yes2SDK.ads.isRewardedSupported === 'function') {
+            try { return window.Yes2SDK.ads.isRewardedSupported() ? 1 : 0; }
+            catch (e) { return 0; }
+        }
+        return 0;
     }
 
 });
