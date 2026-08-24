@@ -82,6 +82,45 @@ mergeInto(LibraryManager.library, {
     Yes2SDK_InitializeJS: function() {
         window.__y2.log('[Init] Step 1: Yes2SDK_InitializeJS called');
 
+        // Minimum injected Core runtime this wrapper build is compatible with.
+        // Distinct from the wrapper's own version (Yes2SDK.Version) — see Yes2SDK.cs.
+        // Must match the dashboard's MIN_CORE_BY_ENGINE floor for Unity.
+        var REQUIRED_CORE_VERSION = '2.2.0';
+
+        // Compare two semver strings on major.minor.patch (pre-release/build metadata ignored).
+        // Returns 1 if a > b, -1 if a < b, 0 if equal.
+        function compareSemver(a, b) {
+            var pa = String(a).split('.');
+            var pb = String(b).split('.');
+            for (var i = 0; i < 3; i++) {
+                var na = parseInt(pa[i], 10) || 0;
+                var nb = parseInt(pb[i], 10) || 0;
+                if (na > nb) return 1;
+                if (na < nb) return -1;
+            }
+            return 0;
+        }
+
+        // Warn (non-blocking) if the injected Core is older than this build requires.
+        // Reads Core's OWN version field, which is Core-only: the CrazyGames wrapper
+        // exposes a second window.Yes2SDK with no .version, and pre-2.2.0 Core has no
+        // getter either — both read as null, which means "can't verify", NOT a skew.
+        function checkCoreVersion() {
+            try {
+                var coreVer = (window.Yes2SDK && typeof window.Yes2SDK.version === 'string')
+                    ? window.Yes2SDK.version : null;
+                if (coreVer === null) return; // CG wrapper or pre-2.2.0 Core — cannot verify, skip
+                if (compareSemver(coreVer, REQUIRED_CORE_VERSION) < 0) {
+                    window.__y2.warn('Injected Core v' + coreVer + ' is older than this build requires (v' +
+                        REQUIRED_CORE_VERSION + '). Some SDK calls may silently no-op. ' +
+                        'Update the injected Core runtime.');
+                }
+            } catch (error) {
+                // A version probe must never break init.
+                window.__y2.warn('[Init] Core version check skipped:', error);
+            }
+        }
+
         // Helper: subscribe to platform lifecycle events ONCE after init succeeds.
         // Required for YouTube Playables certification (integration #14, #21, #22).
         // The Core SDK fires these events; we forward them to Unity via SendMessage.
@@ -115,6 +154,9 @@ mergeInto(LibraryManager.library, {
 
         // Helper: run init once wrapper exists (try-catch prevents uncaught throws → no popup)
         function doInit() {
+            // window.Yes2SDK is guaranteed defined here (paths A/B/C confirm the wrapper
+            // before calling doInit), so this is the single point to verify Core skew.
+            checkCoreVersion();
             try {
                 window.__y2.log('[Init] doInit: calling window.Yes2SDK.initializeAsync()');
                 window.Yes2SDK.initializeAsync()
