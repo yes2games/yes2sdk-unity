@@ -42,6 +42,32 @@ mergeInto(LibraryManager.library, {
                 }));
             };
         },
+        // Resume Unity's WebAudio context when an ad surface left it suspended.
+        // The browser suspends the page context while the ad holds focus, and
+        // nothing resumes it, so game audio stays silent until a manual tab
+        // blur and refocus. resume() is idempotent, so calling this on every ad
+        // exit is safe. The state is logged because the autoplay policy can
+        // defer a resume that has no user gesture behind it, and the log is the
+        // only way to tell that apart from a context that was never suspended.
+        resumeAudio: function() {
+            try {
+                var ctx = (typeof WEBAudio !== 'undefined' && WEBAudio) ? WEBAudio.audioContext : null;
+                if (!ctx) {
+                    return;
+                }
+                window.__y2.log('[Audio] AudioContext state on ad exit: ' + ctx.state);
+                if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+                    var pending = ctx.resume();
+                    if (pending && typeof pending.catch === 'function') {
+                        pending.catch(function(error) {
+                            window.__y2.warn('[Audio] AudioContext resume deferred:', error);
+                        });
+                    }
+                }
+            } catch(error) {
+                window.__y2.warn('[Audio] AudioContext resume failed:', error);
+            }
+        },
         // Allocate and return a UTF8 string to C#
         returnStr: function(str) {
             var bufferSize = lengthBytesUTF8(str) + 1;
