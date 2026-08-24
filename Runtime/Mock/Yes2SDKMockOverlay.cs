@@ -161,16 +161,28 @@ namespace Yes2SDK
         private void CompleteRewarded(bool viewed)
         {
             Hide();
-            // Same ordering as the platform flow: afterAd (resume the game),
-            // then the reward outcome.
-            Yes2SDKAds.InvokeRewardedAfterAd();
-            if (viewed)
+            // Same ordering as the platform flow: the reward outcome first, then
+            // afterAd (resume the game) last. afterAd completes the ad and clears
+            // the callbacks, so an outcome fired after it would be dropped.
+            //
+            // Both invokes run inside this popup's GUI callback, so a throwing
+            // outcome callback would skip the teardown and leave the ad in flight
+            // with the popup already hidden. The finally completes the ad and still
+            // lets the exception reach game code.
+            try
             {
-                Yes2SDKAds.InvokeRewardedAdViewed();
+                if (viewed)
+                {
+                    Yes2SDKAds.InvokeRewardedAdViewed();
+                }
+                else
+                {
+                    Yes2SDKAds.InvokeRewardedAdDismissed();
+                }
             }
-            else
+            finally
             {
-                Yes2SDKAds.InvokeRewardedAdDismissed();
+                Yes2SDKAds.InvokeRewardedAfterAd();
             }
         }
 
@@ -408,7 +420,7 @@ namespace Yes2SDK
             GUILayout.Space(8f * _uiScale);
             GUILayout.Label(
                 rewarded
-                    ? "Claim fires afterAd then adViewed (grant the reward). Skip fires afterAd then adDismissed."
+                    ? "Claim fires adViewed (grant the reward) then afterAd. Skip fires adDismissed then afterAd."
                     : "Close fires afterAd. Pause your game in beforeAd, resume in afterAd.",
                 _adHintStyle);
         }

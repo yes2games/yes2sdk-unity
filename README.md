@@ -19,10 +19,10 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 
 1. Open **Window > Package Manager**
 2. Click **+** > **Add package from git URL...**
-3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.7.0`
+3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.8.0`
 4. Click **Add**
 
-> Pinning the URL with `#v2.7.0` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
+> Pinning the URL with `#v2.8.0` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
 
 ### Via Local Folder
 
@@ -184,13 +184,15 @@ The callbacks fire in this order. Pay attention — getting it wrong silently br
 ```text
 beforeAd      → pause game (always)
 (ad shown)
-afterAd       → resume game (always — fires whether the player watched or dismissed)
 adViewed      → grant reward (ONLY fires if the player watched the full ad)
    — or —
 adDismissed   → no reward (fires if the player skipped/closed early)
+afterAd       → resume game (always — fires whether the player watched or dismissed)
 ```
 
 > ⚠️ **Do NOT grant rewards in `afterAd`.** `afterAd` fires for both completion *and* dismissal — granting rewards there gives them away on skip. Always grant in `adViewed`.
+
+> `afterAd` is **last**, and it is what completes the ad: the outcome arrives first, then `afterAd`. A new ad can be started from `afterAd`, but not from `adViewed` or `adDismissed`, because the previous ad is still in flight there.
 
 #### Concurrent ad guard + readiness
 

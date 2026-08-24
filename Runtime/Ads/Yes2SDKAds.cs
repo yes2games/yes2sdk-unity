@@ -130,10 +130,25 @@ namespace Yes2SDK
                 }
             }
 #endif
-            // Simulate ad flow in Editor
-            _interstitialBeforeAdCallback?.Invoke();
-            _interstitialAfterAdCallback?.Invoke();
-            _adInFlight = false;
+            // Simulate ad flow in Editor. Routed through the same entry points the
+            // real callbacks arrive on, so callback ordering and ad teardown have a
+            // single definition instead of one per path.
+            //
+            // Both invokes share one managed call stack here, unlike WebGL where
+            // each callback arrives on its own SendMessage. A throwing beforeAd
+            // would otherwise skip the teardown and leave the ad in flight for the
+            // rest of the session, rejecting every later ad call. The finally keeps
+            // the throw visible to game code while still completing the ad, and it
+            // cannot stomp an ad started from beforeAd, because
+            // InvokeInterstitialAfterAd tears down before it invokes.
+            try
+            {
+                InvokeInterstitialBeforeAd();
+            }
+            finally
+            {
+                InvokeInterstitialAfterAd();
+            }
 #endif
         }
 
@@ -217,20 +232,36 @@ namespace Yes2SDK
                 }
             }
 #endif
-            // Simulate ad flow in Editor
-            _rewardedBeforeAdCallback?.Invoke();
-            _rewardedAfterAdCallback?.Invoke();
+            // Simulate ad flow in Editor. Routed through the same entry points the
+            // real callbacks arrive on, so callback ordering and ad teardown have a
+            // single definition instead of one per path. The reward outcome comes
+            // before afterAd, matching the platform flow.
+            //
+            // Every invoke below shares one managed call stack, unlike WebGL where
+            // each callback arrives on its own SendMessage. A throwing beforeAd or
+            // outcome callback would otherwise skip the teardown and leave the ad in
+            // flight for the rest of the session, rejecting every later ad call. The
+            // finally keeps the throw visible to game code while still completing the
+            // ad, and it cannot stomp an ad started re-entrantly, because
+            // InvokeRewardedAfterAd tears down before it invokes.
+            try
+            {
+                InvokeRewardedBeforeAd();
 
-            // For testing: "dismiss" description triggers dismissed callback
-            if (description == "dismiss")
-            {
-                _rewardedAdDismissedCallback?.Invoke();
+                // For testing: "dismiss" description triggers dismissed callback
+                if (description == "dismiss")
+                {
+                    InvokeRewardedAdDismissed();
+                }
+                else
+                {
+                    InvokeRewardedAdViewed();
+                }
             }
-            else
+            finally
             {
-                _rewardedAdViewedCallback?.Invoke();
+                InvokeRewardedAfterAd();
             }
-            _adInFlight = false;
 #endif
         }
 
@@ -370,22 +401,36 @@ namespace Yes2SDK
 
         /// <summary>
         /// Called by Bridge when interstitial afterAd callback is received from JS.
+        /// Completes the ad: releases the in-flight latch and clears the callbacks.
         /// </summary>
         internal static void InvokeInterstitialAfterAd()
         {
-            _interstitialAfterAdCallback?.Invoke();
+            // Tear down before invoking. A game callback that throws would skip
+            // any teardown placed after the invoke, latching _adInFlight on and
+            // rejecting every later ad call. On WebGL the throw escapes into the
+            // SendMessage caller, which discards it; on the Editor paths it
+            // propagates back into game code. Either way the teardown has already
+            // run. Releasing first also lets a callback start a new ad
+            // re-entrantly.
+            var afterAd = _interstitialAfterAdCallback;
             ClearInterstitialCallbacks();
             _adInFlight = false;
+            afterAd?.Invoke();
         }
 
         /// <summary>
         /// Called by Bridge when interstitial error callback is received from JS.
+        /// Completes the ad: releases the in-flight latch and clears the callbacks.
+        /// A platform afterAd may still follow a no-fill and is dropped, because
+        /// the ad is already complete by then, so resume work belongs in onError
+        /// as well as afterAd.
         /// </summary>
         internal static void InvokeInterstitialError(Error error)
         {
-            _interstitialErrorCallback?.Invoke(error);
+            var onError = _interstitialErrorCallback;
             ClearInterstitialCallbacks();
             _adInFlight = false;
+            onError?.Invoke(error);
         }
 
         /// <summary>
@@ -398,40 +443,49 @@ namespace Yes2SDK
 
         /// <summary>
         /// Called by Bridge when rewarded afterAd callback is received from JS.
+        /// Completes the ad: releases the in-flight latch and clears the callbacks.
+        /// Arrives after adViewed or adDismissed, so it is the last callback of a
+        /// successful rewarded ad and the one that tears the ad down.
         /// </summary>
         internal static void InvokeRewardedAfterAd()
         {
-            _rewardedAfterAdCallback?.Invoke();
+            var afterAd = _rewardedAfterAdCallback;
+            ClearRewardedCallbacks();
+            _adInFlight = false;
+            afterAd?.Invoke();
         }
 
         /// <summary>
         /// Called by Bridge when rewarded adDismissed callback is received from JS.
+        /// Does not complete the ad: afterAd still follows and tears it down.
         /// </summary>
         internal static void InvokeRewardedAdDismissed()
         {
             _rewardedAdDismissedCallback?.Invoke();
-            ClearRewardedCallbacks();
-            _adInFlight = false;
         }
 
         /// <summary>
         /// Called by Bridge when rewarded adViewed callback is received from JS.
+        /// Does not complete the ad: afterAd still follows and tears it down.
         /// </summary>
         internal static void InvokeRewardedAdViewed()
         {
             _rewardedAdViewedCallback?.Invoke();
-            ClearRewardedCallbacks();
-            _adInFlight = false;
         }
 
         /// <summary>
         /// Called by Bridge when rewarded error callback is received from JS.
+        /// Completes the ad: releases the in-flight latch and clears the callbacks.
+        /// Whether an afterAd follows is platform dependent: a no-fill on a live
+        /// platform emits one, and it is dropped here because the ad is already
+        /// complete. Resume work therefore belongs in onError as well as afterAd.
         /// </summary>
         internal static void InvokeRewardedError(Error error)
         {
-            _rewardedErrorCallback?.Invoke(error);
+            var onError = _rewardedErrorCallback;
             ClearRewardedCallbacks();
             _adInFlight = false;
+            onError?.Invoke(error);
         }
 
         /// <summary>
@@ -439,9 +493,12 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeBannerShown()
         {
-            _bannerShownCallback?.Invoke();
-            _bannerShownCallback = null;
-            _bannerShowErrorCallback = null;
+            // Tear down before invoking, for the same reason the ad callbacks do:
+            // a throwing callback must not leave a stale callback pair behind, and
+            // clearing first lets one show a banner re-entrantly.
+            var shown = _bannerShownCallback;
+            ClearBannerShowCallbacks();
+            shown?.Invoke();
         }
 
         /// <summary>
@@ -449,9 +506,9 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeBannerShowError(Error error)
         {
-            _bannerShowErrorCallback?.Invoke(error);
-            _bannerShownCallback = null;
-            _bannerShowErrorCallback = null;
+            var onError = _bannerShowErrorCallback;
+            ClearBannerShowCallbacks();
+            onError?.Invoke(error);
         }
 
         /// <summary>
@@ -459,9 +516,9 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeBannerHidden()
         {
-            _bannerHiddenCallback?.Invoke();
-            _bannerHiddenCallback = null;
-            _bannerHideErrorCallback = null;
+            var hidden = _bannerHiddenCallback;
+            ClearBannerHideCallbacks();
+            hidden?.Invoke();
         }
 
         /// <summary>
@@ -469,9 +526,9 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeBannerHideError(Error error)
         {
-            _bannerHideErrorCallback?.Invoke(error);
-            _bannerHiddenCallback = null;
-            _bannerHideErrorCallback = null;
+            var onError = _bannerHideErrorCallback;
+            ClearBannerHideCallbacks();
+            onError?.Invoke(error);
         }
 
         #endregion
@@ -498,6 +555,18 @@ namespace Yes2SDK
             _interstitialBeforeAdCallback = null;
             _interstitialAfterAdCallback = null;
             _interstitialErrorCallback = null;
+        }
+
+        private static void ClearBannerShowCallbacks()
+        {
+            _bannerShownCallback = null;
+            _bannerShowErrorCallback = null;
+        }
+
+        private static void ClearBannerHideCallbacks()
+        {
+            _bannerHiddenCallback = null;
+            _bannerHideErrorCallback = null;
         }
 
         private static void ClearRewardedCallbacks()
