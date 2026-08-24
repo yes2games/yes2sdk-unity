@@ -207,6 +207,17 @@ mergeInto(LibraryManager.library, {
                     return false;
                 },
 
+                // CrazyGames serves both formats through sdk.ad.requestAd, so both
+                // are supported whenever the ad module is reachable (mirrors Core
+                // crazygames-ads-strategy.isInterstitialSupported / isRewardedSupported).
+                isInterstitialSupported: function() {
+                    return true;
+                },
+
+                isRewardedSupported: function() {
+                    return true;
+                },
+
                 // Best-effort readiness — CG has no explicit signal; ad module present => may be available
                 // (mirrors Core crazygames-ads-strategy.isRewardedAdAvailable).
                 isRewardedAdAvailable: function() {

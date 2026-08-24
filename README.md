@@ -19,10 +19,10 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 
 1. Open **Window > Package Manager**
 2. Click **+** > **Add package from git URL...**
-3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.7.0`
+3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.8.0`
 4. Click **Add**
 
-> Pinning the URL with `#v2.7.0` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
+> Pinning the URL with `#v2.8.0` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
 
 ### Via Local Folder
 
@@ -38,6 +38,8 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 3. The status indicator changes from "Setup Pending" to "Ready"
 
 > After updating the SDK package, click **Reinstall Template** in the Build Window to copy changes into your project.
+
+> The package's EditMode tests stay hidden from the Test Runner until the project opts in. See [Automated tests](#automated-tests) for the one-line `testables` entry.
 
 ---
 
@@ -184,13 +186,27 @@ The callbacks fire in this order. Pay attention — getting it wrong silently br
 ```text
 beforeAd      → pause game (always)
 (ad shown)
-afterAd       → resume game (always — fires whether the player watched or dismissed)
 adViewed      → grant reward (ONLY fires if the player watched the full ad)
    — or —
 adDismissed   → no reward (fires if the player skipped/closed early)
+afterAd       → resume game (always — fires whether the player watched or dismissed)
 ```
 
 > ⚠️ **Do NOT grant rewards in `afterAd`.** `afterAd` fires for both completion *and* dismissal — granting rewards there gives them away on skip. Always grant in `adViewed`.
+
+> `afterAd` is **last**, and it is what completes the ad: the outcome arrives first, then `afterAd`. A new ad can be started from `afterAd`, but not from `adViewed` or `adDismissed`, because the previous ad is still in flight there.
+
+#### Format support
+
+- `Ads.IsInterstitialSupported()` / `Ads.IsRewardedSupported()` — whether the platform serves that ad format at all. Use these to feature-gate ad UI up front instead of hard-coding which platforms have which format. Both report `false` when the injected runtime is older than the checks, so a gate never sends the game into a call the platform cannot serve. In the Editor both report `true`, because the mock serves either format.
+- Banner support is a separate check on its own module: `Banners.IsSupported()`.
+
+```csharp
+// Hide the whole offer where the format is absent, rather than failing on click.
+doubleCoinsButton.gameObject.SetActive(Yes2SDK.Ads.IsRewardedSupported());
+```
+
+Support is not readiness: these ask whether the format exists on the platform, `IsRewardedAdAvailable()` below asks whether an ad looks ready right now.
 
 #### Concurrent ad guard + readiness
 
@@ -455,6 +471,28 @@ In the Unity Editor, SDK calls run against mock implementations:
 Both mocks can be turned off under **Yes2SDK > Build Window > Play Mode Testing**. With the ad popup off, ad callbacks fire instantly with no UI (pass `"dismiss"` as the rewarded description to trigger `adDismissed`). Batch-mode runs (CI) always use the instant flow.
 
 For richer simulation (specific locales, network conditions, event log capture), use the **QA Inspector** in the Yes2Games Dashboard.
+
+### Automated tests
+
+The package ships EditMode tests covering the ad callback contract: callback order, and the in-flight teardown that keeps one bad ad from blocking every later one. They run on the instant flow, so they need no rendering and work in batch mode.
+
+To see them in a consuming project, add the package to `testables` in that project's `Packages/manifest.json`:
+
+```json
+{
+  "testables": [
+    "com.yes2games.yes2sdk"
+  ]
+}
+```
+
+They then appear under **Window > General > Test Runner > EditMode**. Headless:
+
+```bash
+Unity -batchmode -nographics -projectPath <project>   -runTests -testPlatform EditMode -testResults results.xml
+```
+
+`testables` is a project-manifest field, so a package cannot opt itself in; each consuming project adds the line.
 
 ---
 

@@ -18,12 +18,17 @@ mergeInto(LibraryManager.library, {
                     SendMessage('Bridge', 'OnInterstitialBeforeAd', '');
                 },
                 afterAd: function() {
+                    __y2h.resumeAudio();
                     SendMessage('Bridge', 'OnInterstitialAfterAd', '');
                 },
                 noFill: function() {
                     __y2h.sendError('OnInterstitialError', 'NoFill', 'No interstitial ad available', 'Yes2SDK.Ads.ShowInterstitial');
                 }
-            }).catch(__y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'));
+            }).catch(__y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'))
+              // afterAd does not fire on a no-fill or an error, and a strategy
+              // whose promise never settles would leave audio dead, so resume on
+              // both the callback and the settle. resumeAudio is idempotent.
+              .then(__y2h.resumeAudio);
         } catch(error) {
             __y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial')(error);
         }
@@ -47,6 +52,7 @@ mergeInto(LibraryManager.library, {
                     SendMessage('Bridge', 'OnRewardedBeforeAd', '');
                 },
                 afterAd: function() {
+                    __y2h.resumeAudio();
                     SendMessage('Bridge', 'OnRewardedAfterAd', '');
                 },
                 adDismissed: function() {
@@ -58,7 +64,8 @@ mergeInto(LibraryManager.library, {
                 noFill: function() {
                     __y2h.sendError('OnRewardedError', 'NoFill', 'No rewarded ad available', 'Yes2SDK.Ads.ShowRewarded');
                 }
-            }).catch(__y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'));
+            }).catch(__y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'))
+              .then(__y2h.resumeAudio);
         } catch(error) {
             __y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded')(error);
         }
@@ -127,6 +134,29 @@ mergeInto(LibraryManager.library, {
         if (!__y2h.has('ads')) return false;
         if (typeof window.Yes2SDK.ads.isRewardedAdAvailable === 'function') {
             try { return window.Yes2SDK.ads.isRewardedAdAvailable() ? 1 : 0; }
+            catch (e) { return 0; }
+        }
+        return 0;
+    },
+
+    // Support checks report 0 when the runtime predates them rather than
+    // assuming the format works: a false gate hides ad UI, a wrong true gate
+    // sends the game into a call the platform cannot serve.
+    Yes2SDK_IsInterstitialSupportedJS__deps: ['$__y2h'],
+    Yes2SDK_IsInterstitialSupportedJS: function() {
+        if (!__y2h.has('ads')) return 0;
+        if (typeof window.Yes2SDK.ads.isInterstitialSupported === 'function') {
+            try { return window.Yes2SDK.ads.isInterstitialSupported() ? 1 : 0; }
+            catch (e) { return 0; }
+        }
+        return 0;
+    },
+
+    Yes2SDK_IsRewardedSupportedJS__deps: ['$__y2h'],
+    Yes2SDK_IsRewardedSupportedJS: function() {
+        if (!__y2h.has('ads')) return 0;
+        if (typeof window.Yes2SDK.ads.isRewardedSupported === 'function') {
+            try { return window.Yes2SDK.ads.isRewardedSupported() ? 1 : 0; }
             catch (e) { return 0; }
         }
         return 0;
