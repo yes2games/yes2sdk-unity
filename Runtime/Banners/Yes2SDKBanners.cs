@@ -47,6 +47,11 @@ namespace Yes2SDK
 
         /// <summary>
         /// Show a banner ad with the given id and size.
+        /// This is the container surface: each banner lives in a container you name
+        /// and size. A platform that offers only one sticky banner ignores both, so
+        /// prefer <see cref="Yes2SDKAds.ShowBanner"/> where that is the shape on
+        /// offer. The two surfaces are separate end to end, so driving both at once
+        /// is not supported.
         /// </summary>
         /// <param name="id">Unique identifier for the banner container.</param>
         /// <param name="size">The banner size to request.</param>

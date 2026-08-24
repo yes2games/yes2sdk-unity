@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The Editor and the mock popup fired rewarded callbacks in a different order than the platforms do.** Both now route through the same entry points as the WebGL bridge, so the order a game sees in Play Mode is the order it gets in a build.
 - **Banner callbacks are cleared before they run**, so a throwing callback no longer leaves the previous pair in place and a banner shown from inside one keeps its own callbacks.
 
+### Documentation
+- **The two banner surfaces are documented as distinct, with the hazard of mixing them written down.** `Ads.ShowBanner(BannerPosition)` places one sticky banner whose size the platform owns; `Banners.ShowBanner(id, BannerSize)` places several banners into named containers at sizes the game chooses. Neither delegates to the other and they share no state, so a positional `HideBanner()` can clear banners the container surface placed and a refresh can miss one. The support asymmetry is called out too: `Banners.IsSupported()` answers before the call, while the position-based surface reports an unsupported platform through `onError` after the fact. Both `ShowBanner` doc comments now cross-reference the other surface.
+
 ## [2.7.0] - 2026-08-13
 
 ### Added
