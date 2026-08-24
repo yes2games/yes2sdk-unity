@@ -1,6 +1,6 @@
 {
     "name": "com.yes2games.yes2sdk",
-    "version": "2.7.0",
+    "version": "2.8.0",
     "displayName": "Yes2SDK",
     "description": "Yes2SDK Unity package for the SuperSDK pipeline",
     "unity": "2021.3",
@@ -9,7 +9,9 @@
     "changelogUrl": "https://github.com/yes2games/yes2sdk-unity/blob/main/CHANGELOG.md",
     "licensesUrl": "https://github.com/yes2games/yes2sdk-unity/blob/main/LICENSE",
     "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.2.1"
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
+        "com.unity.test-framework": "1.1.33",
+        "com.unity.ugui": "1.0.0"
     },
     "keywords": [
         "sdk",
