@@ -26,10 +26,16 @@ concurrency:
 permissions:
   contents: read
 
+# Runner labels are spelled out rather than derived from a variable. A missing or
+# renamed variable must leave a job unschedulable, not silently relocate the whole
+# pipeline onto GitHub-hosted runners this organization has no allowance for:
+# that is the difference between a failure you see and one you pay for. `light`
+# for the Node lanes, `heavy` for anything that drives a Unity editor.
+
 jobs:
   workflow-governance:
     name: Workflow governance
-    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    runs-on: [self-hosted, pavg15, light]
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -45,7 +51,7 @@ jobs:
 
   release-state:
     name: Release state
-    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    runs-on: [self-hosted, pavg15, light]
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -59,9 +65,15 @@ jobs:
       - name: Verify version authority, mirrors and the Release Please contract
         run: node 'ci~/verify-release-state.mjs'
 
+      # The advisory push guard, exercised in both checkout shapes. It lives here
+      # rather than in a job of its own because #97 section 4 fixes the mandatory
+      # result list at six names, and a guard nobody has seen fail is not a guard.
+      - name: Verify the pre-push hook refuses only the default branch
+        run: node 'ci~/verify-pre-push-hook.mjs'
+
   wrapper-parity:
     name: Wrapper parity
-    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    runs-on: [self-hosted, pavg15, light]
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -77,7 +89,7 @@ jobs:
 
   optimizer-anchors:
     name: Optimizer anchors
-    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    runs-on: [self-hosted, pavg15, light]
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -101,7 +113,7 @@ jobs:
   # a suffix the action picks is a dependency nothing in this file can see.
   unity-floor:
     name: Unity 2021.3.0f1 floor lane
-    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","heavy"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    runs-on: [self-hosted, pavg15, heavy]
     timeout-minutes: 90
     steps:
       - name: Checkout repository
@@ -122,7 +134,7 @@ jobs:
 
   unity-current:
     name: Unity 6000.3.16f1 current lane + WebGL smoke
-    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","heavy"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    runs-on: [self-hosted, pavg15, heavy]
     timeout-minutes: 120
     steps:
       - name: Checkout repository
@@ -171,7 +183,7 @@ jobs:
       - unity-floor
       - unity-current
     if: always()
-    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    runs-on: [self-hosted, pavg15, light]
     timeout-minutes: 5
     permissions: {}
 
@@ -212,11 +224,9 @@ jobs:
       - required-ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.required-ci.result == 'success'
     # One explicit runner class (#97 section 9, guard 1): a determinism check means
-    # nothing if the machine class underneath it is free to change. Spelled out as
-    # literal labels rather than through vars.RUNNER_HOST, because "pinned" means
-    # the machine class cannot move under the check without a commit that says so.
-    # `heavy` because this job runs the edge and stable Unity consumer smokes.
-    # There is no GitHub-hosted fallback: this organization runs none.
+    # nothing if the machine class underneath it is free to change, so the class
+    # cannot move without a commit that says so. `heavy` because this job runs the
+    # edge and stable Unity consumer smokes.
     runs-on: [self-hosted, pavg15, heavy]
     timeout-minutes: 180
     # Required, not optional (yes2games/yes2dashboard#141 section 13, item 3). The

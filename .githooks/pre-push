@@ -11,10 +11,18 @@ set -Eeuo pipefail
 
 # Read the default branch from git rather than hardcoding it, so renaming it
 # cannot silently disarm the guard.
-default_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+#
+# Both lookups may legitimately find nothing, and `|| true` is what lets them.
+# Under `set -e` an assignment inherits the exit status of its command
+# substitution, so a failing lookup killed this hook before the fallback below
+# could run - and it then refused every push, including pushes that have
+# nothing to do with the default branch. `git clone` writes
+# refs/remotes/origin/HEAD, but actions/checkout does not, so the shape that
+# tripped it is every CI checkout.
+default_branch=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)
 if [ -z "$default_branch" ]; then
   default_branch=$(git ls-remote --symref origin HEAD 2>/dev/null |
-    awk '$1 == "ref:" { sub("refs/heads/", "", $2); print $2; exit }')
+    awk '$1 == "ref:" { sub("refs/heads/", "", $2); print $2; exit }' || true)
 fi
 default_branch=${default_branch:-main}
 protected="refs/heads/${default_branch}"
