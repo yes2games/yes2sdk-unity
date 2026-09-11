@@ -78,7 +78,13 @@ jobs:
       - name: Verify the pre-push hook refuses only the default branch
         run: node 'ci~/verify-pre-push-hook.mjs'
 
-      # Whether this run can drive a Unity editor at all. The probe lives here
+      # Whether this run can drive a Unity editor at all. The editor lanes borrow
+      # a Unity seat with a username and password, so those two are what gates
+      # coverage; UNITY_LICENSE is a `.ulf` replayed by game-ci and nothing reads
+      # it any more. It is deliberately not probed for, because a gate that demands
+      # a secret nothing consumes is the same residue as a variable nothing reads.
+      #
+      # The probe lives here
       # rather than in a job of its own because #97 section 4 fixes the mandatory
       # result list at six names, and a seventh job would change that list.
       #
@@ -90,13 +96,11 @@ jobs:
       - name: Probe for Unity credentials
         id: credentials
         env:
-          HAS_LICENSE: ${{ secrets.UNITY_LICENSE != '' }}
           HAS_EMAIL: ${{ secrets.UNITY_EMAIL != '' }}
           HAS_PASSWORD: ${{ secrets.UNITY_PASSWORD != '' }}
         run: |
           set -euo pipefail
           missing=""
-          [ "$HAS_LICENSE" = "true" ]  || missing="$missing UNITY_LICENSE"
           [ "$HAS_EMAIL" = "true" ]    || missing="$missing UNITY_EMAIL"
           [ "$HAS_PASSWORD" = "true" ] || missing="$missing UNITY_PASSWORD"
           missing="${missing# }"
@@ -160,84 +164,135 @@ jobs:
     if: needs.release-state.outputs.unity-credentials == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    # One floor lane at a time across the whole repository, so two open pull
+    # requests queue rather than stacking seats. Paired with the same rule on the
+    # current lane, the ceiling is the two seats a single run needs, never four or
+    # six - and the two lanes still run in parallel with each other, because the
+    # group is per lane rather than shared between them.
+    #
+    # This sits on the jobs rather than on the workflow deliberately: a workflow
+    # level group shared across pull requests cannot also cancel a superseded run
+    # of the same pull request, and #97 section 11 requires that cancellation.
+    concurrency:
+      group: yes2-unity-seat-floor
+      cancel-in-progress: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      # A hosted runner does not have room for a Unity editor image without this.
-      # Safe to run unguarded now that every job is hosted: the VM is ephemeral and
-      # nothing here is shared with another job.
-      - name: Free disk space for the Unity editor image
+      # A hosted runner does not have room for a Unity editor without this.
+      - name: Free disk space for the Unity editor
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - name: Package resolve, compile and every package EditMode test
-        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      - name: Set up Unity 2021.3.0f1
+        uses: buildalon/unity-setup@30fcbcb56c10ea5d64298e970d952b8d29bc268b # v2.6.0
         with:
-          projectPath: ci~/consumer
-          unityVersion: 2021.3.0f1
-          customImage: unityci/editor:ubuntu-2021.3.0f1-webgl-3
-          testMode: EditMode
-          artifactsPath: floor-test-results
+          unity-version: 2021.3.0f1
+          version-file: ci~/consumer/ProjectSettings/ProjectVersion.txt
+
+      - name: Borrow a Unity seat
+        id: licence
+        uses: buildalon/activate-unity-license@e0d245d0787b7b9931b56ccbde3b508f6b70f1af # v2.2.2
+        with:
+          license: personal
+          username: ${{ secrets.UNITY_EMAIL }}
+          password: ${{ secrets.UNITY_PASSWORD }}
+
+      # The action reports a seat problem only as `License command failed with exit
+      # code 17`, which covers activation and return alike and never says that no
+      # seat was free. This says it, in the same PROVISIONING vocabulary the final
+      # gate uses, so a reader does not have to know Unity's exit codes.
+      - name: Explain a licence failure
+        if: failure() && steps.licence.outcome == 'failure'
+        run: |
+          echo "::error title=PROVISIONING: could not borrow a Unity seat::Activation failed. \
+          The likeliest cause is that no Personal seat was free: this Unity account is shared with \
+          yes2games/nsr, and a seat leaked by an earlier cancelled run stays checked out until it is \
+          revoked. Recovery: sign in to the Unity ID dashboard, open seat management, and revoke the \
+          stale activation, then re-run. Exit code 2 means the credentials are wrong instead; exit 17 \
+          is a seat problem either way. This is provisioning, not a defect in this branch."
+
+      # EditMode tests never build a player, so the base editor is enough and no
+      # platform module is installed. No `-quit`: the test runner ends the editor
+      # itself, and `-quit` can end it before the run finishes.
+      - name: Package resolve, compile and every package EditMode test
+        uses: buildalon/unity-action@2d420bea0f47fbe01377601fa3231bcf4de04f3a # v3.1.0
+        with:
+          project-path: ci~/consumer
+          log-name: floor-editmode
+          args: -batchmode -nographics -runTests -testPlatform EditMode -testResults ${{ github.workspace }}/floor-test-results.xml
 
   unity-current:
     name: Unity 6000.3.16f1 current lane + WebGL smoke
-    # Skipped, never faked, when this run cannot drive an editor. A lane that
-    # exits 0 without starting Unity would be a green that means "we skipped the
-    # hard part"; a skipped lane renders grey and claims nothing.
     needs: [release-state]
     if: needs.release-state.outputs.unity-credentials == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    # One current lane at a time across the repository. See the floor lane's note:
+    # per-lane groups cap the repository at one run's worth of seats while leaving
+    # the two lanes free to run alongside each other.
+    concurrency:
+      group: yes2-unity-seat-current
+      cancel-in-progress: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      # A hosted runner does not have room for a Unity editor image without this.
-      # Safe to run unguarded now that every job is hosted: the VM is ephemeral and
-      # nothing here is shared with another job.
-      - name: Free disk space for the Unity editor image
+      # A hosted runner does not have room for a Unity editor without this.
+      - name: Free disk space for the Unity editor
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - name: Package resolve, compile and every package EditMode test
-        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      - name: Set up Unity 6000.3.16f1 with WebGL support
+        uses: buildalon/unity-setup@30fcbcb56c10ea5d64298e970d952b8d29bc268b # v2.6.0
         with:
-          projectPath: ci~/consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
-          testMode: EditMode
-          artifactsPath: current-test-results
+          unity-version: 6000.3.16f1
+          version-file: ci~/consumer/ProjectSettings/ProjectVersion.txt
+          build-targets: WebGL
+
+      - name: Borrow a Unity seat
+        id: licence
+        uses: buildalon/activate-unity-license@e0d245d0787b7b9931b56ccbde3b508f6b70f1af # v2.2.2
+        with:
+          license: personal
+          username: ${{ secrets.UNITY_EMAIL }}
+          password: ${{ secrets.UNITY_PASSWORD }}
+
+      # The action reports a seat problem only as `License command failed with exit
+      # code 17`, which covers activation and return alike and never says that no
+      # seat was free. This says it, in the same PROVISIONING vocabulary the final
+      # gate uses, so a reader does not have to know Unity's exit codes.
+      - name: Explain a licence failure
+        if: failure() && steps.licence.outcome == 'failure'
+        run: |
+          echo "::error title=PROVISIONING: could not borrow a Unity seat::Activation failed. \
+          The likeliest cause is that no Personal seat was free: this Unity account is shared with \
+          yes2games/nsr, and a seat leaked by an earlier cancelled run stays checked out until it is \
+          revoked. Recovery: sign in to the Unity ID dashboard, open seat management, and revoke the \
+          stale activation, then re-run. Exit code 2 means the credentials are wrong instead; exit 17 \
+          is a seat problem either way. This is provisioning, not a defect in this branch."
+
+      - name: Package resolve, compile and every package EditMode test
+        uses: buildalon/unity-action@2d420bea0f47fbe01377601fa3231bcf4de04f3a # v3.1.0
+        with:
+          project-path: ci~/consumer
+          log-name: current-editmode
+          args: -batchmode -nographics -runTests -testPlatform EditMode -testResults ${{ github.workspace }}/current-test-results.xml
 
       # A real WebGL player, not a compile: the supported installer runs, the
       # template it installs is verified, Yes2SDKBuildGuard evaluates it as a
       # preprocess callback, and BuildPipeline.BuildPlayer has to succeed and leave
-      # a loader behind. Any of those failing exits the editor non-zero.
+      # a loader behind. The smoke exits the editor non-zero on any of those.
       - name: Real WebGL package smoke
-        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        uses: buildalon/unity-action@2d420bea0f47fbe01377601fa3231bcf4de04f3a # v3.1.0
         with:
-          projectPath: ci~/consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
-          targetPlatform: WebGL
-          buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
-          buildName: Yes2SDKSmoke
-          versioning: None
-          allowDirtyBuild: true
+          project-path: ci~/consumer
+          build-target: WebGL
+          log-name: current-webgl-smoke
+          args: -quit -batchmode -nographics -executeMethod Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL -customBuildPath ${{ github.workspace }}/webgl-smoke
 
   required-ci:
     name: YES2 Unity Required CI
@@ -297,7 +352,7 @@ jobs:
           ALL_RESULTS: ${{ toJSON(needs) }}
           PROBE: ${{ needs.release-state.outputs.unity-credentials }}
           MISSING: ${{ needs.release-state.outputs.unity-credentials-missing }}
-          HAS_CREDENTIALS: ${{ secrets.UNITY_LICENSE != '' && secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '' }}
+          HAS_CREDENTIALS: ${{ secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '' }}
           EVENT: ${{ github.event_name }}
           IS_FORK: ${{ github.event.pull_request.head.repo.fork || false }}
         run: |
@@ -307,7 +362,7 @@ jobs:
             const results = EDITOR.map((job) => [job, needs[job]?.result]);
             const has = process.env.HAS_CREDENTIALS === "true";
             const probe = process.env.PROBE;
-            const missing = process.env.MISSING || "UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD";
+            const missing = process.env.MISSING || "UNITY_EMAIL UNITY_PASSWORD";
             const onMain = process.env.EVENT === "push";
             const fork = process.env.IS_FORK === "true";
             const fs = require("node:fs");
@@ -328,11 +383,26 @@ jobs:
             if (has) {
               const bad = results.filter(([, result]) => result !== "success");
               if (bad.length > 0) {
-                const skipped = bad.filter(([, result]) => result === "skipped");
-                const title = skipped.length > 0
-                  ? "Contract failure: editor coverage was switched off while credentials exist"
-                  : "Contract failure: an editor lane did not pass";
-                console.error(`::error title=${title}::${bad.map(([j, r]) => `${j} is ${r}`).join("; ")}.`);
+                const detail = bad.map(([j, r]) => `${j} is ${r}`).join("; ");
+                // Only call it "switched off" when nothing actually failed. A lane
+                // skipped because the lane before it failed is a cascade, and a
+                // cancelled lane is almost always the single-seat queue dropping a
+                // pending job; blaming either on someone disabling coverage would
+                // send the reader to the wrong place.
+                if (bad.some(([, r]) => r === "cancelled")) {
+                  console.error(
+                    `::error title=Contract failure: an editor lane was cancelled::${detail}. ` +
+                      `The likeliest cause is the single-seat queue: this repository holds at most one ` +
+                      `Unity seat, and GitHub keeps only one pending job per concurrency group, so a third ` +
+                      `concurrent demand drops the one already waiting. Re-run the cancelled lane.`
+                  );
+                } else if (bad.some(([, r]) => r === "failure")) {
+                  console.error(`::error title=Contract failure: an editor lane did not pass::${detail}.`);
+                } else {
+                  console.error(
+                    `::error title=Contract failure: editor coverage was switched off while credentials exist::${detail}.`
+                  );
+                }
                 process.exit(1);
               }
               summary("## Coverage: FULL\n\nBoth Unity editor lanes ran and passed. This gate covers the release contract and the package tests.");
@@ -438,7 +508,6 @@ jobs:
       # to this rather than guessing; v2.8.0 is the newest canonical stable Release
       # in this repository at the time this lane landed.
       STABLE_BASELINE: "2.8.0"
-      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
@@ -549,32 +618,53 @@ jobs:
           git push --force origin "$CANDIDATE:refs/tags/edge"
           echo "diagnostics: ref=edge sha=$CANDIDATE semver=$V channel=edge unity=6000.3.16f1"
 
+      # One editor and one borrowed seat for this whole job, covering both the edge
+      # and the stable consumer smokes. The seat is returned by the action's post
+      # step, which runs even when this job fails.
+      - name: Set up Unity 6000.3.16f1 with WebGL support
+        uses: buildalon/unity-setup@30fcbcb56c10ea5d64298e970d952b8d29bc268b # v2.6.0
+        with:
+          unity-version: 6000.3.16f1
+          version-file: None
+          build-targets: WebGL
+
+      - name: Borrow a Unity seat
+        id: licence
+        uses: buildalon/activate-unity-license@e0d245d0787b7b9931b56ccbde3b508f6b70f1af # v2.2.2
+        with:
+          license: personal
+          username: ${{ secrets.UNITY_EMAIL }}
+          password: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Explain a licence failure
+        if: failure() && steps.licence.outcome == 'failure'
+        run: |
+          echo "::error title=PROVISIONING: could not borrow a Unity seat::Activation failed before the \
+          release could prove its consumers. The likeliest cause is that no Personal seat was free; this \
+          Unity account is shared with yes2games/nsr. Recovery: revoke the stale activation in Unity ID \
+          seat management and re-run. Nothing was tagged or published: the smokes run before any mutation \
+          that depends on them."
+
       - name: Build a clean edge consumer
         run: node 'ci~/make-consumer.mjs' .edge-consumer 'https://github.com/yes2games/yes2sdk-unity.git#edge'
 
       - name: Edge consumer package smoke
-        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        uses: buildalon/unity-action@2d420bea0f47fbe01377601fa3231bcf4de04f3a # v3.1.0
         with:
-          projectPath: .edge-consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
-          testMode: EditMode
-          artifactsPath: edge-test-results
+          project-path: .edge-consumer
+          log-name: edge-editmode
+          args: -batchmode -nographics -runTests -testPlatform EditMode -testResults ${{ github.workspace }}/edge-editmode.xml
 
       - name: Edge consumer resolved the exact candidate
         run: node 'ci~/verify-resolved-ref.mjs' .edge-consumer "$CANDIDATE"
 
       - name: Edge consumer WebGL integration smoke
-        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        uses: buildalon/unity-action@2d420bea0f47fbe01377601fa3231bcf4de04f3a # v3.1.0
         with:
-          projectPath: .edge-consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
-          targetPlatform: WebGL
-          buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
-          buildName: Yes2SDKEdgeSmoke
-          versioning: None
-          allowDirtyBuild: true
+          project-path: .edge-consumer
+          build-target: WebGL
+          log-name: edge-webgl-smoke
+          args: -quit -batchmode -nographics -executeMethod Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL -customBuildPath ${{ github.workspace }}/edge-webgl-smoke
 
       # Everything below finalizes the stable release, and runs only when the
       # merged Release Please PR advanced the source version past the newest
@@ -723,13 +813,11 @@ jobs:
 
       - name: Stable consumer package smoke
         if: steps.state.outputs.mode == 'stable'
-        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        uses: buildalon/unity-action@2d420bea0f47fbe01377601fa3231bcf4de04f3a # v3.1.0
         with:
-          projectPath: .stable-consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
-          testMode: EditMode
-          artifactsPath: stable-test-results
+          project-path: .stable-consumer
+          log-name: stable-editmode
+          args: -batchmode -nographics -runTests -testPlatform EditMode -testResults ${{ github.workspace }}/stable-editmode.xml
 
       - name: Stable consumer resolved the exact release commit
         if: steps.state.outputs.mode == 'stable'
@@ -737,16 +825,12 @@ jobs:
 
       - name: Stable consumer WebGL integration smoke
         if: steps.state.outputs.mode == 'stable'
-        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        uses: buildalon/unity-action@2d420bea0f47fbe01377601fa3231bcf4de04f3a # v3.1.0
         with:
-          projectPath: .stable-consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
-          targetPlatform: WebGL
-          buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
-          buildName: Yes2SDKStableSmoke
-          versioning: None
-          allowDirtyBuild: true
+          project-path: .stable-consumer
+          build-target: WebGL
+          log-name: stable-webgl-smoke
+          args: -quit -batchmode -nographics -executeMethod Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL -customBuildPath ${{ github.workspace }}/stable-webgl-smoke
 
       # A Release published with GITHUB_TOKEN fires no `release: published` event,
       # so consumers are woken explicitly. repository_dispatch is the documented
