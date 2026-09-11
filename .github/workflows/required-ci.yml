@@ -256,7 +256,7 @@ jobs:
       # preprocess callback, and BuildPipeline.BuildPlayer has to succeed and leave
       # a loader behind. Any of those failing exits the editor non-zero.
       - name: Real WebGL package smoke
-        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v6.0.0
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -627,7 +627,7 @@ jobs:
         run: node 'ci~/verify-resolved-ref.mjs' .edge-consumer "$CANDIDATE"
 
       - name: Edge consumer WebGL integration smoke
-        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v6.0.0
         with:
           projectPath: .edge-consumer
           unityVersion: 6000.3.16f1
@@ -799,7 +799,7 @@ jobs:
 
       - name: Stable consumer WebGL integration smoke
         if: steps.state.outputs.mode == 'stable'
-        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        uses: game-ci/unity-builder@eb1b9fba120c6e62c9fb7a7a81d6c107ce004c45 # v6.0.0
         with:
           projectPath: .stable-consumer
           unityVersion: 6000.3.16f1
