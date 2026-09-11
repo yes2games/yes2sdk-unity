@@ -19,10 +19,19 @@ The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string
 
 1. Open **Window > Package Manager**
 2. Click **+** > **Add package from git URL...**
-3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.8.0`
+3. Enter: `https://github.com/yes2games/yes2sdk-unity.git#v2.8.0` <!-- x-release-please-version -->
 4. Click **Add**
 
-> Pinning the URL with `#v2.8.0` keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
+> Pinning the URL with the release tag keeps the package hash stable across resolves. Bump the tag when a newer release ships. Without a tag, Package Manager re-resolves against `main` on every refresh and reports phantom diffs.
+
+### Channels
+
+```text
+integration: https://github.com/yes2games/yes2sdk-unity.git#edge
+production:  https://github.com/yes2games/yes2sdk-unity.git#vX.Y.Z
+```
+
+`edge` is a mutable Git tag that moves to the newest commit on `main` whose required CI went green, and it is a tag and nothing else — there is no GitHub Release and no prerelease behind it. Use it to integrate against unreleased work, never to ship. `vX.Y.Z` is an immutable tag and an immutable GitHub Release at the exact commit that was tested; that is the only thing a shipping game should resolve.
 
 ### Via Local Folder
 
@@ -476,15 +485,20 @@ For richer simulation (specific locales, network conditions, event log capture),
 
 The package ships EditMode tests covering the ad callback contract: callback order, and the in-flight teardown that keeps one bad ad from blocking every later one. They run on the instant flow, so they need no rendering and work in batch mode.
 
-To see them in a consuming project, add the package to `testables` in that project's `Packages/manifest.json`:
+To see them in a consuming project, add the package to `testables` in that project's `Packages/manifest.json`, and add the test framework there too — the package does not depend on it, because a shipping game has no reason to inherit test infrastructure:
 
 ```json
 {
+  "dependencies": {
+    "com.unity.test-framework": "1.4.6"
+  },
   "testables": [
     "com.yes2games.yes2sdk"
   ]
 }
 ```
+
+`ci~/consumer` is the committed minimal project that does exactly this, and it is what the required CI lanes run the tests through.
 
 They then appear under **Window > General > Test Runner > EditMode**. Headless:
 
@@ -551,6 +565,20 @@ Real games often ship with multiple platform SDKs in the same build (Yes2SDK + P
 - **One owner for ads.** Don't call ads via two SDKs in the same session — the platform almost always rejects the second call. Pick the SDK that targets the platform you're actually hosted on.
 - **Namespace collisions.** If you have your own `Platform` type, qualify the Yes2SDK enum (`Yes2SDK.Platform`) at the call site or use a `using` alias (`using Y2 = Yes2SDK;`). C# resolves namespace-vs-type ambiguity by full qualification.
 - **Init timeout.** If you depend on Yes2SDK init completing before your other SDK's flow, wrap `InitializeAsync` in a `CancellationToken` with a timeout (see [`await`-friendly overloads](#await-friendly-overloads)) so your game doesn't hang on a wedged JS bridge.
+
+---
+
+## Contributing
+
+After cloning, point Git at the committed hooks once:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-push` then refuses a direct push to the default branch, so changes go through a pull request and face `YES2 Unity Required CI`.
+
+**It is a soft guard, not enforcement.** It fires only in a clone that has run the command above, and `git push --no-verify` bypasses it outright. Nothing protects `main` server-side: this organization's plan and the deliberately uniform cross-SDK contract mean there is no branch protection, no ruleset and no CODEOWNERS gate on any Yes2 SDK (yes2games/yes2dashboard#141 sections 3 and 14). Read the checklist as "a mistake is caught", never as "`main` is protected".
 
 ---
 

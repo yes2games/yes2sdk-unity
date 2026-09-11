@@ -1,0 +1,575 @@
+name: YES2 Unity Required CI Workflow
+
+# The canonical required CI for this repository, and its only release authority
+# (yes2games/yes2sdk-unity#97, yes2games/yes2dashboard#141).
+#
+# `push: main` is not a second copy of the pull-request lanes. It is where the
+# release happens. The release job lives in this same workflow run, at this same
+# commit, behind an ordinary `needs:` edge on the final gate, so there is no run
+# to look up, no attempt to compare, and no window in which `main` can move
+# between the proof and the mutation (yes2games/yes2dashboard#141 section 5).
+# That is why the push trigger is mandatory and cannot be path-filtered.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A superseded pull-request run cancels; a push to `main` never does. Grouping
+# main runs by ref would let a newer push cancel a pending run, and a pending run
+# on main carries a release. Serialization of the mutation itself is on the
+# release job, which is the only thing that must not overlap.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-governance:
+    name: Workflow governance
+    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.x"
+
+      - name: Verify canonical workflow and final-gate identities
+        run: node 'ci~/verify-workflow-governance.mjs'
+
+  release-state:
+    name: Release state
+    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.x"
+
+      - name: Verify version authority, mirrors and the Release Please contract
+        run: node 'ci~/verify-release-state.mjs'
+
+  wrapper-parity:
+    name: Wrapper parity
+    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.x"
+
+      - name: Check wrapper method parity
+        run: node 'scripts~/check-wrapper-parity.mjs'
+
+  optimizer-anchors:
+    name: Optimizer anchors
+    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.x"
+
+      - name: Check optimizer docs anchors
+        run: node 'scripts~/check-optimizer-anchors.mjs'
+
+  # The compatibility matrix (#97 section 3). Both lanes run the package through
+  # ci~/consumer, the committed minimal project that installs this checkout over a
+  # local file dependency and owns the test framework, so the tests #70 built are
+  # consumed by the lanes rather than sitting unused beside them.
+  #
+  # The editor image is named explicitly rather than composed by the action from a
+  # default image-version suffix: only the `-3` variant exists for 6000.3.16f1, and
+  # a suffix the action picks is a dependency nothing in this file can see.
+  unity-floor:
+    name: Unity 2021.3.0f1 floor lane
+    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","heavy"]', vars.RUNNER_HOST) || '["ubuntu-latest"]') }}
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Free disk space for the Unity editor image
+        if: runner.environment == 'github-hosted'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Package resolve, compile and every package EditMode test
+        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ci~/consumer
+          unityVersion: 2021.3.0f1
+          customImage: unityci/editor:ubuntu-2021.3.0f1-webgl-3
+          testMode: EditMode
+          artifactsPath: floor-test-results
+
+  unity-current:
+    name: Unity 6000.3.16f1 current lane + WebGL smoke
+    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","heavy"]', vars.RUNNER_HOST) || '["ubuntu-latest"]') }}
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Free disk space for the Unity editor image
+        if: runner.environment == 'github-hosted'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Package resolve, compile and every package EditMode test
+        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ci~/consumer
+          unityVersion: 6000.3.16f1
+          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          testMode: EditMode
+          artifactsPath: current-test-results
+
+      # A real WebGL player, not a compile: the supported installer runs, the
+      # template it installs is verified, Yes2SDKBuildGuard evaluates it as a
+      # preprocess callback, and BuildPipeline.BuildPlayer has to succeed and leave
+      # a loader behind. Any of those failing exits the editor non-zero.
+      - name: Real WebGL package smoke
+        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ci~/consumer
+          unityVersion: 6000.3.16f1
+          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          targetPlatform: WebGL
+          buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
+          buildName: Yes2SDKSmoke
+          versioning: None
+          allowDirtyBuild: true
+
+  required-ci:
+    name: YES2 Unity Required CI
+    needs:
+      - workflow-governance
+      - release-state
+      - wrapper-parity
+      - optimizer-anchors
+      - unity-floor
+      - unity-current
+    if: always()
+    runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
+    timeout-minutes: 5
+    permissions: {}
+
+    steps:
+      - name: Assert every mandatory result is an exact success
+        env:
+          MANDATORY_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e '
+            const needs = JSON.parse(process.env.MANDATORY_RESULTS);
+            const entries = Object.entries(needs);
+            if (entries.length === 0) {
+              console.error("the final gate depends on no mandatory job");
+              process.exit(1);
+            }
+            for (const [job, outcome] of entries) {
+              console.log(`${outcome.result === "success" ? "ok  " : "FAIL"} ${job}: ${outcome.result}`);
+            }
+            const bad = entries.filter(([, outcome]) => outcome.result !== "success");
+            if (bad.length > 0) {
+              console.error(`${bad.length} of ${entries.length} mandatory results are not an exact success`);
+              process.exit(1);
+            }
+            console.log(`all ${entries.length} mandatory results succeeded`);
+          '
+
+  # The release. It runs only on a push to `main` whose final gate went green in
+  # THIS run, and that `needs:` edge is the whole of the proof-of-CI-at-the-
+  # release-commit requirement: same run, same commit, nothing to look up
+  # (yes2games/yes2dashboard#141 section 5).
+  #
+  # `R`, the stable candidate, is `github.sha`. Merge, squash and rebase all
+  # produce exactly one commit on `main` and that commit is what `github.sha`
+  # names, so there is nothing to enumerate and nothing to match (#97 section 9).
+  release:
+    name: Release
+    needs:
+      - required-ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.required-ci.result == 'success'
+    # One explicit runner class (#97 section 9, guard 1): a determinism check means
+    # nothing if the machine class underneath it is free to change. Deliberately
+    # NOT the shared self-hosted expression the Unity lanes use, so a mutation
+    # never queues behind somebody else's Unity build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    # Required, not optional (yes2games/yes2dashboard#141 section 13, item 3). The
+    # needs: edge orders CI before the tag inside one run; nothing orders two runs.
+    # Non-cancelling, because a cancelled release is a lost release. GitHub still
+    # keeps at most one pending entry per group, so three merges inside one release
+    # window can drop the middle one; two - the case the contract names - is safe.
+    concurrency:
+      group: yes2-unity-release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CANDIDATE: ${{ github.sha }}
+      # The known historical stable baseline (#97 section 7). Bootstrap reconciles
+      # to this rather than guessing; v2.8.0 is the newest canonical stable Release
+      # in this repository at the time this lane landed.
+      STABLE_BASELINE: "2.8.0"
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+    steps:
+      - name: Checkout the release commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.x"
+
+      - name: Free disk space for the Unity editor image
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      # Vsource == Vstable permits Release Please maintenance and nothing else.
+      # Vsource > Vstable means a stable finalization is pending for Vsource - the
+      # release PR has merged and this push is it. Vsource < Vstable is an
+      # invariant failure and fails closed (#97 section 7).
+      - name: Resolve release state
+        id: state
+        run: |
+          set -euo pipefail
+          VSOURCE=$(node -p "require('./package.json').version")
+
+          LATEST=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 \
+            --json tagName,isDraft,isPrerelease \
+            --jq '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V | tail -1 || true)
+          VSTABLE=${LATEST:-$STABLE_BASELINE}
+
+          newest() { printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1; }
+
+          if [ "$(newest "$VSTABLE" "$STABLE_BASELINE")" != "$VSTABLE" ]; then
+            echo "newest canonical stable $VSTABLE is older than the recorded baseline $STABLE_BASELINE; refusing to guess a baseline" >&2
+            exit 1
+          fi
+
+          if [ "$VSOURCE" = "$VSTABLE" ]; then
+            MODE=rp
+          elif [ "$(newest "$VSOURCE" "$VSTABLE")" = "$VSOURCE" ]; then
+            MODE=stable
+          else
+            echo "invariant failure: source version $VSOURCE is behind the newest canonical stable $VSTABLE" >&2
+            exit 1
+          fi
+
+          {
+            echo "vsource=$VSOURCE"
+            echo "vstable=$VSTABLE"
+            echo "mode=$MODE"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Vsource=$VSOURCE Vstable=$VSTABLE mode=$MODE candidate=$CANDIDATE"
+
+      # edge is a mutable Git tag and nothing else: no GitHub Release, no
+      # prerelease (#97 section 8). Absent, equal or an ancestor is allowed;
+      # divergence or regression fails closed.
+      - name: Move the edge tag to the candidate
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: |
+          set -euo pipefail
+          git fetch --force origin 'refs/tags/edge:refs/tags/edge' 2>/dev/null || true
+
+          if git rev-parse -q --verify 'refs/tags/edge^{commit}' >/dev/null; then
+            EDGE=$(git rev-parse 'refs/tags/edge^{commit}')
+            if [ "$EDGE" = "$CANDIDATE" ]; then
+              echo "edge already equals the candidate $CANDIDATE"
+            elif git merge-base --is-ancestor "$EDGE" "$CANDIDATE"; then
+              echo "edge $EDGE is an ancestor of the candidate $CANDIDATE"
+            else
+              echo "edge $EDGE is neither absent, equal, nor an ancestor of $CANDIDATE: divergence or regression, failing closed" >&2
+              exit 1
+            fi
+          else
+            echo "no edge tag yet; this push establishes it"
+          fi
+
+          git push --force origin "$CANDIDATE:refs/tags/edge"
+          echo "diagnostics: ref=edge sha=$CANDIDATE semver=$V channel=edge unity=6000.3.16f1"
+
+      - name: Build a clean edge consumer
+        run: node 'ci~/make-consumer.mjs' .edge-consumer 'https://github.com/yes2games/yes2sdk-unity.git#edge'
+
+      - name: Edge consumer package smoke
+        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        with:
+          projectPath: .edge-consumer
+          unityVersion: 6000.3.16f1
+          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          testMode: EditMode
+          artifactsPath: edge-test-results
+
+      - name: Edge consumer resolved the exact candidate
+        run: node 'ci~/verify-resolved-ref.mjs' .edge-consumer "$CANDIDATE"
+
+      - name: Edge consumer WebGL integration smoke
+        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        with:
+          projectPath: .edge-consumer
+          unityVersion: 6000.3.16f1
+          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          targetPlatform: WebGL
+          buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
+          buildName: Yes2SDKEdgeSmoke
+          versioning: None
+          allowDirtyBuild: true
+
+      # Everything below finalizes the immutable stable, and runs only when the
+      # merged Release Please PR advanced the source version past the newest
+      # canonical stable.
+      #
+      # This is also the CHANGELOG-section guard (#97 section 9, guard 2): a
+      # version bumped outside the Release Please PR has no section, and
+      # verify-release-state.mjs fails the job loudly instead of the release
+      # failing closed and silently the way yes2sdk-core v2.7.1 did.
+      - name: Verify the version mirrors and the CHANGELOG section at the release commit
+        if: steps.state.outputs.mode == 'stable'
+        run: node 'ci~/verify-release-state.mjs'
+
+      - name: Require the stable tag to be absent
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null 2>&1; then
+            echo "refs/tags/v$V already exists; an immutable stable is never rewritten, a content fix needs a new SemVer" >&2
+            exit 1
+          fi
+          echo "refs/tags/v$V is absent"
+
+      - name: Require release immutability to be enabled
+        if: steps.state.outputs.mode == 'stable'
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/$GITHUB_REPOSITORY/immutable-releases" --silent; then
+            echo "release immutability is not enabled on $GITHUB_REPOSITORY, or this token cannot read the setting." >&2
+            echo "yes2games/yes2dashboard#141 section 10 requires it before any canonical stable publication." >&2
+            exit 1
+          fi
+          echo "release immutability is enabled"
+
+      - name: Derive the release notes from the exact CHANGELOG section
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: |
+          set -euo pipefail
+          awk -v v="$V" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "the CHANGELOG section for $V is empty; refusing to publish an immutable release with no notes" >&2
+            exit 1
+          fi
+          echo "release notes: $(wc -l < release-notes.md) line(s)"
+
+      - name: Create the stable draft targeting the release commit
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: |
+          set -euo pipefail
+          gh release create "v$V" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --target "$CANDIDATE" \
+            --title "v$V" \
+            --notes-file release-notes.md
+
+      - name: Assert the tag stays absent while the release is unpublished
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null 2>&1; then
+            echo "the platform exposed refs/tags/v$V before the draft was published." >&2
+            echo "#97 section 10 says fail closed and re-specify rather than continue." >&2
+            exit 1
+          fi
+          echo "refs/tags/v$V is still absent while the release is a draft"
+
+      - name: Validate the draft
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: |
+          set -euo pipefail
+          gh release view "v$V" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft,isPrerelease,targetCommitish > draft.json
+          cat draft.json
+          node -e '
+            const draft = JSON.parse(require("node:fs").readFileSync("draft.json", "utf8"));
+            const want = { tagName: `v${process.env.V}`, isDraft: true, isPrerelease: false, targetCommitish: process.env.CANDIDATE };
+            const bad = Object.entries(want).filter(([key, value]) => draft[key] !== value);
+            if (bad.length > 0) {
+              for (const [key, value] of bad) {
+                console.error(`draft ${key} is ${JSON.stringify(draft[key])}, expected ${JSON.stringify(value)}`);
+              }
+              process.exit(1);
+            }
+            console.log("draft is valid and targets the release commit");
+          '
+
+      # Publish LAST. An immutable release cannot be edited afterwards, so every
+      # assertion above has to hold before this line, not after it.
+      - name: Publish the draft
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: gh release edit "v$V" --repo "$GITHUB_REPOSITORY" --draft=false
+
+      - name: Verify the published immutable stable
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: |
+          set -euo pipefail
+          TAG_SHA=$(git ls-remote origin "refs/tags/v$V^{}" | awk '{print $1}')
+          if [ -z "$TAG_SHA" ]; then
+            TAG_SHA=$(git ls-remote origin "refs/tags/v$V" | awk '{print $1}')
+          fi
+          if [ "$TAG_SHA" != "$CANDIDATE" ]; then
+            echo "refs/tags/v$V points at ${TAG_SHA:-nothing}, expected the release commit $CANDIDATE" >&2
+            exit 1
+          fi
+
+          gh release view "v$V" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft,isPrerelease,targetCommitish > published.json
+          cat published.json
+          node -e '
+            const release = JSON.parse(require("node:fs").readFileSync("published.json", "utf8"));
+            const want = { tagName: `v${process.env.V}`, isDraft: false, isPrerelease: false, targetCommitish: process.env.CANDIDATE };
+            const bad = Object.entries(want).filter(([key, value]) => release[key] !== value);
+            if (bad.length > 0) {
+              for (const [key, value] of bad) {
+                console.error(`published release ${key} is ${JSON.stringify(release[key])}, expected ${JSON.stringify(value)}`);
+              }
+              process.exit(1);
+            }
+          '
+
+          gh release verify "v$V" --repo "$GITHUB_REPOSITORY"
+          echo "diagnostics: ref=v$V sha=$CANDIDATE semver=$V channel=stable unity=6000.3.16f1"
+
+      - name: Build a clean exact-tag consumer
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: node 'ci~/make-consumer.mjs' .stable-consumer "https://github.com/yes2games/yes2sdk-unity.git#v$V"
+
+      - name: Stable consumer package smoke
+        if: steps.state.outputs.mode == 'stable'
+        uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
+        with:
+          projectPath: .stable-consumer
+          unityVersion: 6000.3.16f1
+          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          testMode: EditMode
+          artifactsPath: stable-test-results
+
+      - name: Stable consumer resolved the exact release commit
+        if: steps.state.outputs.mode == 'stable'
+        run: node 'ci~/verify-resolved-ref.mjs' .stable-consumer "$CANDIDATE"
+
+      - name: Stable consumer WebGL integration smoke
+        if: steps.state.outputs.mode == 'stable'
+        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        with:
+          projectPath: .stable-consumer
+          unityVersion: 6000.3.16f1
+          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          targetPlatform: WebGL
+          buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
+          buildName: Yes2SDKStableSmoke
+          versioning: None
+          allowDirtyBuild: true
+
+      # A Release published with GITHUB_TOKEN fires no `release: published` event,
+      # so consumers are woken explicitly. repository_dispatch is the documented
+      # exception to the GITHUB_TOKEN recursion rule and does start a run
+      # (#97 section 10, yes2games/yes2dashboard#141 section 4).
+      - name: Wake stable consumers explicitly
+        if: steps.state.outputs.mode == 'stable'
+        env:
+          V: ${{ steps.state.outputs.vsource }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/dispatches" \
+            -f "event_type=stable-released" \
+            -f "client_payload[tag]=v$V"
+
+      # Release Please maintenance runs only when there is nothing to finalize.
+      # The App token exists for one reason and no other: a pull request opened
+      # with GITHUB_TOKEN fires no `pull_request` event, so the release PR would
+      # face no gate at all (yes2games/yes2dashboard#141 section 4). Everything
+      # after the merge uses the workflow's own GITHUB_TOKEN.
+      - name: Mint the Butler App token
+        id: app-token
+        if: steps.state.outputs.mode == 'rp'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BUTLER_APP_ID }}
+          private-key: ${{ secrets.BUTLER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-metadata: read
+
+      - name: Release Please maintenance
+        if: steps.state.outputs.mode == 'rp'
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "com.yes2games.yes2sdk": "file:../../..",
+    "com.unity.test-framework": "1.4.6"
+  },
+  "testables": [
+    "com.yes2games.yes2sdk"
+  ]
+}

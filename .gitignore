@@ -189,3 +189,26 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+### Yes2SDK CI ###
+# The Linux `*~` rule above swallows the tilde-suffixed folders Unity uses to
+# keep CI material out of a consuming project's asset database. Keep them.
+!/ci~/
+!/scripts~/
+
+# Clean UPM consumers the release job generates to prove edge and stable
+# (ci~/make-consumer.mjs), and the Unity state the CI consumer accumulates.
+/.edge-consumer/
+/.stable-consumer/
+/ci~/consumer/[Ll]ibrary/
+/ci~/consumer/[Ll]ogs/
+/ci~/consumer/[Tt]emp/
+/ci~/consumer/[Bb]uild/
+/ci~/consumer/[Uu]ser[Ss]ettings/
+/ci~/consumer/Assets/WebGLTemplates/
+/ci~/consumer/Assets/Smoke/Smoke.unity
+
+# Unity regenerates these on every lane; only ProjectVersion.txt is committed.
+/ci~/consumer/**/*.meta
+/ci~/consumer/ProjectSettings/*
+!/ci~/consumer/ProjectSettings/ProjectVersion.txt
