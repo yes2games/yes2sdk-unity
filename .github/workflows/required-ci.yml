@@ -57,6 +57,9 @@ jobs:
     name: Release state
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    outputs:
+      unity-credentials: ${{ steps.credentials.outputs.present }}
+      unity-credentials-missing: ${{ steps.credentials.outputs.missing }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -74,6 +77,39 @@ jobs:
       # result list at six names, and a guard nobody has seen fail is not a guard.
       - name: Verify the pre-push hook refuses only the default branch
         run: node 'ci~/verify-pre-push-hook.mjs'
+
+      # Whether this run can drive a Unity editor at all. The probe lives here
+      # rather than in a job of its own because #97 section 4 fixes the mandatory
+      # result list at six names, and a seventh job would change that list.
+      #
+      # It must be a step: the `secrets` context is not available in a job-level
+      # `if:`, so a conditional editor lane can only read this through a job
+      # output. The expressions below compare each secret to the empty string and
+      # emit only the resulting boolean, so no secret value is ever materialised
+      # into the environment, the log or the output.
+      - name: Probe for Unity credentials
+        id: credentials
+        env:
+          HAS_LICENSE: ${{ secrets.UNITY_LICENSE != '' }}
+          HAS_EMAIL: ${{ secrets.UNITY_EMAIL != '' }}
+          HAS_PASSWORD: ${{ secrets.UNITY_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ "$HAS_LICENSE" = "true" ]  || missing="$missing UNITY_LICENSE"
+          [ "$HAS_EMAIL" = "true" ]    || missing="$missing UNITY_EMAIL"
+          [ "$HAS_PASSWORD" = "true" ] || missing="$missing UNITY_PASSWORD"
+          missing="${missing# }"
+
+          if [ -z "$missing" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "missing=" >> "$GITHUB_OUTPUT"
+            echo "Unity credentials are present; the editor lanes will run."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "missing=$missing" >> "$GITHUB_OUTPUT"
+            echo "Unity credentials are absent: $missing"
+          fi
 
   wrapper-parity:
     name: Wrapper parity
@@ -117,6 +153,11 @@ jobs:
   # a suffix the action picks is a dependency nothing in this file can see.
   unity-floor:
     name: Unity 2021.3.0f1 floor lane
+    # Skipped, never faked, when this run cannot drive an editor. A lane that
+    # exits 0 without starting Unity would be a green that means "we skipped the
+    # hard part"; a skipped lane renders grey and claims nothing.
+    needs: [release-state]
+    if: needs.release-state.outputs.unity-credentials == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -146,6 +187,11 @@ jobs:
 
   unity-current:
     name: Unity 6000.3.16f1 current lane + WebGL smoke
+    # Skipped, never faked, when this run cannot drive an editor. A lane that
+    # exits 0 without starting Unity would be a green that means "we skipped the
+    # hard part"; a skipped lane renders grey and claims nothing.
+    needs: [release-state]
+    if: needs.release-state.outputs.unity-credentials == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -208,26 +254,143 @@ jobs:
     permissions: {}
 
     steps:
-      - name: Assert every mandatory result is an exact success
+      # Step one is the release contract. These four never get an exception: no
+      # credential state, no event, no fork makes a contract assertion optional.
+      - name: Assert every release-contract result is an exact success
         env:
-          MANDATORY_RESULTS: ${{ toJSON(needs) }}
+          CONTRACT_RESULTS: ${{ toJSON(needs) }}
         run: |
           node -e '
-            const needs = JSON.parse(process.env.MANDATORY_RESULTS);
-            const entries = Object.entries(needs);
-            if (entries.length === 0) {
-              console.error("the final gate depends on no mandatory job");
+            const CONTRACT = ["workflow-governance", "release-state", "wrapper-parity", "optimizer-anchors"];
+            const needs = JSON.parse(process.env.CONTRACT_RESULTS);
+            const entries = CONTRACT.map((job) => [job, needs[job]?.result]);
+            const missing = entries.filter(([, result]) => result === undefined).map(([job]) => job);
+            if (missing.length > 0) {
+              console.error(`::error title=Contract failure::the final gate does not depend on ${missing.join(", ")}`);
               process.exit(1);
             }
-            for (const [job, outcome] of entries) {
-              console.log(`${outcome.result === "success" ? "ok  " : "FAIL"} ${job}: ${outcome.result}`);
+            for (const [job, result] of entries) {
+              console.log(`${result === "success" ? "ok  " : "FAIL"} ${job}: ${result}`);
             }
-            const bad = entries.filter(([, outcome]) => outcome.result !== "success");
+            const bad = entries.filter(([, result]) => result !== "success");
             if (bad.length > 0) {
-              console.error(`${bad.length} of ${entries.length} mandatory results are not an exact success`);
+              console.error(
+                `::error title=Contract failure: a release-contract assertion did not pass::` +
+                  `${bad.map(([job, result]) => `${job} is ${result}`).join("; ")}. ` +
+                  `This is the repository failing its own contract, not a provisioning problem.`
+              );
               process.exit(1);
             }
-            console.log(`all ${entries.length} mandatory results succeeded`);
+            console.log(`all ${entries.length} release-contract results succeeded`);
+          '
+
+      # Step two is editor coverage, kept separate and named for provisioning so a
+      # missing credential and a broken contract can never look alike. It runs even
+      # when step one failed, so one run reports both verdicts.
+      #
+      # The credential state is re-read here from the secrets themselves rather
+      # than trusted from the probe's output, so "credentials exist but a lane was
+      # skipped" - coverage quietly switched off - is a failure rather than a pass.
+      - name: Assert Unity editor coverage
+        if: always()
+        env:
+          ALL_RESULTS: ${{ toJSON(needs) }}
+          PROBE: ${{ needs.release-state.outputs.unity-credentials }}
+          MISSING: ${{ needs.release-state.outputs.unity-credentials-missing }}
+          HAS_CREDENTIALS: ${{ secrets.UNITY_LICENSE != '' && secrets.UNITY_EMAIL != '' && secrets.UNITY_PASSWORD != '' }}
+          EVENT: ${{ github.event_name }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork || false }}
+        run: |
+          node -e '
+            const EDITOR = ["unity-floor", "unity-current"];
+            const needs = JSON.parse(process.env.ALL_RESULTS);
+            const results = EDITOR.map((job) => [job, needs[job]?.result]);
+            const has = process.env.HAS_CREDENTIALS === "true";
+            const probe = process.env.PROBE;
+            const missing = process.env.MISSING || "UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD";
+            const onMain = process.env.EVENT === "push";
+            const fork = process.env.IS_FORK === "true";
+            const fs = require("node:fs");
+            const summary = (text) => {
+              if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + "\n");
+            };
+
+            for (const [job, result] of results) console.log(`${job}: ${result}`);
+
+            if (has !== (probe === "true")) {
+              console.error(
+                `::error title=Contract failure: the credential probe disagrees with the secrets::` +
+                  `probe reported ${probe} but this job reads ${has}.`
+              );
+              process.exit(1);
+            }
+
+            if (has) {
+              const bad = results.filter(([, result]) => result !== "success");
+              if (bad.length > 0) {
+                const skipped = bad.filter(([, result]) => result === "skipped");
+                const title = skipped.length > 0
+                  ? "Contract failure: editor coverage was switched off while credentials exist"
+                  : "Contract failure: an editor lane did not pass";
+                console.error(`::error title=${title}::${bad.map(([j, r]) => `${j} is ${r}`).join("; ")}.`);
+                process.exit(1);
+              }
+              summary("## Coverage: FULL\n\nBoth Unity editor lanes ran and passed. This gate covers the release contract and the package tests.");
+              console.log("editor coverage is complete");
+              process.exit(0);
+            }
+
+            // No credentials. The lanes must be exactly skipped - a failure here
+            // would mean something other than provisioning went wrong.
+            const notSkipped = results.filter(([, result]) => result !== "skipped");
+            if (notSkipped.length > 0) {
+              console.error(
+                `::error title=Contract failure: an editor lane did not skip cleanly without credentials::` +
+                  `${notSkipped.map(([j, r]) => `${j} is ${r}`).join("; ")}.`
+              );
+              process.exit(1);
+            }
+
+            const secrets = missing.split(/\s+/).filter(Boolean).join(", ");
+            const forkNote = fork
+              ? " This is a pull request from a fork, and a fork never receives repository secrets on a public repository. " +
+                "Nothing is wrong with this contribution and nothing about it needs changing: the editor lanes cannot run here by design."
+              : "";
+
+            if (onMain) {
+              const message =
+                `PROVISIONING, NOT A CONTRACT FAILURE. The Unity editor lanes did not run because ` +
+                `${secrets} ${missing.split(/\s+/).filter(Boolean).length === 1 ? "is" : "are"} not set on this repository. ` +
+                `Every release-contract assertion passed. Add ${secrets} as repository secrets and re-run; ` +
+                `no change to this branch is needed. main is held red deliberately: this gate is one name making one ` +
+                `claim, and it will not assert coverage that did not happen.`;
+              console.error(`::error title=PROVISIONING: Unity credentials missing on this repository::${message}`);
+              summary(
+                `## Coverage: PARTIAL - editor lanes did not run\n\n` +
+                  `**This is a provisioning failure, not a contract failure.**\n\n` +
+                  `Missing repository secrets: \`${secrets}\`\n\n` +
+                  `The release contract passed in full. The package tests and the WebGL smoke did not run at all, ` +
+                  `and this gate does not claim they did. Add the secrets above and re-run.`
+              );
+              process.exit(1);
+            }
+
+            console.log(
+              `::warning title=PROVISIONING: Unity editor lanes did not run::` +
+                `${secrets} ${missing.split(/\s+/).filter(Boolean).length === 1 ? "is" : "are"} not set, so the editor lanes were skipped.` +
+                `${forkNote} This gate covers the release contract only and does not claim package-test coverage.`
+            );
+            summary(
+              `## Coverage: PARTIAL - editor lanes did not run\n\n` +
+                `Missing repository secrets: \`${secrets}\`\n\n` +
+                `**What this gate checked:** the release contract - required-CI identity and governance, ` +
+                `release-state and version mirrors, the CHANGELOG guard, the pre-push hook, wrapper parity, ` +
+                `optimizer anchors.\n\n` +
+                `**What it did not check:** package resolve and compile, every package EditMode test, and the ` +
+                `real WebGL smoke. Those need a Unity editor.${fork ? "\n\nThis is a fork pull request. A fork never receives repository secrets on a public repository, so this outcome is expected and is not a defect in the contribution." : ""}\n\n` +
+                `A push to \`main\` in this state fails the gate deliberately.`
+            );
+            console.log("release contract proven; editor coverage not run");
           '
 
   # The release. It runs only on a push to `main` whose final gate went green in
@@ -242,7 +405,17 @@ jobs:
     name: Release
     needs:
       - required-ci
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.required-ci.result == 'success'
+      - release-state
+    # The gate already fails on `main` when the editor lanes could not run, so
+    # this condition is defence in depth rather than the primary guard. It is here
+    # because the mutation path should state its own precondition: nothing tags,
+    # moves edge or publishes off a run that could not drive a Unity editor, and
+    # therefore could not run the consumer smokes that prove what it released.
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.required-ci.result == 'success'
+      && needs.release-state.outputs.unity-credentials == 'true'
     # One explicit runner class (#97 section 9, guard 1): a determinism check means
     # nothing if the machine class underneath it is free to change, so the class
     # is named outright and cannot move without a commit that says so.
