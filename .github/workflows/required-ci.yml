@@ -190,7 +190,12 @@ jobs:
         uses: buildalon/unity-setup@30fcbcb56c10ea5d64298e970d952b8d29bc268b # v2.6.0
         with:
           unity-version: 2021.3.0f1
-          version-file: ci~/consumer/ProjectSettings/ProjectVersion.txt
+          # The editor version is pinned by the #97 section 3 compatibility matrix,
+          # not by the scratch project. unity-setup validates the version file
+          # before applying the unity-version override and requires a changeset in
+          # it, and the current lane has to override the file regardless, so the
+          # file is a liability in both lanes rather than a source of truth.
+          version-file: None
 
       - name: Borrow a Unity seat
         id: licence
@@ -250,7 +255,7 @@ jobs:
         uses: buildalon/unity-setup@30fcbcb56c10ea5d64298e970d952b8d29bc268b # v2.6.0
         with:
           unity-version: 6000.3.16f1
-          version-file: ci~/consumer/ProjectSettings/ProjectVersion.txt
+          version-file: None
           build-targets: WebGL
 
       - name: Borrow a Unity seat
