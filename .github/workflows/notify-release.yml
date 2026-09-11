@@ -8,10 +8,6 @@ name: Notify Google Chat on Release
 # documented exception to the GITHUB_TOKEN recursion rule. The `release` trigger
 # stays for a release published by a person through the UI. Neither path is
 # allowed to be the only one (yes2games/yes2dashboard#141 section 4).
-#
-# The work is one Node script rather than gh piped through jq: this
-# organization's runners are self-hosted and supply neither, and a read-only
-# notifier is not a good reason to install a toolchain onto a shared host.
 
 on:
   release:
@@ -28,18 +24,85 @@ jobs:
     runs-on: ${{ fromJson(vars.RUNNER_HOST && format('["self-hosted","{0}","light"]', vars.RUNNER_HOST) || '["ubuntu-24.04"]') }}
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: "22.x"
-
-      - name: Announce the published stable release
+      - name: Resolve the released tag
+        id: release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_TAG: ${{ github.event.release.tag_name }}
           DISPATCH_TAG: ${{ github.event.client_payload.tag }}
-        run: node 'ci~/notify-release.mjs' "${EVENT_TAG:-${DISPATCH_TAG:-}}"
+        run: |
+          set -euo pipefail
+          TAG="${EVENT_TAG:-${DISPATCH_TAG:-}}"
+          if [ -z "$TAG" ]; then
+            echo "neither the release event nor the dispatch payload carried a tag" >&2
+            exit 1
+          fi
+
+          # Read the release back from the API rather than trusting the payload,
+          # so both triggers reach the same fields by the same path.
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,name,url,author,body,isDraft,isPrerelease > release.json
+
+          if [ "$(jq -r '.isDraft' release.json)" != "false" ] || \
+             [ "$(jq -r '.isPrerelease' release.json)" != "false" ]; then
+            echo "$TAG is a draft or a prerelease; this notifier is published-stable-only"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Send Google Chat notification
+        if: steps.release.outputs.skip == 'false'
+        env:
+          WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          TAG=$(jq -r '.tagName' release.json)
+          NAME=$(jq -r '.name // ""' release.json)
+          URL=$(jq -r '.url' release.json)
+          AUTHOR=$(jq -r '.author.login // "unknown"' release.json)
+          BODY=$(jq -r '.body // ""' release.json)
+
+          BODY_TRUNC=$(printf '%s' "${BODY:-_(no release notes)_}" | head -c 1500)
+          DISPLAY_NAME="${NAME:-$TAG}"
+
+          jq -n \
+            --arg repo       "$REPO" \
+            --arg tag        "$TAG" \
+            --arg name       "$DISPLAY_NAME" \
+            --arg url        "$URL" \
+            --arg author     "$AUTHOR" \
+            --arg body       "$BODY_TRUNC" \
+            --arg status     "Stable Release" \
+            '{
+              cardsV2: [{
+                cardId: "release-card",
+                card: {
+                  header: {
+                    title: ("New Release " + $tag),
+                    subtitle: $repo,
+                    imageUrl: "https://github.githubassets.com/favicons/favicon.png",
+                    imageType: "CIRCLE"
+                  },
+                  sections: [{
+                    widgets: [
+                      { decoratedText: { topLabel: "Release",  text: $name } },
+                      { decoratedText: { topLabel: "Status",   text: $status } },
+                      { decoratedText: { topLabel: "Author",   text: $author } },
+                      { textParagraph:  { text: $body } },
+                      { buttonList: { buttons: [
+                        { text: "View on GitHub",
+                          onClick: { openLink: { url: $url } } }
+                      ] } }
+                    ]
+                  }]
+                }
+              }]
+            }' \
+            | curl -sS --fail-with-body \
+                -X POST \
+                -H "Content-Type: application/json; charset=UTF-8" \
+                --data-binary @- \
+                "$WEBHOOK_URL"
