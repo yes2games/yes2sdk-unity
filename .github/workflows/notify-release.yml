@@ -21,7 +21,7 @@ permissions:
 jobs:
   notify:
     name: Notify Google Chat
-    runs-on: [self-hosted, pavg15, light]
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Resolve the released tag
