@@ -334,18 +334,43 @@ namespace Yes2SDK.Editor
             if (EditorGUI.EndChangeCheck())
                 PlayerSettings.WebGL.exceptionSupport = newException;
 
-            // Initial Memory Size
+            // Memory Size
+            //
+            // PlayerSettings.WebGL.initialMemorySize does not exist before Unity
+            // 2022.1, which is where Unity split the single WebGL heap size into an
+            // initial size plus growth settings (maximumMemorySize, memoryGrowthMode
+            // and the growth steps). Below that the equivalent is memorySize.
+            //
+            // It is not a pure rename, and the tooltip differs because of it: on
+            // 2021.3 the value is the whole heap, fixed for the life of the player;
+            // from 2022.1 it is only where a growable heap starts. The number the
+            // developer types means something different on each side of the guard,
+            // so saying "initial" on 2021.3 would be wrong.
             EditorGUI.BeginChangeCheck();
+#if UNITY_2022_1_OR_NEWER
+            int currentMemory = PlayerSettings.WebGL.initialMemorySize;
+            const string memoryTooltip =
+                "Initial WebAssembly heap size; it grows from here. Most games need 256–512+ MB. Too small triggers a generic 'unspecified error' at boot when Unity can't allocate the heap.";
+#else
+            int currentMemory = PlayerSettings.WebGL.memorySize;
+            const string memoryTooltip =
+                "WebAssembly heap size for the whole run. Most games need 256–512+ MB. Too small triggers a generic 'unspecified error' at boot when Unity can't allocate the heap.";
+#endif
             int newMemory = EditorGUILayout.IntField(
-                new GUIContent("Memory Size (MB)",
-                    "Initial WebAssembly heap size. Most games need 256–512+ MB. Too small triggers a generic 'unspecified error' at boot when Unity can't allocate the heap."),
-                PlayerSettings.WebGL.initialMemorySize);
+                new GUIContent("Memory Size (MB)", memoryTooltip),
+                currentMemory);
             if (EditorGUI.EndChangeCheck())
+            {
                 // Floor at 32 MB — Unity's empty-project default and a
                 // practical minimum for any real game. Lower values often
                 // trigger "unspecified error" at boot before Unity can even
                 // log a useful failure.
+#if UNITY_2022_1_OR_NEWER
                 PlayerSettings.WebGL.initialMemorySize = Mathf.Max(32, newMemory);
+#else
+                PlayerSettings.WebGL.memorySize = Mathf.Max(32, newMemory);
+#endif
+            }
 
             EditorGUILayout.Space(6);
 
