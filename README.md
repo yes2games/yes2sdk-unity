@@ -31,7 +31,7 @@ integration: https://github.com/yes2games/yes2sdk-unity.git#edge
 production:  https://github.com/yes2games/yes2sdk-unity.git#vX.Y.Z
 ```
 
-`edge` is a mutable Git tag that moves to the newest commit on `main` whose required CI went green, and it is a tag and nothing else — there is no GitHub Release and no prerelease behind it. Use it to integrate against unreleased work, never to ship. `vX.Y.Z` is an immutable tag and an immutable GitHub Release at the exact commit that was tested; that is the only thing a shipping game should resolve.
+`edge` is a mutable Git tag that moves to the newest commit on `main` whose required CI went green, and it is a tag and nothing else — there is no GitHub Release and no prerelease behind it. Use it to integrate against unreleased work, never to ship. `vX.Y.Z` is a tag and a GitHub Release at the exact commit that was tested, and it is never rewritten — a content fix ships as a new SemVer rather than as a moved tag. That is the only thing a shipping game should resolve.
 
 ### Via Local Folder
 
