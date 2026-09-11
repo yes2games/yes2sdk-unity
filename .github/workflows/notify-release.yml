@@ -1,32 +1,72 @@
 name: Notify Google Chat on Release
 
+# Published stable releases only, and read-only (#97 section 11).
+#
+# The repository_dispatch trigger is not a convenience. A Release published with
+# the workflow's own GITHUB_TOKEN fires no `release: published` event, so the
+# release job wakes this workflow explicitly; repository_dispatch is the
+# documented exception to the GITHUB_TOKEN recursion rule. The `release` trigger
+# stays for a release published by a person through the UI. Neither path is
+# allowed to be the only one (yes2games/yes2dashboard#141 section 4).
+
 on:
   release:
     types: [published]
+  repository_dispatch:
+    types: [stable-released]
+
+permissions:
+  contents: read
 
 jobs:
   notify:
-    runs-on: ubuntu-latest
+    name: Notify Google Chat
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
+      - name: Resolve the released tag
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${EVENT_TAG:-${DISPATCH_TAG:-}}"
+          if [ -z "$TAG" ]; then
+            echo "neither the release event nor the dispatch payload carried a tag" >&2
+            exit 1
+          fi
+
+          # Read the release back from the API rather than trusting the payload,
+          # so both triggers reach the same fields by the same path.
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,name,url,author,body,isDraft,isPrerelease > release.json
+
+          if [ "$(jq -r '.isDraft' release.json)" != "false" ] || \
+             [ "$(jq -r '.isPrerelease' release.json)" != "false" ]; then
+            echo "$TAG is a draft or a prerelease; this notifier is published-stable-only"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
       - name: Send Google Chat notification
+        if: steps.release.outputs.skip == 'false'
         env:
           WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
           REPO: ${{ github.repository }}
-          TAG: ${{ github.event.release.tag_name }}
-          NAME: ${{ github.event.release.name }}
-          URL: ${{ github.event.release.html_url }}
-          AUTHOR: ${{ github.event.release.author.login }}
-          BODY: ${{ github.event.release.body }}
-          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           set -euo pipefail
 
+          TAG=$(jq -r '.tagName' release.json)
+          NAME=$(jq -r '.name // ""' release.json)
+          URL=$(jq -r '.url' release.json)
+          AUTHOR=$(jq -r '.author.login // "unknown"' release.json)
+          BODY=$(jq -r '.body // ""' release.json)
+
           BODY_TRUNC=$(printf '%s' "${BODY:-_(no release notes)_}" | head -c 1500)
           DISPLAY_NAME="${NAME:-$TAG}"
-          STATUS_LABEL="Stable Release"
-          if [ "$PRERELEASE" = "true" ]; then
-            STATUS_LABEL="Pre-release"
-          fi
 
           jq -n \
             --arg repo       "$REPO" \
@@ -35,7 +75,7 @@ jobs:
             --arg url        "$URL" \
             --arg author     "$AUTHOR" \
             --arg body       "$BODY_TRUNC" \
-            --arg status     "$STATUS_LABEL" \
+            --arg status     "Stable Release" \
             '{
               cardsV2: [{
                 cardId: "release-card",
