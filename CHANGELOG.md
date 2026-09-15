@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1](https://github.com/yes2games/yes2sdk-unity/compare/v2.8.0...v2.8.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* compile on the declared Unity 2021.3 floor, and drop the test-framework runtime dependency ([8180818](https://github.com/yes2games/yes2sdk-unity/commit/818081854a05200c29a997f5fecd372e81639132))
+* **editor:** compile on the declared Unity 2021.3 floor ([e7dbddc](https://github.com/yes2games/yes2sdk-unity/commit/e7dbddc47cf0754e818588e4736e460436a106ba)), closes [#97](https://github.com/yes2games/yes2sdk-unity/issues/97)
+* **package:** stop declaring com.unity.test-framework as a runtime dependency ([7fe4ff9](https://github.com/yes2games/yes2sdk-unity/commit/7fe4ff923f1506cff95f30a8661b5a2d73f3629f)), closes [#97](https://github.com/yes2games/yes2sdk-unity/issues/97)
+
 ## [2.8.0] - 2026-08-24
 
 ### Added
