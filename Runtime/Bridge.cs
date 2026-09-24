@@ -111,11 +111,16 @@ namespace Yes2SDK
             // Friends
             ["OnListFriendsSuccess"] = Yes2SDKFriends.InvokeListFriendsSuccess,
 
-            // IAP
-            ["OnGetCatalogSuccess"] = Yes2SDKIAP.InvokeGetCatalogSuccess,
-            ["OnPurchaseSuccess"] = Yes2SDKIAP.InvokePurchaseSuccess,
-            ["OnGetPurchasesSuccess"] = Yes2SDKIAP.InvokeGetPurchasesSuccess,
-            ["OnConsumePurchaseSuccess"] = _ => Yes2SDKIAP.InvokeConsumePurchaseSuccess(),
+            // IAP. Messages carry a request id, so errors are unwrapped here too
+            // rather than in _errorHandlers, which would parse the id as JSON.
+            ["OnGetCatalogSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.GetCatalog, data),
+            ["OnPurchaseSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.Purchase, data),
+            ["OnGetPurchasesSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.GetPurchases, data),
+            ["OnConsumePurchaseSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.ConsumePurchase, data),
+            ["OnGetCatalogError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.GetCatalog, data, ParseError),
+            ["OnPurchaseError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.Purchase, data, ParseError),
+            ["OnGetPurchasesError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.GetPurchases, data, ParseError),
+            ["OnConsumePurchaseError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.ConsumePurchase, data, ParseError),
 
             // Data (async durable saves)
             ["OnDataSetStringSuccess"] = Yes2SDKData.InvokeSetStringAsyncSuccess,
@@ -186,12 +191,6 @@ namespace Yes2SDK
 
             // Friends
             ["OnListFriendsError"] = Yes2SDKFriends.InvokeListFriendsError,
-
-            // IAP
-            ["OnGetCatalogError"] = Yes2SDKIAP.InvokeGetCatalogError,
-            ["OnPurchaseError"] = Yes2SDKIAP.InvokePurchaseError,
-            ["OnGetPurchasesError"] = Yes2SDKIAP.InvokeGetPurchasesError,
-            ["OnConsumePurchaseError"] = Yes2SDKIAP.InvokeConsumePurchaseError,
 
             // Data (async durable saves)
             ["OnDataSetStringError"] = Yes2SDKData.InvokeSetStringAsyncError,
@@ -377,7 +376,7 @@ namespace Yes2SDK
 
         #region Utility
 
-        private static Error ParseError(string errorJson)
+        internal static Error ParseError(string errorJson)
         {
             if (string.IsNullOrEmpty(errorJson))
             {

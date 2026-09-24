@@ -46,6 +46,7 @@ namespace Yes2SDK
         private string _placement;
         private float _canCloseAt;
 
+        private int _purchaseRequestId;
         private string _productId;
         private string _productTitle;
         private string _productPrice;
@@ -110,13 +111,14 @@ namespace Yes2SDK
         }
 
         /// <summary>Show the purchase dialog. Returns false if another popup is open.</summary>
-        internal static bool ShowPurchase(string productId, string developerPayload)
+        internal static bool ShowPurchase(int requestId, string productId, string developerPayload)
         {
             var overlay = GetOrCreate();
             if (overlay._kind != Kind.None) return false;
 
             var product = Yes2SDKMockIAP.FindProduct(productId);
             overlay._kind = Kind.Purchase;
+            overlay._purchaseRequestId = requestId;
             overlay._productId = productId;
             overlay._productTitle = product?.Title ?? productId;
             overlay._productPrice = product?.Price ?? "$0.99 (mock price)";
@@ -188,17 +190,19 @@ namespace Yes2SDK
 
         private void CompletePurchase(bool confirmed)
         {
+            int requestId = _purchaseRequestId;
             string productId = _productId;
             string payload = _developerPayload;
             Hide();
 
             if (confirmed)
             {
-                Yes2SDKIAP.InvokePurchaseSuccess(Yes2SDKMockIAP.RecordPurchase(productId, payload));
+                Yes2SDKIAP.CompleteSuccess(Yes2SDKIAP.Operation.Purchase, requestId,
+                    Yes2SDKMockIAP.RecordPurchase(productId, payload));
             }
             else
             {
-                Yes2SDKIAP.InvokePurchaseError(new Error
+                Yes2SDKIAP.CompleteError(Yes2SDKIAP.Operation.Purchase, requestId, new Error
                 {
                     Code = "UserCancelled",
                     Message = "Purchase cancelled by user (mock)",
