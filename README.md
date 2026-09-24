@@ -272,7 +272,7 @@ Yes2SDK.Data.FlushAsync(onSuccess: saved => Debug.Log($"Flushed: {saved}"));
 bool ok = await Yes2SDK.Data.FlushAsync(CancellationToken.None);
 ```
 
-In the Editor both complete immediately with `true` (`PlayerPrefs` is saved on the spot). Wait for one confirmed call to finish before starting the next: overlapping `SetStringAsync` or `FlushAsync` calls can currently report to the wrong callback.
+In the Editor both complete immediately with `true` (`PlayerPrefs` is saved on the spot). Overlapping calls are fine: each one reports its own result.
 
 ### Analytics (recommended)
 

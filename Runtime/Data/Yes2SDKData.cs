@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,20 +46,36 @@ namespace Yes2SDK
         private static extern void Yes2SDK_Data_DeleteAllJS();
 
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_Data_SetStringAsyncJS(string key, string value);
+        private static extern void Yes2SDK_Data_SetStringAsyncJS(int requestId, string key, string value);
 
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_Data_FlushAsyncJS();
+        private static extern void Yes2SDK_Data_FlushAsyncJS(int requestId);
 #endif
 
         #endregion
 
-        #region Async Callback Fields
+        #region Async Request Tracking
 
-        private static Action<bool> _setStringAsyncSuccessCallback;
-        private static Action<Error> _setStringAsyncErrorCallback;
-        private static Action<bool> _flushSuccessCallback;
-        private static Action<Error> _flushErrorCallback;
+        /// <summary>The confirmed-write operation a request belongs to.</summary>
+        internal enum Operation
+        {
+            SetString,
+            Flush
+        }
+
+        private sealed class PendingRequest
+        {
+            public Operation Operation;
+            public Action<bool> OnSuccess;
+            public Action<Error> OnError;
+        }
+
+        // Every call gets its own id, carried through the JS bridge and echoed
+        // back on its response, so overlapping saves each hear their own result.
+        // A single shared slot let the second call receive the first call's
+        // result and lose its own.
+        private static readonly Dictionary<int, PendingRequest> _pending = new Dictionary<int, PendingRequest>();
+        private static int _nextRequestId;
 
         #endregion
 
@@ -187,15 +205,14 @@ namespace Yes2SDK
         /// </summary>
         public void SetStringAsync(string key, string value, Action<bool> onSuccess = null, Action<Error> onError = null)
         {
-            _setStringAsyncSuccessCallback = onSuccess;
-            _setStringAsyncErrorCallback = onError;
+            int requestId = Register(Operation.SetString, onSuccess, onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_Data_SetStringAsyncJS(key, value);
+            Yes2SDK_Data_SetStringAsyncJS(requestId, key, value);
 #else
             PlayerPrefs.SetString(key, value);
             PlayerPrefs.Save();
-            InvokeSetStringAsyncSuccess("true");
+            CompleteSuccess(Operation.SetString, requestId, true);
 #endif
         }
 
@@ -207,15 +224,14 @@ namespace Yes2SDK
         /// </summary>
         public void FlushAsync(Action<bool> onSuccess = null, Action<Error> onError = null)
         {
-            _flushSuccessCallback = onSuccess;
-            _flushErrorCallback = onError;
+            int requestId = Register(Operation.Flush, onSuccess, onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_Data_FlushAsyncJS();
+            Yes2SDK_Data_FlushAsyncJS(requestId);
 #else
             // PlayerPrefs writes are already durable in the editor.
             PlayerPrefs.Save();
-            InvokeFlushSuccess("true");
+            CompleteSuccess(Operation.Flush, requestId, true);
 #endif
         }
 
@@ -233,34 +249,117 @@ namespace Yes2SDK
 
         #endregion
 
-        #region Async Callback Invocations (called by Bridge)
+        #region Async Completion (called by Bridge)
 
-        internal static void InvokeSetStringAsyncSuccess(string result)
+        /// <summary>
+        /// Bridge entry for a success message: "&lt;requestId&gt;|true" or
+        /// "&lt;requestId&gt;|false", as written by Yes2SDKData.jslib.
+        /// </summary>
+        internal static void HandleSuccessMessage(Operation operation, string message)
         {
-            _setStringAsyncSuccessCallback?.Invoke(result == "true" || result == "1");
-            _setStringAsyncSuccessCallback = null;
-            _setStringAsyncErrorCallback = null;
+            if (!TryParseEnvelope(operation, message, out int requestId, out string payload)) return;
+            CompleteSuccess(operation, requestId, payload == "true" || payload == "1");
         }
 
-        internal static void InvokeSetStringAsyncError(Error error)
+        /// <summary>Bridge entry for an error message: "&lt;requestId&gt;|&lt;error JSON&gt;".</summary>
+        internal static void HandleErrorMessage(Operation operation, string message, Func<string, Error> parseError)
         {
-            _setStringAsyncErrorCallback?.Invoke(error);
-            _setStringAsyncSuccessCallback = null;
-            _setStringAsyncErrorCallback = null;
+            if (!TryParseEnvelope(operation, message, out int requestId, out string payload)) return;
+            CompleteError(operation, requestId, parseError(payload));
         }
 
-        internal static void InvokeFlushSuccess(string result)
+        internal static void CompleteSuccess(Operation operation, int requestId, bool saved)
         {
-            _flushSuccessCallback?.Invoke(result == "true" || result == "1");
-            _flushSuccessCallback = null;
-            _flushErrorCallback = null;
+            // Take the request out before running game code, so a callback that
+            // starts the next save, or throws, cannot touch another request.
+            if (!TryTake(operation, requestId, out PendingRequest request)) return;
+            request.OnSuccess?.Invoke(saved);
         }
 
-        internal static void InvokeFlushError(Error error)
+        internal static void CompleteError(Operation operation, int requestId, Error error)
         {
-            _flushErrorCallback?.Invoke(error);
-            _flushSuccessCallback = null;
-            _flushErrorCallback = null;
+            if (!TryTake(operation, requestId, out PendingRequest request)) return;
+            request.OnError?.Invoke(error);
+        }
+
+        #endregion
+
+        #region Test Seams
+
+        /// <summary>
+        /// Registers a request without sending it, so tests can deliver its
+        /// response later and in any order, as a slow platform would.
+        /// </summary>
+        internal static int RegisterForTests(Operation operation, Action<bool> onSuccess, Action<Error> onError)
+        {
+            return Register(operation, onSuccess, onError);
+        }
+
+        /// <summary>Requests still waiting for a response.</summary>
+        internal static int PendingCountForTests => _pending.Count;
+
+        /// <summary>Drops every pending request so tests start clean.</summary>
+        internal static void ResetDataStateForTests()
+        {
+            _pending.Clear();
+        }
+
+        #endregion
+
+        #region Private Helpers
+
+#if UNITY_EDITOR
+        // With Domain Reload disabled statics survive into the next play, so
+        // drop requests left over from the previous one.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetEditorState()
+        {
+            _pending.Clear();
+        }
+#endif
+
+        private static int Register(Operation operation, Action<bool> onSuccess, Action<Error> onError)
+        {
+            // Ids only need to be unique among pending requests, so wrap back to
+            // 1 rather than go negative after int.MaxValue calls.
+            _nextRequestId = _nextRequestId == int.MaxValue ? 1 : _nextRequestId + 1;
+            _pending[_nextRequestId] = new PendingRequest
+            {
+                Operation = operation,
+                OnSuccess = onSuccess,
+                OnError = onError
+            };
+            return _nextRequestId;
+        }
+
+        private static bool TryTake(Operation operation, int requestId, out PendingRequest request)
+        {
+            if (!_pending.TryGetValue(requestId, out request) || request.Operation != operation)
+            {
+                Yes2Log.Warning($"Data: dropped {operation} response for request {requestId}: no such request pending (already completed or unknown)");
+                request = null;
+                return false;
+            }
+
+            _pending.Remove(requestId);
+            return true;
+        }
+
+        private static bool TryParseEnvelope(Operation operation, string message, out int requestId, out string payload)
+        {
+            requestId = 0;
+            payload = null;
+
+            int separator = message?.IndexOf('|') ?? -1;
+            if (separator <= 0
+                || !int.TryParse(message.Substring(0, separator), NumberStyles.None, CultureInfo.InvariantCulture, out requestId))
+            {
+                Yes2Log.Warning($"Data: dropped {operation} response with no request id: '{message}'");
+                return false;
+            }
+
+            payload = message.Substring(separator + 1);
+            return true;
         }
 
         #endregion
