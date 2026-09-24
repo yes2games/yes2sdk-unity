@@ -134,8 +134,12 @@ namespace Yes2SDK
             ["OnConsumePurchaseError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.ConsumePurchase, data, ParseError),
 
             // Data (async durable saves)
-            ["OnDataSetStringSuccess"] = Yes2SDKData.InvokeSetStringAsyncSuccess,
-            ["OnDataFlushSuccess"] = Yes2SDKData.InvokeFlushSuccess,
+            // Data confirmed writes carry a request id, so their errors are
+            // unwrapped here too rather than in _errorHandlers.
+            ["OnDataSetStringSuccess"] = data => Yes2SDKData.HandleSuccessMessage(Yes2SDKData.Operation.SetString, data),
+            ["OnDataFlushSuccess"] = data => Yes2SDKData.HandleSuccessMessage(Yes2SDKData.Operation.Flush, data),
+            ["OnDataSetStringError"] = data => Yes2SDKData.HandleErrorMessage(Yes2SDKData.Operation.SetString, data, ParseError),
+            ["OnDataFlushError"] = data => Yes2SDKData.HandleErrorMessage(Yes2SDKData.Operation.Flush, data, ParseError),
 
             // Leaderboard
             ["OnGetLeaderboardSuccess"] = Yes2SDKLeaderboard.InvokeGetLeaderboardSuccess,
@@ -202,8 +206,6 @@ namespace Yes2SDK
             ["OnListFriendsError"] = Yes2SDKFriends.InvokeListFriendsError,
 
             // Data (async durable saves)
-            ["OnDataSetStringError"] = Yes2SDKData.InvokeSetStringAsyncError,
-            ["OnDataFlushError"] = Yes2SDKData.InvokeFlushError,
 
             // Leaderboard
             ["OnGetLeaderboardError"] = Yes2SDKLeaderboard.InvokeGetLeaderboardError,

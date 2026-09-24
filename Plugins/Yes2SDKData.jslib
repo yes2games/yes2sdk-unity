@@ -72,32 +72,51 @@ mergeInto(LibraryManager.library, {
         window.__y2.warn('Data module not loaded — ignoring deleteAll');
     },
 
-    Yes2SDK_Data_SetStringAsyncJS__deps: ['$__y2', '$__y2h'],
-    Yes2SDK_Data_SetStringAsyncJS: function(keyPtr, valuePtr) {
+    // Confirmed writes answer as "<requestId>|<payload>" so Yes2SDKData.cs can
+    // hand each result to the call that made it.
+    $__y2data: {
+        send: function(callback, requestId, payload) {
+            SendMessage('Bridge', callback, requestId + '|' + payload);
+        },
+        sendError: function(callback, requestId, code, message, context) {
+            __y2data.send(callback, requestId, JSON.stringify({ code: code, message: message, context: context }));
+        },
+        handleCatch: function(callback, requestId, defaultMessage, context) {
+            return function(error) {
+                __y2data.sendError(callback, requestId,
+                    (error && error.code) || 'Unknown',
+                    (error && error.message) || defaultMessage,
+                    context);
+            };
+        }
+    },
+
+    Yes2SDK_Data_SetStringAsyncJS__deps: ['$__y2', '$__y2h', '$__y2data'],
+    Yes2SDK_Data_SetStringAsyncJS: function(requestId, keyPtr, valuePtr) {
         if (!__y2h.has('data')) {
-            __y2h.sendError('OnDataSetStringError', 'NotInitialized', 'Yes2SDK Data module not loaded', 'Yes2SDK.Data.SetStringAsync');
+            __y2data.sendError('OnDataSetStringError', requestId, 'NotInitialized', 'Yes2SDK Data module not loaded', 'Yes2SDK.Data.SetStringAsync');
             return;
         }
         var key = UTF8ToString(keyPtr);
         var value = UTF8ToString(valuePtr);
         window.Yes2SDK.data.setStringAsync(key, value)
             .then(function(ok) {
-                SendMessage('Bridge', 'OnDataSetStringSuccess', ok ? 'true' : 'false');
+                __y2data.send('OnDataSetStringSuccess', requestId, ok ? 'true' : 'false');
             })
-            .catch(__y2h.handleCatch('OnDataSetStringError', 'SetStringAsync failed', 'Yes2SDK.Data.SetStringAsync'));
+            .catch(__y2data.handleCatch('OnDataSetStringError', requestId, 'SetStringAsync failed', 'Yes2SDK.Data.SetStringAsync'));
     },
 
-    Yes2SDK_Data_FlushAsyncJS__deps: ['$__y2', '$__y2h'],
-    Yes2SDK_Data_FlushAsyncJS: function() {
+    Yes2SDK_Data_FlushAsyncJS__deps: ['$__y2', '$__y2h', '$__y2data'],
+    Yes2SDK_Data_FlushAsyncJS: function(requestId) {
         if (!__y2h.has('data')) {
-            __y2h.sendError('OnDataFlushError', 'NotInitialized', 'Yes2SDK Data module not loaded', 'Yes2SDK.Data.FlushAsync');
+            __y2data.sendError('OnDataFlushError', requestId, 'NotInitialized', 'Yes2SDK Data module not loaded', 'Yes2SDK.Data.FlushAsync');
             return;
         }
         window.Yes2SDK.data.flushAsync()
             .then(function(ok) {
-                SendMessage('Bridge', 'OnDataFlushSuccess', ok ? 'true' : 'false');
+                __y2data.send('OnDataFlushSuccess', requestId, ok ? 'true' : 'false');
             })
-            .catch(__y2h.handleCatch('OnDataFlushError', 'FlushAsync failed', 'Yes2SDK.Data.FlushAsync'));
+            .catch(__y2data.handleCatch('OnDataFlushError', requestId, 'FlushAsync failed', 'Yes2SDK.Data.FlushAsync'));
     }
 
 });
