@@ -236,7 +236,7 @@ Yes2SDK.Game.GameplayStart();
 Yes2SDK.Game.GameplayStop();
 ```
 
-> `Analytics.LogLevelStart` / `LogLevelEnd` can also trigger gameplay start / stop — use either pair, but don't call both.
+> `Analytics.LogLevelStart` / `LogLevelEnd` also mark gameplay start / stop. Calling both pairs is safe: repeated starts or stops are ignored, so the platform sees one signal per transition.
 
 ### Data (required)
 

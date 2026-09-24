@@ -64,7 +64,27 @@ mergeInto(LibraryManager.library, {
             _platform: 'crazygames',
             _sdk: null,
             _loadingStarted: false,
+            _gameplayActive: false,
             _settingsListeners: [],
+
+            // Single owner of the CrazyGames gameplay signal, mirroring Core's
+            // GameplaySession. Game.GameplayStart/Stop and Analytics.LogLevelStart/End
+            // both route here, and repeated calls in the same direction are no-ops,
+            // so a game that calls both pairs no longer double-fires the platform
+            // signal (yes2sdk-unity#77).
+            _gameplayStart: function() {
+                var sdk = this._sdk;
+                if (this._gameplayActive || !sdk || !sdk.game) return;
+                this._gameplayActive = true;
+                sdk.game.gameplayStart();
+            },
+
+            _gameplayStop: function() {
+                var sdk = this._sdk;
+                if (!this._gameplayActive || !sdk || !sdk.game) return;
+                this._gameplayActive = false;
+                sdk.game.gameplayStop();
+            },
 
             initializeAsync: function() {
                 var self = this;
@@ -226,20 +246,18 @@ mergeInto(LibraryManager.library, {
                 }
             },
 
-            // Analytics module - maps to CrazyGames gameplay events
+            // Analytics module - level start/end drive the shared gameplay owner
             analytics: {
                 logEvent: function(name, paramsJson) {
                     window.__y2.log('Event:', name, paramsJson);
                 },
                 logLevelStart: function(level) {
                     window.__y2.log('Level start:', level);
-                    var sdk = window.Yes2SDK._sdk;
-                    if (sdk && sdk.game) sdk.game.gameplayStart();
+                    window.Yes2SDK._gameplayStart();
                 },
                 logLevelEnd: function(level, score, success) {
                     window.__y2.log('Level end:', level, score, success);
-                    var sdk = window.Yes2SDK._sdk;
-                    if (sdk && sdk.game) sdk.game.gameplayStop();
+                    window.Yes2SDK._gameplayStop();
                 },
                 logScore: function(score, level) {
                     window.__y2.log('Score:', score, level);
@@ -633,13 +651,11 @@ mergeInto(LibraryManager.library, {
             // Game module - gameplay lifecycle, invite, settings, clipboard
             game: {
                 gameplayStart: function() {
-                    var sdk = window.Yes2SDK._sdk;
-                    if (sdk && sdk.game) sdk.game.gameplayStart();
+                    window.Yes2SDK._gameplayStart();
                 },
 
                 gameplayStop: function() {
-                    var sdk = window.Yes2SDK._sdk;
-                    if (sdk && sdk.game) sdk.game.gameplayStop();
+                    window.Yes2SDK._gameplayStop();
                 },
 
                 happyTime: function() {
