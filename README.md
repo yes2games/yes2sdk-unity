@@ -267,7 +267,7 @@ Yes2SDK.Data.FlushAsync(onSuccess: saved => Debug.Log($"Flushed: {saved}"));
 bool ok = await Yes2SDK.Data.FlushAsync(CancellationToken.None);
 ```
 
-In the Editor both complete immediately with `true` (`PlayerPrefs` is saved on the spot).
+In the Editor both complete immediately with `true` (`PlayerPrefs` is saved on the spot). Wait for one confirmed call to finish before starting the next: overlapping `SetStringAsync` or `FlushAsync` calls can currently report to the wrong callback.
 
 ### Analytics (recommended)
 
@@ -424,7 +424,7 @@ if (Yes2SDK.Player.IsConnectedPlayersSupported())
 
 `Yes2SDK.IAP.IsSupported()` tells you at runtime whether the current platform can take payments. Check it before showing a shop, a "buy" button, or any mechanic that depends on paid items. When it returns `false`, hide that UI instead of letting the player hit an error.
 
-Currently only **Yandex** supports IAP. On every other platform `IsSupported()` returns `false` and the calls fail with `FeatureNotSupported`. On Yandex, payments must also be enabled for your game in the Yandex Games console, otherwise the calls fail with a platform error.
+Currently only **Yandex** supports IAP. On every other platform `IsSupported()` returns `false` and the calls fail through `onError`. On Yandex, payments must also be enabled for your game in the Yandex Games console, otherwise the calls fail with a platform error.
 
 ```csharp
 if (Yes2SDK.IAP.IsSupported())
@@ -456,14 +456,16 @@ Yes2SDK.IAP.PurchaseAsync("gems_100",
     },
     onError: err =>
     {
-        if (err.ErrorCode != ErrorCode.UserCancelled) ShowPurchaseFailed();
+        // Yandex reports a closed payment dialog the same way as a failed
+        // payment, so keep this message neutral ("Purchase not completed").
+        ShowPurchaseNotCompleted();
     });
 
 [Serializable]
 class Purchase { public string productId; public string purchaseToken; }
 ```
 
-- Results arrive as JSON strings. Each purchase carries `productId` and `purchaseToken`. Each catalog product carries `productId`, `title`, `description`, `price` (formatted) and `priceCurrencyCode`.
+- Results arrive as JSON strings. `GetCatalogAsync` and `GetPurchasesAsync` return a top-level JSON array, which `JsonUtility` cannot parse on its own: wrap it (`JsonUtility.FromJson<Wrapper>("{\"items\":" + json + "}")`) or use Newtonsoft. Each purchase carries `productId` and `purchaseToken`. Each catalog product carries `productId`, `title`, `description`, `price` (formatted) and `priceCurrencyCode`.
 - Grant the item before consuming it, and save progress (see `Data.FlushAsync`) so a closed tab can't lose a paid item. Any purchase that was paid but not consumed comes back from `GetPurchasesAsync` on the next launch.
 - In the Editor, IAP is mocked in Play Mode (see [Editor Testing](#editor-testing)), so you can test your shop and your `IsSupported()` gating without a platform build.
 
