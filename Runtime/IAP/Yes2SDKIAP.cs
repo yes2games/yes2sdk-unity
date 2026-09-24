@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace Yes2SDK
@@ -11,16 +13,32 @@ namespace Yes2SDK
     /// </summary>
     public class Yes2SDKIAP
     {
-        #region Static Callback Fields
+        #region Request Tracking
 
-        private static Action<string> _getCatalogSuccessCallback;
-        private static Action<Error> _getCatalogErrorCallback;
-        private static Action<string> _purchaseSuccessCallback;
-        private static Action<Error> _purchaseErrorCallback;
-        private static Action<string> _getPurchasesSuccessCallback;
-        private static Action<Error> _getPurchasesErrorCallback;
-        private static Action _consumeSuccessCallback;
-        private static Action<Error> _consumeErrorCallback;
+        /// <summary>The IAP operation a request belongs to.</summary>
+        internal enum Operation
+        {
+            GetCatalog,
+            Purchase,
+            GetPurchases,
+            ConsumePurchase
+        }
+
+        private sealed class PendingRequest
+        {
+            public Operation Operation;
+            public Action<string> OnSuccess;
+            public Action<Error> OnError;
+        }
+
+        // Every call gets its own id, carried through the JS bridge and echoed
+        // back on its response. A shared slot per operation let a late response
+        // to an abandoned call complete the retry that replaced it (#102).
+        private static readonly Dictionary<int, PendingRequest> _pending = new Dictionary<int, PendingRequest>();
+        private static int _nextRequestId;
+
+        // Separates the request id from the payload in a bridge message.
+        private const char EnvelopeSeparator = '|';
 
         #endregion
 
@@ -31,16 +49,16 @@ namespace Yes2SDK
         private static extern bool Yes2SDK_IAP_IsSupportedJS();
 
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_IAP_GetCatalogAsyncJS();
+        private static extern void Yes2SDK_IAP_GetCatalogAsyncJS(int requestId);
 
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_IAP_PurchaseAsyncJS(string productId, string developerPayload);
+        private static extern void Yes2SDK_IAP_PurchaseAsyncJS(int requestId, string productId, string developerPayload);
 
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_IAP_GetPurchasesAsyncJS();
+        private static extern void Yes2SDK_IAP_GetPurchasesAsyncJS(int requestId);
 
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_IAP_ConsumePurchaseAsyncJS(string purchaseToken);
+        private static extern void Yes2SDK_IAP_ConsumePurchaseAsyncJS(int requestId, string purchaseToken);
 #endif
 
         #endregion
@@ -74,22 +92,21 @@ namespace Yes2SDK
         /// </summary>
         public void GetCatalogAsync(Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            _getCatalogSuccessCallback = onSuccess;
-            _getCatalogErrorCallback = onError;
+            int requestId = Register(Operation.GetCatalog, onSuccess, onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_IAP_GetCatalogAsyncJS();
+            Yes2SDK_IAP_GetCatalogAsyncJS(requestId);
 #else
 #if UNITY_EDITOR
             if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
             {
                 Yes2Log.Log("Mock: IAP.GetCatalogAsync() — returning mock catalog");
-                InvokeGetCatalogSuccess(Yes2SDKMockIAP.CatalogJson);
+                CompleteSuccess(Operation.GetCatalog, requestId, Yes2SDKMockIAP.CatalogJson);
                 return;
             }
 #endif
             Yes2Log.Log("Mock: IAP.GetCatalogAsync() — returning empty catalog");
-            InvokeGetCatalogSuccess("[]");
+            CompleteSuccess(Operation.GetCatalog, requestId, "[]");
 #endif
         }
 
@@ -107,9 +124,9 @@ namespace Yes2SDK
             string developerPayload = null)
         {
 #if UNITY_EDITOR
-            // Reject overlapping mock purchases BEFORE storing the new
-            // callbacks — overwriting them here would silently orphan the
-            // purchase dialog still waiting on screen.
+            // Reject overlapping mock purchases BEFORE registering the new
+            // request: the overlay shows one dialog at a time, so a second
+            // purchase would never get a dialog to resolve it.
             if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups
                 && Yes2SDKMockOverlay.IsBusy)
             {
@@ -123,11 +140,10 @@ namespace Yes2SDK
                 return;
             }
 #endif
-            _purchaseSuccessCallback = onSuccess;
-            _purchaseErrorCallback = onError;
+            int requestId = Register(Operation.Purchase, onSuccess, onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_IAP_PurchaseAsyncJS(productId, developerPayload ?? string.Empty);
+            Yes2SDK_IAP_PurchaseAsyncJS(requestId, productId, developerPayload ?? string.Empty);
 #else
 #if UNITY_EDITOR
             if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
@@ -137,7 +153,7 @@ namespace Yes2SDK
                 if (Yes2SDKEditorMock.IAPFailPurchases)
                 {
                     Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — simulated failure");
-                    InvokePurchaseError(new Error
+                    CompleteError(Operation.Purchase, requestId, new Error
                     {
                         Code = "PlatformError",
                         Message = "Simulated purchase failure (mock)",
@@ -146,7 +162,7 @@ namespace Yes2SDK
                     return;
                 }
 
-                if (Yes2SDKMockOverlay.ShowPurchase(productId, developerPayload))
+                if (Yes2SDKMockOverlay.ShowPurchase(requestId, productId, developerPayload))
                 {
                     Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — showing purchase dialog");
                     return;
@@ -154,7 +170,7 @@ namespace Yes2SDK
             }
 #endif
             Yes2Log.Log($"Mock: IAP.PurchaseAsync('{productId}') — FeatureNotSupported");
-            InvokePurchaseError(FeatureNotSupportedError("Yes2SDK.IAP.PurchaseAsync"));
+            CompleteError(Operation.Purchase, requestId, FeatureNotSupportedError("Yes2SDK.IAP.PurchaseAsync"));
 #endif
         }
 
@@ -164,22 +180,21 @@ namespace Yes2SDK
         /// </summary>
         public void GetPurchasesAsync(Action<string> onSuccess = null, Action<Error> onError = null)
         {
-            _getPurchasesSuccessCallback = onSuccess;
-            _getPurchasesErrorCallback = onError;
+            int requestId = Register(Operation.GetPurchases, onSuccess, onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_IAP_GetPurchasesAsyncJS();
+            Yes2SDK_IAP_GetPurchasesAsyncJS(requestId);
 #else
 #if UNITY_EDITOR
             if (Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups)
             {
                 Yes2Log.Log("Mock: IAP.GetPurchasesAsync() — returning mock purchases");
-                InvokeGetPurchasesSuccess(Yes2SDKMockIAP.PurchasesJson);
+                CompleteSuccess(Operation.GetPurchases, requestId, Yes2SDKMockIAP.PurchasesJson);
                 return;
             }
 #endif
             Yes2Log.Log("Mock: IAP.GetPurchasesAsync() — returning empty list");
-            InvokeGetPurchasesSuccess("[]");
+            CompleteSuccess(Operation.GetPurchases, requestId, "[]");
 #endif
         }
 
@@ -188,11 +203,12 @@ namespace Yes2SDK
         /// </summary>
         public void ConsumePurchaseAsync(string purchaseToken, Action onSuccess = null, Action<Error> onError = null)
         {
-            _consumeSuccessCallback = onSuccess;
-            _consumeErrorCallback = onError;
+            Action<string> consumeSuccess = null;
+            if (onSuccess != null) consumeSuccess = _ => onSuccess();
+            int requestId = Register(Operation.ConsumePurchase, consumeSuccess, onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_IAP_ConsumePurchaseAsyncJS(purchaseToken);
+            Yes2SDK_IAP_ConsumePurchaseAsyncJS(requestId, purchaseToken);
 #else
 #if UNITY_EDITOR
             // Remove the purchase from the mock session list so a consumable
@@ -203,68 +219,75 @@ namespace Yes2SDK
             }
 #endif
             Yes2Log.Log($"Mock: IAP.ConsumePurchaseAsync('{purchaseToken}') — success");
-            InvokeConsumePurchaseSuccess();
+            CompleteSuccess(Operation.ConsumePurchase, requestId, string.Empty);
 #endif
         }
 
         #endregion
 
-        #region Internal Callback Invocations (called by Bridge)
+        #region Internal Completion (called by Bridge and the Editor mock)
 
-        internal static void InvokeGetCatalogSuccess(string catalogJson)
+        /// <summary>
+        /// Bridge entry for a success message. The message is
+        /// "&lt;requestId&gt;|&lt;payload&gt;", as written by Yes2SDKIAP.jslib.
+        /// </summary>
+        internal static void HandleSuccessMessage(Operation operation, string message)
         {
-            _getCatalogSuccessCallback?.Invoke(catalogJson);
-            _getCatalogSuccessCallback = null;
-            _getCatalogErrorCallback = null;
+            if (!TryParseEnvelope(operation, message, out int requestId, out string payload)) return;
+            CompleteSuccess(operation, requestId, payload);
         }
 
-        internal static void InvokeGetCatalogError(Error error)
+        /// <summary>
+        /// Bridge entry for an error message: "&lt;requestId&gt;|&lt;error JSON&gt;".
+        /// </summary>
+        internal static void HandleErrorMessage(Operation operation, string message, Func<string, Error> parseError)
         {
-            _getCatalogErrorCallback?.Invoke(error);
-            _getCatalogSuccessCallback = null;
-            _getCatalogErrorCallback = null;
+            if (!TryParseEnvelope(operation, message, out int requestId, out string payload)) return;
+            CompleteError(operation, requestId, parseError(payload));
         }
 
-        internal static void InvokePurchaseSuccess(string purchaseJson)
+        internal static void CompleteSuccess(Operation operation, int requestId, string payload)
         {
-            _purchaseSuccessCallback?.Invoke(purchaseJson);
-            _purchaseSuccessCallback = null;
-            _purchaseErrorCallback = null;
+            // Take the request out BEFORE running game code, so a callback that
+            // starts the next operation, or throws, cannot touch the next
+            // request's callbacks (#103). A duplicate or stale response finds
+            // nothing and is dropped.
+            if (!TryTake(operation, requestId, out PendingRequest request)) return;
+            request.OnSuccess?.Invoke(payload);
         }
 
-        internal static void InvokePurchaseError(Error error)
+        internal static void CompleteError(Operation operation, int requestId, Error error)
         {
-            _purchaseErrorCallback?.Invoke(error);
-            _purchaseSuccessCallback = null;
-            _purchaseErrorCallback = null;
+            if (!TryTake(operation, requestId, out PendingRequest request)) return;
+            request.OnError?.Invoke(error);
         }
 
-        internal static void InvokeGetPurchasesSuccess(string purchasesJson)
+        #endregion
+
+        #region Test Seams
+
+        /// <summary>
+        /// Registers a request without sending it, so tests can deliver its
+        /// response later and in any order, as a delayed platform would.
+        /// </summary>
+        internal static int RegisterForTests(Operation operation, Action<string> onSuccess, Action<Error> onError)
         {
-            _getPurchasesSuccessCallback?.Invoke(purchasesJson);
-            _getPurchasesSuccessCallback = null;
-            _getPurchasesErrorCallback = null;
+            return Register(operation, onSuccess, onError);
         }
 
-        internal static void InvokeGetPurchasesError(Error error)
+        /// <summary>Requests still waiting for a response.</summary>
+        internal static int PendingCountForTests => _pending.Count;
+
+        /// <summary>Drops every pending request so tests start clean.</summary>
+        internal static void ResetIapStateForTests()
         {
-            _getPurchasesErrorCallback?.Invoke(error);
-            _getPurchasesSuccessCallback = null;
-            _getPurchasesErrorCallback = null;
+            _pending.Clear();
         }
 
-        internal static void InvokeConsumePurchaseSuccess()
+        /// <summary>Builds the message the jslib sends for a response.</summary>
+        internal static string EnvelopeForTests(int requestId, string payload)
         {
-            _consumeSuccessCallback?.Invoke();
-            _consumeSuccessCallback = null;
-            _consumeErrorCallback = null;
-        }
-
-        internal static void InvokeConsumePurchaseError(Error error)
-        {
-            _consumeErrorCallback?.Invoke(error);
-            _consumeSuccessCallback = null;
-            _consumeErrorCallback = null;
+            return requestId.ToString(CultureInfo.InvariantCulture) + EnvelopeSeparator + payload;
         }
 
         #endregion
@@ -279,16 +302,53 @@ namespace Yes2SDK
         [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetEditorState()
         {
-            _getCatalogSuccessCallback = null;
-            _getCatalogErrorCallback = null;
-            _purchaseSuccessCallback = null;
-            _purchaseErrorCallback = null;
-            _getPurchasesSuccessCallback = null;
-            _getPurchasesErrorCallback = null;
-            _consumeSuccessCallback = null;
-            _consumeErrorCallback = null;
+            _pending.Clear();
         }
 #endif
+
+        private static int Register(Operation operation, Action<string> onSuccess, Action<Error> onError)
+        {
+            // Ids only need to be unique among requests still pending, so wrap
+            // back to 1 rather than go negative after int.MaxValue calls.
+            _nextRequestId = _nextRequestId == int.MaxValue ? 1 : _nextRequestId + 1;
+            _pending[_nextRequestId] = new PendingRequest
+            {
+                Operation = operation,
+                OnSuccess = onSuccess,
+                OnError = onError
+            };
+            return _nextRequestId;
+        }
+
+        private static bool TryTake(Operation operation, int requestId, out PendingRequest request)
+        {
+            if (!_pending.TryGetValue(requestId, out request) || request.Operation != operation)
+            {
+                Yes2Log.Warning($"IAP: dropped {operation} response for request {requestId}: no such request pending (already completed or unknown)");
+                request = null;
+                return false;
+            }
+
+            _pending.Remove(requestId);
+            return true;
+        }
+
+        private static bool TryParseEnvelope(Operation operation, string message, out int requestId, out string payload)
+        {
+            requestId = 0;
+            payload = null;
+
+            int separator = message?.IndexOf(EnvelopeSeparator) ?? -1;
+            if (separator <= 0
+                || !int.TryParse(message.Substring(0, separator), NumberStyles.None, CultureInfo.InvariantCulture, out requestId))
+            {
+                Yes2Log.Warning($"IAP: dropped {operation} response with no request id: '{message}'");
+                return false;
+            }
+
+            payload = message.Substring(separator + 1);
+            return true;
+        }
 
         private static Error FeatureNotSupportedError(string context)
         {
