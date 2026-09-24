@@ -56,7 +56,7 @@ namespace Yes2SDK
         private void Update()
         {
             // Releases an ad the platform accepted but never completed.
-            Yes2SDKAds.CheckAdWatchdog();
+            Yes2SDKAds.AdvanceAdWatchdog(Time.unscaledDeltaTime);
         }
 
         #region Handler Registry

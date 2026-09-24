@@ -220,7 +220,7 @@ Support is not readiness: these ask whether the format exists on the platform, `
 #### Concurrent ad guard + readiness
 
 - `Ads.IsAdShowing()` — returns `true` while a `ShowInterstitial` or `ShowRewarded` is in flight (between the call and `afterAd`/error). Calling `Show*` again while one is already showing is rejected immediately — `onError` fires with `ErrorCode.InvalidParams` and a message starting `"Another ad is already in flight (AdAlreadyShowing)…"`.
-- **An ad that never completes is released automatically.** If the platform does not start the ad within 30 seconds, or starts it and does not finish within 3 minutes, the ad is released and `onError` fires with `ErrorCode.Timeout`. `IsAdShowing()` then returns `false` and the next `Show*` runs normally. A late callback from the released ad is ignored. Resume your game in `onError` as well as `afterAd`, so a timed-out ad does not leave it paused. The Editor mock popup has no timeout.
+- **An ad that never completes is released automatically.** If the platform does not start the ad within 30 seconds, or starts it and does not finish within 3 minutes of play (time in a hidden tab does not count), the ad is released and `onError` fires with `ErrorCode.Timeout`. `IsAdShowing()` then returns `false` and the next `Show*` runs normally. A late callback from the released ad is ignored. Resume your game in `onError` as well as `afterAd`, so a timed-out ad does not leave it paused. The Editor mock popup has no timeout.
 - `Ads.IsRewardedAdAvailable()` — best-effort check whether a rewarded ad appears available right now. Most platform SDKs don't expose explicit readiness, so this returns `true` as long as the platform's ad module is loaded; the actual `ShowRewarded` call can still fail with `noFill`. Use it as a hint, not a guarantee.
 
 ```csharp
@@ -554,7 +554,7 @@ onError: err => {
 | `RateLimited` | Too many calls in a short window (e.g. ad spam protection). | Back off and try again later — don't retry immediately. |
 | `UserCancelled` | The player closed/dismissed a flow (e.g. login dialog, rewarded ad). | Not an error in the usual sense — silently respect the player's choice, no toast. |
 | `Unknown` | The error didn't match any of the above. | Log everything (`err.Code`, `err.Message`, `err.Context`) and treat as a hard failure. |
-| `Timeout` | The platform did not answer in time (for ads: the ad never started, or never finished). | Treat the call as failed and resume the game. For ads, the next `Show*` works normally. |
+| `Timeout` | Raised by the SDK's ad watchdog: an interstitial or rewarded ad never started, or started and never finished. | Treat the ad as failed and resume the game. The next `Show*` works normally. |
 
 ---
 

@@ -50,14 +50,18 @@ namespace Yes2SDK
         // the session. The ad gets AdStartTimeoutSeconds to reach beforeAd (the
         // same limit as the Defold wrapper), then AdPlayingTimeoutSeconds once it
         // is on screen, which leaves room for a long rewarded video and its end
-        // card. Checked from Bridge.Update against real time, so a game that sets
-        // Time.timeScale to 0 while the ad plays does not stop it.
+        // card.
+        //
+        // Time is counted in frames the game actually runs, from unscaled delta
+        // time, so Time.timeScale = 0 during the ad does not stop it. Each frame
+        // counts for at most MaxFrameSeconds: a browser stops running frames in a
+        // hidden tab, and the first frame after the player comes back must not
+        // count the whole absence and time out an ad they return to finish.
         internal const float AdStartTimeoutSeconds = 30f;
         internal const float AdPlayingTimeoutSeconds = 180f;
+        internal const float MaxFrameSeconds = 0.5f;
+        private static float _activeSeconds;
         private static float _adDeadline = float.PositiveInfinity;
-
-        /// <summary>Real-time clock for the watchdog. Tests replace it.</summary>
-        internal static Func<float> Clock = DefaultClock;
 
         #endregion
 
@@ -149,11 +153,18 @@ namespace Yes2SDK
                 // buttons so pause/resume wiring can be exercised. Falls
                 // through to the synchronous flow when the popup is disabled
                 // or unavailable.
-                if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKMockOverlay.ShowInterstitial(placement))
+                if (Yes2SDKEditorMock.AdPopupEnabled)
                 {
-                    // The popup waits on a click, so it has no deadline.
+                    // The popup waits on a click, so it has no deadline. Disarm
+                    // before showing it: the popup runs beforeAd synchronously,
+                    // and a beforeAd that throws must not leave it armed. If the
+                    // popup cannot open, the synchronous flow below completes
+                    // the ad at once, so the watchdog is not needed there either.
                     DisarmAdWatchdog();
-                    return;
+                    if (Yes2SDKMockOverlay.ShowInterstitial(placement))
+                    {
+                        return;
+                    }
                 }
             }
 #endif
@@ -246,11 +257,18 @@ namespace Yes2SDK
                 // fires adDismissed, so both outcomes are testable without
                 // the "dismiss" description convention. Falls through to the
                 // synchronous flow when the popup is disabled or unavailable.
-                if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKMockOverlay.ShowRewarded(placement))
+                if (Yes2SDKEditorMock.AdPopupEnabled)
                 {
-                    // The popup waits on a click, so it has no deadline.
+                    // The popup waits on a click, so it has no deadline. Disarm
+                    // before showing it: the popup runs beforeAd synchronously,
+                    // and a beforeAd that throws must not leave it armed. If the
+                    // popup cannot open, the synchronous flow below completes
+                    // the ad at once, so the watchdog is not needed there either.
                     DisarmAdWatchdog();
-                    return;
+                    if (Yes2SDKMockOverlay.ShowRewarded(placement))
+                    {
+                        return;
+                    }
                 }
             }
 #endif
@@ -485,7 +503,7 @@ namespace Yes2SDK
             ClearInterstitialCallbacks();
             ClearRewardedCallbacks();
             EndAd();
-            Clock = DefaultClock;
+            _activeSeconds = 0f;
         }
 
         /// <summary>
@@ -516,12 +534,18 @@ namespace Yes2SDK
         }
 
         /// <summary>
-        /// Settles the in-flight ad as failed once its deadline has passed.
-        /// Called every frame by Bridge.
+        /// Advances the watchdog by one frame and settles the in-flight ad as
+        /// failed once its deadline has passed. Called every frame by Bridge
+        /// with Time.unscaledDeltaTime.
         /// </summary>
-        internal static void CheckAdWatchdog()
+        internal static void AdvanceAdWatchdog(float unscaledDeltaTime)
         {
-            if (!_adInFlight || Clock() < _adDeadline) return;
+            if (unscaledDeltaTime > 0f)
+            {
+                _activeSeconds += Math.Min(unscaledDeltaTime, MaxFrameSeconds);
+            }
+
+            if (!_adInFlight || _activeSeconds < _adDeadline) return;
 
             string context = _adIsRewarded ? "Yes2SDK.Ads.ShowRewarded" : "Yes2SDK.Ads.ShowInterstitial";
             string message = _adStarted
@@ -721,11 +745,6 @@ namespace Yes2SDK
         }
 #endif
 
-        private static float DefaultClock()
-        {
-            return Time.realtimeSinceStartup;
-        }
-
         private static int BeginAd(bool rewarded)
         {
             _lastAdRequestId = _lastAdRequestId == int.MaxValue ? 1 : _lastAdRequestId + 1;
@@ -733,7 +752,7 @@ namespace Yes2SDK
             _adInFlight = true;
             _adIsRewarded = rewarded;
             _adStarted = false;
-            _adDeadline = Clock() + AdStartTimeoutSeconds;
+            _adDeadline = _activeSeconds + AdStartTimeoutSeconds;
             return _adRequestId;
         }
 
@@ -745,7 +764,7 @@ namespace Yes2SDK
             _adStarted = true;
             if (!float.IsPositiveInfinity(_adDeadline))
             {
-                _adDeadline = Clock() + AdPlayingTimeoutSeconds;
+                _adDeadline = _activeSeconds + AdPlayingTimeoutSeconds;
             }
         }
 

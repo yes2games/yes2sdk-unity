@@ -9,21 +9,18 @@ namespace Yes2SDK.Tests
     /// that is no longer in flight is ignored, so every ad settles exactly once.
     ///
     /// A real platform cannot stall headless, so these cases hold an ad in
-    /// flight through the Begin* seam, drive a fake clock, and deliver bridge
+    /// flight through the Begin* seam, advance the watchdog frame by frame, and deliver bridge
     /// messages by hand in the shape the jslib sends them.
     /// </summary>
     public class AdWatchdogTests
     {
         private List<string> _calls;
-        private float _now;
 
         [SetUp]
         public void SetUp()
         {
             _calls = new List<string>();
-            _now = 1000f;
             Yes2SDKAds.ResetAdStateForTests();
-            Yes2SDKAds.Clock = () => _now;
         }
 
         [TearDown]
@@ -61,10 +58,16 @@ namespace Yes2SDK.Tests
             Yes2SDKAds.HandleBridgeError(requestId + "|" + json, Bridge.ParseError, invoke);
         }
 
-        private void Advance(float seconds)
+        // Runs frames of at most a quarter second, the way Bridge.Update does,
+        // until the given amount of play time has passed.
+        private static void Advance(float seconds)
         {
-            _now += seconds;
-            Yes2SDKAds.CheckAdWatchdog();
+            while (seconds > 0f)
+            {
+                float frame = System.Math.Min(0.25f, seconds);
+                Yes2SDKAds.AdvanceAdWatchdog(frame);
+                seconds -= frame;
+            }
         }
 
         [Test]
@@ -79,6 +82,24 @@ namespace Yes2SDK.Tests
             Advance(0.2f);
             Assert.AreEqual(new[] { "onError:Timeout" }, _calls);
             Assert.IsFalse(Yes2SDK.Ads.IsAdShowing(), "the timeout must release the latch");
+        }
+
+        [Test]
+        public void HiddenTabGap_CountsAsOneCappedFrame()
+        {
+            int ad = BeginRewarded();
+            Send(ad, Yes2SDKAds.InvokeRewardedBeforeAd);
+
+            // The tab was hidden for ten minutes: no frames ran, then one frame
+            // arrives carrying the whole gap. The player is back to finish the ad.
+            Yes2SDKAds.AdvanceAdWatchdog(600f);
+
+            Assert.AreEqual(new[] { "beforeAd" }, _calls, "an absence must not time out the ad");
+            Assert.IsTrue(Yes2SDK.Ads.IsAdShowing());
+
+            Send(ad, Yes2SDKAds.InvokeRewardedAdViewed);
+            Send(ad, Yes2SDKAds.InvokeRewardedAfterAd);
+            Assert.AreEqual(new[] { "beforeAd", "adViewed", "afterAd" }, _calls);
         }
 
         [Test]
@@ -188,7 +209,8 @@ namespace Yes2SDK.Tests
                 BeginInterstitial("B:");
             });
 
-            Advance(Yes2SDKAds.AdStartTimeoutSeconds + 1f);
+            // A times out on the frame that reaches its deadline, and B starts there.
+            Advance(Yes2SDKAds.AdStartTimeoutSeconds);
             Assert.AreEqual(new[] { "A:onError" }, _calls);
             Assert.IsTrue(Yes2SDK.Ads.IsAdShowing(), "B is in flight");
 
