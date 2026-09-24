@@ -75,6 +75,13 @@ namespace Yes2SDK
         UserCancelled,
 
         /// <summary>Unknown error occurred.</summary>
-        Unknown
+        Unknown,
+
+        /// <summary>
+        /// The platform did not answer in time. Ads report this when an ad
+        /// never starts, or starts and never finishes; the ad is released so
+        /// later ads can run.
+        /// </summary>
+        Timeout
     }
 }

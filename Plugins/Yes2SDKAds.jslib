@@ -1,73 +1,94 @@
 mergeInto(LibraryManager.library, {
 
+    // Interstitial and rewarded messages carry the ad's request id: "<id>" for
+    // plain events, "<id>|<error JSON>" for errors. Yes2SDKAds.cs drops any
+    // message for an ad that is no longer in flight, such as one its watchdog
+    // already released.
+    $__y2ads: {
+        send: function(callback, requestId) {
+            SendMessage('Bridge', callback, String(requestId));
+        },
+        sendError: function(callback, requestId, code, message, context) {
+            SendMessage('Bridge', callback, requestId + '|' + JSON.stringify({ code: code, message: message, context: context }));
+        },
+        handleCatch: function(callback, requestId, defaultMessage, context) {
+            return function(error) {
+                __y2ads.sendError(callback, requestId,
+                    (error && error.code) || 'Unknown',
+                    (error && error.message) || defaultMessage,
+                    context);
+            };
+        }
+    },
+
     // Show an interstitial (full-screen) ad
-    Yes2SDK_ShowInterstitialJS__deps: ['$__y2', '$__y2h'],
-    Yes2SDK_ShowInterstitialJS: function(placementPtr, descriptionPtr) {
+    Yes2SDK_ShowInterstitialJS__deps: ['$__y2', '$__y2h', '$__y2ads'],
+    Yes2SDK_ShowInterstitialJS: function(requestId, placementPtr, descriptionPtr) {
         var placement = UTF8ToString(placementPtr);
         // description is passed from C# but not used by the Core SDK API
 
         if (!__y2h.has('ads')) {
             window.__y2.error('SDK or Ads module not loaded.');
-            __y2h.sendError('OnInterstitialError', 'NotInitialized', 'Yes2SDK Ads module not loaded', 'Yes2SDK.Ads.ShowInterstitial');
+            __y2ads.sendError('OnInterstitialError', requestId, 'NotInitialized', 'Yes2SDK Ads module not loaded', 'Yes2SDK.Ads.ShowInterstitial');
             return;
         }
 
         try {
             window.Yes2SDK.ads.showInterstitial(placement, {
                 beforeAd: function() {
-                    SendMessage('Bridge', 'OnInterstitialBeforeAd', '');
+                    __y2ads.send('OnInterstitialBeforeAd', requestId);
                 },
                 afterAd: function() {
                     __y2h.resumeAudio();
-                    SendMessage('Bridge', 'OnInterstitialAfterAd', '');
+                    __y2ads.send('OnInterstitialAfterAd', requestId);
                 },
                 noFill: function() {
-                    __y2h.sendError('OnInterstitialError', 'NoFill', 'No interstitial ad available', 'Yes2SDK.Ads.ShowInterstitial');
+                    __y2ads.sendError('OnInterstitialError', requestId, 'NoFill', 'No interstitial ad available', 'Yes2SDK.Ads.ShowInterstitial');
                 }
-            }).catch(__y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'))
+            }).catch(__y2ads.handleCatch('OnInterstitialError', requestId, 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial'))
               // afterAd does not fire on a no-fill or an error, and a strategy
               // whose promise never settles would leave audio dead, so resume on
               // both the callback and the settle. resumeAudio is idempotent.
               .then(__y2h.resumeAudio);
         } catch(error) {
-            __y2h.handleCatch('OnInterstitialError', 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial')(error);
+            __y2ads.handleCatch('OnInterstitialError', requestId, 'Interstitial ad failed', 'Yes2SDK.Ads.ShowInterstitial')(error);
         }
     },
 
     // Show a rewarded video ad
-    Yes2SDK_ShowRewardedJS__deps: ['$__y2', '$__y2h'],
-    Yes2SDK_ShowRewardedJS: function(placementPtr, descriptionPtr) {
+    Yes2SDK_ShowRewardedJS__deps: ['$__y2', '$__y2h', '$__y2ads'],
+    Yes2SDK_ShowRewardedJS: function(requestId, placementPtr, descriptionPtr) {
         var placement = UTF8ToString(placementPtr);
         // description is passed from C# but not used by the Core SDK API
 
         if (!__y2h.has('ads')) {
             window.__y2.error('SDK or Ads module not loaded.');
-            __y2h.sendError('OnRewardedError', 'NotInitialized', 'Yes2SDK Ads module not loaded', 'Yes2SDK.Ads.ShowRewarded');
+            __y2ads.sendError('OnRewardedError', requestId, 'NotInitialized', 'Yes2SDK Ads module not loaded', 'Yes2SDK.Ads.ShowRewarded');
             return;
         }
 
         try {
             window.Yes2SDK.ads.showRewarded(placement, {
                 beforeAd: function() {
-                    SendMessage('Bridge', 'OnRewardedBeforeAd', '');
+                    __y2ads.send('OnRewardedBeforeAd', requestId);
                 },
                 afterAd: function() {
                     __y2h.resumeAudio();
-                    SendMessage('Bridge', 'OnRewardedAfterAd', '');
+                    __y2ads.send('OnRewardedAfterAd', requestId);
                 },
                 adDismissed: function() {
-                    SendMessage('Bridge', 'OnRewardedAdDismissed', '');
+                    __y2ads.send('OnRewardedAdDismissed', requestId);
                 },
                 adViewed: function() {
-                    SendMessage('Bridge', 'OnRewardedAdViewed', '');
+                    __y2ads.send('OnRewardedAdViewed', requestId);
                 },
                 noFill: function() {
-                    __y2h.sendError('OnRewardedError', 'NoFill', 'No rewarded ad available', 'Yes2SDK.Ads.ShowRewarded');
+                    __y2ads.sendError('OnRewardedError', requestId, 'NoFill', 'No rewarded ad available', 'Yes2SDK.Ads.ShowRewarded');
                 }
-            }).catch(__y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'))
+            }).catch(__y2ads.handleCatch('OnRewardedError', requestId, 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded'))
               .then(__y2h.resumeAudio);
         } catch(error) {
-            __y2h.handleCatch('OnRewardedError', 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded')(error);
+            __y2ads.handleCatch('OnRewardedError', requestId, 'Rewarded ad failed', 'Yes2SDK.Ads.ShowRewarded')(error);
         }
     },
 

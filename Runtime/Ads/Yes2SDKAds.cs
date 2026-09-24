@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -35,16 +36,39 @@ namespace Yes2SDK
         // exposed via IsAdShowing().
         private static bool _adInFlight;
 
+        // Identity of the in-flight ad, 0 when none. Bridge messages carry the id
+        // of the ad they belong to, so a completion for an ad that was already
+        // settled (by the watchdog, or by an earlier completion) is dropped
+        // instead of tearing down the next ad.
+        private static int _adRequestId;
+        private static int _lastAdRequestId;
+        private static bool _adIsRewarded;
+        private static bool _adStarted;
+
+        // Watchdog. If the platform accepts a show but never completes it, the
+        // in-flight latch would otherwise reject every later ad for the rest of
+        // the session. The ad gets AdStartTimeoutSeconds to reach beforeAd (the
+        // same limit as the Defold wrapper), then AdPlayingTimeoutSeconds once it
+        // is on screen, which leaves room for a long rewarded video and its end
+        // card. Checked from Bridge.Update against real time, so a game that sets
+        // Time.timeScale to 0 while the ad plays does not stop it.
+        internal const float AdStartTimeoutSeconds = 30f;
+        internal const float AdPlayingTimeoutSeconds = 180f;
+        private static float _adDeadline = float.PositiveInfinity;
+
+        /// <summary>Real-time clock for the watchdog. Tests replace it.</summary>
+        internal static Func<float> Clock = DefaultClock;
+
         #endregion
 
         #region JavaScript Imports
 
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_ShowInterstitialJS(string placement, string description);
+        private static extern void Yes2SDK_ShowInterstitialJS(int requestId, string placement, string description);
 
         [DllImport("__Internal")]
-        private static extern void Yes2SDK_ShowRewardedJS(string placement, string description);
+        private static extern void Yes2SDK_ShowRewardedJS(int requestId, string placement, string description);
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_ShowBannerJS(int position);
@@ -101,15 +125,10 @@ namespace Yes2SDK
                 });
                 return;
             }
-            _adInFlight = true;
-
-            // Store callbacks
-            _interstitialBeforeAdCallback = beforeAd;
-            _interstitialAfterAdCallback = afterAd;
-            _interstitialErrorCallback = onError;
+            int requestId = BeginInterstitial(beforeAd, afterAd, onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_ShowInterstitialJS(placement, description);
+            Yes2SDK_ShowInterstitialJS(requestId, placement, description);
 #else
             Yes2Log.Log($"Mock: ShowInterstitial(placement: {placement}, description: {description})");
 #if UNITY_EDITOR
@@ -132,6 +151,8 @@ namespace Yes2SDK
                 // or unavailable.
                 if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKMockOverlay.ShowInterstitial(placement))
                 {
+                    // The popup waits on a click, so it has no deadline.
+                    DisarmAdWatchdog();
                     return;
                 }
             }
@@ -204,17 +225,10 @@ namespace Yes2SDK
                 });
                 return;
             }
-            _adInFlight = true;
-
-            // Store callbacks
-            _rewardedBeforeAdCallback = beforeAd;
-            _rewardedAfterAdCallback = afterAd;
-            _rewardedAdDismissedCallback = adDismissed;
-            _rewardedAdViewedCallback = adViewed;
-            _rewardedErrorCallback = onError;
+            int requestId = BeginRewarded(beforeAd, afterAd, adDismissed, adViewed, onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_ShowRewardedJS(placement, description);
+            Yes2SDK_ShowRewardedJS(requestId, placement, description);
 #else
             Yes2Log.Log($"Mock: ShowRewarded(placement: {placement}, description: {description})");
 #if UNITY_EDITOR
@@ -234,6 +248,8 @@ namespace Yes2SDK
                 // synchronous flow when the popup is disabled or unavailable.
                 if (Yes2SDKEditorMock.AdPopupEnabled && Yes2SDKMockOverlay.ShowRewarded(placement))
                 {
+                    // The popup waits on a click, so it has no deadline.
+                    DisarmAdWatchdog();
                     return;
                 }
             }
@@ -468,7 +484,80 @@ namespace Yes2SDK
         {
             ClearInterstitialCallbacks();
             ClearRewardedCallbacks();
-            _adInFlight = false;
+            EndAd();
+            Clock = DefaultClock;
+        }
+
+        /// <summary>
+        /// Stores the interstitial callbacks and marks the ad in flight, without
+        /// asking the platform to show it. Returns the ad's request id.
+        /// </summary>
+        /// <remarks>
+        /// Show* calls this before dispatching. Tests call it directly to hold
+        /// an ad in flight, which the synchronous Editor path never does.
+        /// </remarks>
+        internal static int BeginInterstitial(Action beforeAd, Action afterAd, Action<Error> onError)
+        {
+            _interstitialBeforeAdCallback = beforeAd;
+            _interstitialAfterAdCallback = afterAd;
+            _interstitialErrorCallback = onError;
+            return BeginAd(rewarded: false);
+        }
+
+        /// <summary>Rewarded counterpart of <see cref="BeginInterstitial"/>.</summary>
+        internal static int BeginRewarded(Action beforeAd, Action afterAd, Action adDismissed, Action adViewed, Action<Error> onError)
+        {
+            _rewardedBeforeAdCallback = beforeAd;
+            _rewardedAfterAdCallback = afterAd;
+            _rewardedAdDismissedCallback = adDismissed;
+            _rewardedAdViewedCallback = adViewed;
+            _rewardedErrorCallback = onError;
+            return BeginAd(rewarded: true);
+        }
+
+        /// <summary>
+        /// Settles the in-flight ad as failed once its deadline has passed.
+        /// Called every frame by Bridge.
+        /// </summary>
+        internal static void CheckAdWatchdog()
+        {
+            if (!_adInFlight || Clock() < _adDeadline) return;
+
+            string context = _adIsRewarded ? "Yes2SDK.Ads.ShowRewarded" : "Yes2SDK.Ads.ShowInterstitial";
+            string message = _adStarted
+                ? $"The ad started but did not finish within {AdPlayingTimeoutSeconds:0}s. It was released so later ads can run."
+                : $"The platform did not start the ad within {AdStartTimeoutSeconds:0}s. It was released so later ads can run.";
+            Yes2Log.Warning($"Ad watchdog: {message}");
+
+            var error = new Error { Code = "Timeout", Message = message, Context = context };
+            if (_adIsRewarded)
+            {
+                InvokeRewardedError(error);
+            }
+            else
+            {
+                InvokeInterstitialError(error);
+            }
+        }
+
+        /// <summary>
+        /// Bridge entry for an ad message from JS. The message starts with the
+        /// id of the ad it belongs to; a message for any ad other than the one
+        /// in flight is dropped.
+        /// </summary>
+        internal static void HandleBridgeMessage(string message, Action invoke)
+        {
+            if (!IsForCurrentAd(message, out _)) return;
+            invoke();
+        }
+
+        /// <summary>
+        /// Bridge entry for an ad error from JS: "&lt;requestId&gt;|&lt;error JSON&gt;".
+        /// </summary>
+        internal static void HandleBridgeError(string message, Func<string, Error> parseError, Action<Error> invoke)
+        {
+            if (!IsForCurrentAd(message, out string payload)) return;
+            invoke(parseError(payload));
         }
 
         /// <summary>
@@ -476,6 +565,7 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeInterstitialBeforeAd()
         {
+            MarkAdStarted();
             _interstitialBeforeAdCallback?.Invoke();
         }
 
@@ -494,7 +584,7 @@ namespace Yes2SDK
             // re-entrantly.
             var afterAd = _interstitialAfterAdCallback;
             ClearInterstitialCallbacks();
-            _adInFlight = false;
+            EndAd();
             afterAd?.Invoke();
         }
 
@@ -509,7 +599,7 @@ namespace Yes2SDK
         {
             var onError = _interstitialErrorCallback;
             ClearInterstitialCallbacks();
-            _adInFlight = false;
+            EndAd();
             onError?.Invoke(error);
         }
 
@@ -518,6 +608,7 @@ namespace Yes2SDK
         /// </summary>
         internal static void InvokeRewardedBeforeAd()
         {
+            MarkAdStarted();
             _rewardedBeforeAdCallback?.Invoke();
         }
 
@@ -531,7 +622,7 @@ namespace Yes2SDK
         {
             var afterAd = _rewardedAfterAdCallback;
             ClearRewardedCallbacks();
-            _adInFlight = false;
+            EndAd();
             afterAd?.Invoke();
         }
 
@@ -564,7 +655,7 @@ namespace Yes2SDK
         {
             var onError = _rewardedErrorCallback;
             ClearRewardedCallbacks();
-            _adInFlight = false;
+            EndAd();
             onError?.Invoke(error);
         }
 
@@ -624,11 +715,80 @@ namespace Yes2SDK
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetEditorState()
         {
-            _adInFlight = false;
+            EndAd();
             ClearInterstitialCallbacks();
             ClearRewardedCallbacks();
         }
 #endif
+
+        private static float DefaultClock()
+        {
+            return Time.realtimeSinceStartup;
+        }
+
+        private static int BeginAd(bool rewarded)
+        {
+            _lastAdRequestId = _lastAdRequestId == int.MaxValue ? 1 : _lastAdRequestId + 1;
+            _adRequestId = _lastAdRequestId;
+            _adInFlight = true;
+            _adIsRewarded = rewarded;
+            _adStarted = false;
+            _adDeadline = Clock() + AdStartTimeoutSeconds;
+            return _adRequestId;
+        }
+
+        private static void MarkAdStarted()
+        {
+            // Only an ad still in flight and still under the watchdog gets the
+            // longer on-screen deadline; a disarmed Editor popup stays disarmed.
+            if (!_adInFlight || _adStarted) return;
+            _adStarted = true;
+            if (!float.IsPositiveInfinity(_adDeadline))
+            {
+                _adDeadline = Clock() + AdPlayingTimeoutSeconds;
+            }
+        }
+
+        private static void DisarmAdWatchdog()
+        {
+            _adDeadline = float.PositiveInfinity;
+        }
+
+        private static void EndAd()
+        {
+            _adInFlight = false;
+            _adRequestId = 0;
+            _adStarted = false;
+            _adDeadline = float.PositiveInfinity;
+        }
+
+        private static bool IsForCurrentAd(string message, out string payload)
+        {
+            payload = string.Empty;
+            string idText = message ?? string.Empty;
+            int separator = idText.IndexOf('|');
+            if (separator >= 0)
+            {
+                payload = idText.Substring(separator + 1);
+                idText = idText.Substring(0, separator);
+            }
+
+            if (!int.TryParse(idText, NumberStyles.None, CultureInfo.InvariantCulture, out int requestId))
+            {
+                Yes2Log.Warning($"Ads: dropped a bridge message with no request id: '{message}'");
+                return false;
+            }
+
+            if (!_adInFlight || requestId != _adRequestId)
+            {
+                // Expected after the watchdog released an ad, or for a platform
+                // that sends afterAd after a no-fill that already settled it.
+                Yes2Log.Log($"Ads: ignored a callback for ad {requestId}, which is no longer in flight");
+                return false;
+            }
+
+            return true;
+        }
 
         private static void ClearInterstitialCallbacks()
         {

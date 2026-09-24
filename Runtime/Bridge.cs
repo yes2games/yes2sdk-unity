@@ -53,6 +53,12 @@ namespace Yes2SDK
             DontDestroyOnLoad(gameObject);
         }
 
+        private void Update()
+        {
+            // Releases an ad the platform accepted but never completed.
+            Yes2SDKAds.CheckAdWatchdog();
+        }
+
         #region Handler Registry
 
         // Success handlers — either pass data through or ignore it
@@ -68,12 +74,17 @@ namespace Yes2SDK
             ["OnAccountDialogClose"] = _ => Callbacks.InvokeAccountDialogClose(),
 
             // Ads
-            ["OnInterstitialBeforeAd"] = _ => Yes2SDKAds.InvokeInterstitialBeforeAd(),
-            ["OnInterstitialAfterAd"] = _ => Yes2SDKAds.InvokeInterstitialAfterAd(),
-            ["OnRewardedBeforeAd"] = _ => Yes2SDKAds.InvokeRewardedBeforeAd(),
-            ["OnRewardedAfterAd"] = _ => Yes2SDKAds.InvokeRewardedAfterAd(),
-            ["OnRewardedAdDismissed"] = _ => Yes2SDKAds.InvokeRewardedAdDismissed(),
-            ["OnRewardedAdViewed"] = _ => Yes2SDKAds.InvokeRewardedAdViewed(),
+            // Interstitial and rewarded messages carry the ad's request id, so
+            // Yes2SDKAds can drop one for an ad that is no longer in flight.
+            // Their errors are unwrapped here too, not in _errorHandlers.
+            ["OnInterstitialBeforeAd"] = data => Yes2SDKAds.HandleBridgeMessage(data, Yes2SDKAds.InvokeInterstitialBeforeAd),
+            ["OnInterstitialAfterAd"] = data => Yes2SDKAds.HandleBridgeMessage(data, Yes2SDKAds.InvokeInterstitialAfterAd),
+            ["OnInterstitialError"] = data => Yes2SDKAds.HandleBridgeError(data, ParseError, Yes2SDKAds.InvokeInterstitialError),
+            ["OnRewardedBeforeAd"] = data => Yes2SDKAds.HandleBridgeMessage(data, Yes2SDKAds.InvokeRewardedBeforeAd),
+            ["OnRewardedAfterAd"] = data => Yes2SDKAds.HandleBridgeMessage(data, Yes2SDKAds.InvokeRewardedAfterAd),
+            ["OnRewardedAdDismissed"] = data => Yes2SDKAds.HandleBridgeMessage(data, Yes2SDKAds.InvokeRewardedAdDismissed),
+            ["OnRewardedAdViewed"] = data => Yes2SDKAds.HandleBridgeMessage(data, Yes2SDKAds.InvokeRewardedAdViewed),
+            ["OnRewardedError"] = data => Yes2SDKAds.HandleBridgeError(data, ParseError, Yes2SDKAds.InvokeRewardedError),
             ["OnBannerShown"] = _ => Yes2SDKAds.InvokeBannerShown(),
             ["OnBannerHidden"] = _ => Yes2SDKAds.InvokeBannerHidden(),
 
@@ -149,8 +160,6 @@ namespace Yes2SDK
             ["OnStartGameError"] = Callbacks.InvokeStartGameError,
 
             // Ads
-            ["OnInterstitialError"] = Yes2SDKAds.InvokeInterstitialError,
-            ["OnRewardedError"] = Yes2SDKAds.InvokeRewardedError,
             ["OnBannerShowError"] = Yes2SDKAds.InvokeBannerShowError,
             ["OnBannerHideError"] = Yes2SDKAds.InvokeBannerHideError,
 
@@ -377,7 +386,7 @@ namespace Yes2SDK
 
         #region Utility
 
-        private static Error ParseError(string errorJson)
+        internal static Error ParseError(string errorJson)
         {
             if (string.IsNullOrEmpty(errorJson))
             {
