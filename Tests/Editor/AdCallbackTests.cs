@@ -188,6 +188,48 @@ namespace Yes2SDK.Tests
             Assert.That(_calls, Does.Contain("next-afterAd"), "the next ad should run normally");
         }
 
+        // The error callback is terminal (#96). Live platforms send afterAd after a
+        // no-fill; it must be dropped, so a game that resumes in both onError and
+        // afterAd resumes exactly once.
+
+        [Test]
+        public void Interstitial_PlatformAfterAdFollowingAnErrorIsDropped()
+        {
+            int resumes = 0;
+            int ad = Yes2SDKAds.BeginInterstitial(
+                beforeAd: null,
+                afterAd: () => { resumes++; _calls.Add("afterAd"); },
+                onError: error => { resumes++; _calls.Add("onError:" + error.Code); });
+
+            Yes2SDKAds.HandleBridgeError(ad + "|{\"code\":\"NoFill\",\"message\":\"m\",\"context\":\"c\"}",
+                Bridge.ParseError, Yes2SDKAds.InvokeInterstitialError);
+            Yes2SDKAds.HandleBridgeMessage(ad.ToString(), Yes2SDKAds.InvokeInterstitialAfterAd);
+
+            Assert.AreEqual(new[] { "onError:NoFill" }, _calls, "afterAd must not re-enter game code after an error");
+            Assert.AreEqual(1, resumes, "resuming in both callbacks resumes once");
+            Assert.IsFalse(Yes2SDK.Ads.IsAdShowing());
+        }
+
+        [Test]
+        public void Rewarded_PlatformAfterAdFollowingAnErrorIsDropped()
+        {
+            int resumes = 0;
+            int ad = Yes2SDKAds.BeginRewarded(
+                beforeAd: () => _calls.Add("beforeAd"),
+                afterAd: () => { resumes++; _calls.Add("afterAd"); },
+                adDismissed: () => _calls.Add("adDismissed"),
+                adViewed: () => _calls.Add("adViewed"),
+                onError: error => { resumes++; _calls.Add("onError:" + error.Code); });
+
+            Yes2SDKAds.HandleBridgeMessage(ad.ToString(), Yes2SDKAds.InvokeRewardedBeforeAd);
+            Yes2SDKAds.HandleBridgeError(ad + "|{\"code\":\"NoFill\",\"message\":\"m\",\"context\":\"c\"}",
+                Bridge.ParseError, Yes2SDKAds.InvokeRewardedError);
+            Yes2SDKAds.HandleBridgeMessage(ad.ToString(), Yes2SDKAds.InvokeRewardedAfterAd);
+
+            Assert.AreEqual(new[] { "beforeAd", "onError:NoFill" }, _calls);
+            Assert.AreEqual(1, resumes);
+        }
+
         [Test]
         public void Rewarded_ReleasesInFlightWhenNoCallbacksAreSupplied()
         {

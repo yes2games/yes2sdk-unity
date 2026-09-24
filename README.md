@@ -188,6 +188,8 @@ Yes2SDK.Ads.ShowRewarded(
 );
 ```
 
+> **Resume in `onError` as well as `afterAd`. This is required, not optional.** An ad that fails (no fill, blocked, timed out) ends with `onError` and nothing else. Some platforms still send `afterAd` after a no-fill, but the SDK drops it, because the ad already ended at `onError`. A game that resumes only in `afterAd` stays paused after every failed ad. Each ad ends with exactly one of `afterAd` or `onError`, so resuming in both never runs twice.
+
 #### Rewarded ad firing order
 
 The callbacks fire in this order. Pay attention — getting it wrong silently breaks reward logic:
@@ -198,8 +200,10 @@ beforeAd      → pause game (always)
 adViewed      → grant reward (ONLY fires if the player watched the full ad)
    — or —
 adDismissed   → no reward (fires if the player skipped/closed early)
-afterAd       → resume game (always — fires whether the player watched or dismissed)
+afterAd       → resume game (fires whether the player watched or dismissed)
 ```
+
+If the ad fails instead, only `onError` fires, with no `afterAd` after it (see above).
 
 > ⚠️ **Do NOT grant rewards in `afterAd`.** `afterAd` fires for both completion *and* dismissal — granting rewards there gives them away on skip. Always grant in `adViewed`.
 
