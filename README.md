@@ -610,6 +610,8 @@ onError: err => {
 
 ### Error code reference
 
+`err.ErrorCode` is the typed code to branch on. It reads both the SDK's own codes and the platform runtime's codes (such as `PLATFORM_ERROR` or `NETWORK_FAILURE`), while `err.Code` keeps the original string for logging.
+
 | Code | When it fires | Recommended handling |
 |------|---------------|----------------------|
 | `NotInitialized` | An API was called before `InitializeAsync` succeeded. | Wait for init to complete first; never call SDK methods from `Awake()` without checking `Yes2SDK.IsInitialized`. |
