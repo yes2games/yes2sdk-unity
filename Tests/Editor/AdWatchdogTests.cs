@@ -222,6 +222,33 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Rewarded_WatchdogTimeoutStillReportsOnError()
+        {
+            // The watchdog settles a stuck rewarded ad through onError, which is
+            // its outcome. It must not also synthesize adDismissed (#117), and a
+            // late afterAd for the released ad stays ignored.
+            int ad = BeginRewarded();
+            Send(ad, Yes2SDKAds.InvokeRewardedBeforeAd);
+
+            Advance(Yes2SDKAds.AdPlayingTimeoutSeconds + 1f);
+            Send(ad, Yes2SDKAds.InvokeRewardedAfterAd);
+
+            Assert.AreEqual(new[] { "beforeAd", "onError:Timeout" }, _calls);
+            Assert.IsFalse(Yes2SDK.Ads.IsAdShowing());
+        }
+
+        [Test]
+        public void Rewarded_WatchdogTimeoutBeforeStartReportsOnlyOnError()
+        {
+            int ad = BeginRewarded();
+
+            Advance(Yes2SDKAds.AdStartTimeoutSeconds + 1f);
+            Send(ad, Yes2SDKAds.InvokeRewardedAfterAd);
+
+            Assert.AreEqual(new[] { "onError:Timeout" }, _calls);
+        }
+
+        [Test]
         public void EditorSynchronousPath_CompletesWithNothingLeftForTheWatchdog()
         {
             Yes2SDK.Ads.ShowRewarded("test", "rewarded",

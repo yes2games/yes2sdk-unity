@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace Yes2SDK.Tests
 {
@@ -228,6 +231,219 @@ namespace Yes2SDK.Tests
 
             Assert.AreEqual(new[] { "beforeAd", "onError:NoFill" }, _calls);
             Assert.AreEqual(1, resumes);
+        }
+
+        // Exactly one outcome per rewarded ad (#117). The runtime can complete a
+        // rewarded ad with afterAd alone; the binding then reports it as
+        // dismissed, never as viewed, so a game that settles on the outcome
+        // always settles. A second outcome for the same ad is dropped.
+
+        private int BeginRecordedRewarded(string label = "")
+        {
+            return Yes2SDKAds.BeginRewarded(
+                beforeAd: () => _calls.Add(label + "beforeAd"),
+                afterAd: () => _calls.Add(label + "afterAd"),
+                adDismissed: () => _calls.Add(label + "adDismissed"),
+                adViewed: () => _calls.Add(label + "adViewed"),
+                onError: error => _calls.Add(label + "onError:" + error.Code));
+        }
+
+        private static readonly Regex SynthesizedDismissWarning = new Regex("completed without an outcome");
+        private static readonly Regex DroppedOutcomeWarning = new Regex("second outcome");
+
+        [Test]
+        public void Rewarded_AfterAdWithoutOutcomeInvokesDismissedThenAfterAd()
+        {
+            BeginRecordedRewarded();
+            LogAssert.Expect(LogType.Warning, SynthesizedDismissWarning);
+
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(new[] { "adDismissed", "afterAd" }, _calls);
+            Assert.IsFalse(Yes2SDK.Ads.IsAdShowing(), "the ad must be complete");
+        }
+
+        [Test]
+        public void Rewarded_AfterAdWithoutOutcomeNeverGrantsReward()
+        {
+            int viewed = 0;
+            Yes2SDKAds.BeginRewarded(null, null, null, () => viewed++, null);
+            LogAssert.Expect(LogType.Warning, SynthesizedDismissWarning);
+
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(0, viewed, "a bare afterAd must never grant the reward");
+        }
+
+        [Test]
+        public void Rewarded_BridgeAfterAdWithoutOutcomeIsReportedAsDismissed()
+        {
+            // The observed runtime sequence: beforeAd, then afterAd, nothing else.
+            int ad = BeginRecordedRewarded();
+            LogAssert.Expect(LogType.Warning, SynthesizedDismissWarning);
+
+            Yes2SDKAds.HandleBridgeMessage(ad.ToString(), Yes2SDKAds.InvokeRewardedBeforeAd);
+            Yes2SDKAds.HandleBridgeMessage(ad.ToString(), Yes2SDKAds.InvokeRewardedAfterAd);
+
+            Assert.AreEqual(new[] { "beforeAd", "adDismissed", "afterAd" }, _calls);
+            Assert.IsFalse(Yes2SDK.Ads.IsAdShowing());
+        }
+
+        [Test]
+        public void Rewarded_ViewedThenAfterAdDoesNotAlsoDismiss()
+        {
+            BeginRecordedRewarded();
+
+            Yes2SDKAds.InvokeRewardedAdViewed();
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(new[] { "adViewed", "afterAd" }, _calls);
+        }
+
+        [Test]
+        public void Rewarded_DismissedThenAfterAdDismissesOnce()
+        {
+            BeginRecordedRewarded();
+
+            Yes2SDKAds.InvokeRewardedAdDismissed();
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(new[] { "adDismissed", "afterAd" }, _calls);
+        }
+
+        [TestCase(true, true)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(false, false)]
+        public void Rewarded_SecondOutcomeIsDropped(bool firstViewed, bool secondViewed)
+        {
+            BeginRecordedRewarded();
+            LogAssert.Expect(LogType.Warning, DroppedOutcomeWarning);
+
+            Deliver(firstViewed);
+            Deliver(secondViewed);
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            string first = firstViewed ? "adViewed" : "adDismissed";
+            Assert.AreEqual(new[] { first, "afterAd" }, _calls, "only the first outcome reaches the game");
+        }
+
+        private static void Deliver(bool viewed)
+        {
+            if (viewed)
+            {
+                Yes2SDKAds.InvokeRewardedAdViewed();
+            }
+            else
+            {
+                Yes2SDKAds.InvokeRewardedAdDismissed();
+            }
+        }
+
+        [Test]
+        public void Rewarded_AnOutcomeFromInsideTheOutcomeCallbackIsDropped()
+        {
+            Yes2SDKAds.BeginRewarded(
+                beforeAd: null,
+                afterAd: () => _calls.Add("afterAd"),
+                adDismissed: () => _calls.Add("adDismissed"),
+                adViewed: () =>
+                {
+                    _calls.Add("adViewed");
+                    Yes2SDKAds.InvokeRewardedAdDismissed();
+                },
+                onError: null);
+            LogAssert.Expect(LogType.Warning, DroppedOutcomeWarning);
+
+            Yes2SDKAds.InvokeRewardedAdViewed();
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(new[] { "adViewed", "afterAd" }, _calls);
+        }
+
+        [Test]
+        public void Rewarded_ASynthesizedDismissThatThrowsStillCompletesTheAd()
+        {
+            bool inFlightDuringAfterAd = true;
+            Yes2SDKAds.BeginRewarded(
+                beforeAd: null,
+                afterAd: () =>
+                {
+                    _calls.Add("afterAd");
+                    inFlightDuringAfterAd = Yes2SDK.Ads.IsAdShowing();
+                },
+                adDismissed: () => throw new InvalidOperationException("game code blew up"),
+                adViewed: () => _calls.Add("adViewed"),
+                onError: null);
+            LogAssert.Expect(LogType.Warning, SynthesizedDismissWarning);
+
+            Assert.Throws<InvalidOperationException>(Yes2SDKAds.InvokeRewardedAfterAd);
+
+            Assert.AreEqual(new[] { "afterAd" }, _calls, "afterAd must still run when the synthesized dismiss throws");
+            Assert.IsFalse(inFlightDuringAfterAd, "afterAd runs after teardown");
+            Assert.IsFalse(Yes2SDK.Ads.IsAdShowing(), "a throwing dismiss must not latch the ad on");
+
+            Yes2SDK.Ads.ShowRewarded("after-throw", "rewarded",
+                afterAd: () => _calls.Add("next-afterAd"));
+
+            Assert.AreEqual(new[] { "afterAd", "next-afterAd" }, _calls, "the next ad should run normally");
+        }
+
+        [Test]
+        public void Rewarded_ANewAdCanStartFromAfterAdAfterASynthesizedDismiss()
+        {
+            Yes2SDKAds.BeginRewarded(
+                beforeAd: null,
+                afterAd: () =>
+                {
+                    _calls.Add("A:afterAd");
+                    BeginRecordedRewarded("B:");
+                },
+                adDismissed: () => _calls.Add("A:adDismissed"),
+                adViewed: () => _calls.Add("A:adViewed"),
+                onError: null);
+            LogAssert.Expect(LogType.Warning, SynthesizedDismissWarning);
+
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(new[] { "A:adDismissed", "A:afterAd" }, _calls);
+            Assert.IsTrue(Yes2SDK.Ads.IsAdShowing(), "B started from A's afterAd and is in flight");
+
+            // B starts with a fresh outcome latch: its real adViewed is delivered,
+            // and its afterAd does not synthesize a dismiss.
+            Yes2SDKAds.InvokeRewardedAdViewed();
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(new[] { "A:adDismissed", "A:afterAd", "B:adViewed", "B:afterAd" }, _calls);
+            Assert.IsFalse(Yes2SDK.Ads.IsAdShowing());
+        }
+
+        [Test]
+        public void Rewarded_OutcomeLatchResetsForEachAd()
+        {
+            BeginRecordedRewarded("A:");
+            Yes2SDKAds.InvokeRewardedAdViewed();
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            BeginRecordedRewarded("B:");
+            LogAssert.Expect(LogType.Warning, SynthesizedDismissWarning);
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(new[] { "A:adViewed", "A:afterAd", "B:adDismissed", "B:afterAd" }, _calls,
+                "A's outcome must not count as B's");
+        }
+
+        [Test]
+        public void Rewarded_ErrorStaysTheOutcomeAndSynthesizesNoDismiss()
+        {
+            int ad = BeginRecordedRewarded();
+
+            Yes2SDKAds.HandleBridgeError(ad + "|{\"code\":\"NoFill\",\"message\":\"m\",\"context\":\"c\"}",
+                Bridge.ParseError, Yes2SDKAds.InvokeRewardedError);
+            Yes2SDKAds.HandleBridgeMessage(ad.ToString(), Yes2SDKAds.InvokeRewardedAfterAd);
+            Yes2SDKAds.InvokeRewardedAfterAd();
+
+            Assert.AreEqual(new[] { "onError:NoFill" }, _calls, "onError is the outcome; no dismiss follows it");
         }
 
         [Test]
