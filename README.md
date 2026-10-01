@@ -205,6 +205,8 @@ afterAd       → resume game (fires whether the player watched or dismissed)
 
 If the ad fails instead, only `onError` fires, with no `afterAd` after it (see above).
 
+**Exactly one outcome per ad.** Every rewarded ad reports exactly one of `adViewed`, `adDismissed` or `onError`, whatever the platform sends. If the platform completes the ad without reporting whether it was watched, the binding reports it as `adDismissed` (no reward) just before `afterAd` and logs a warning. It never reports such an ad as `adViewed`. A second outcome for the same ad is dropped with a warning, so a dismissed ad never also grants a reward. You can settle your reward flow on the outcome callback alone.
+
 > ⚠️ **Do NOT grant rewards in `afterAd`.** `afterAd` fires for both completion *and* dismissal — granting rewards there gives them away on skip. Always grant in `adViewed`.
 
 > `afterAd` is **last**, and it is what completes the ad: the outcome arrives first, then `afterAd`. A new ad can be started from `afterAd`, but not from `adViewed` or `adDismissed`, because the previous ad is still in flight there.

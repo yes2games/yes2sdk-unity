@@ -45,6 +45,14 @@ namespace Yes2SDK
         private static bool _adIsRewarded;
         private static bool _adStarted;
 
+        // Whether the in-flight rewarded ad has delivered its outcome (adViewed
+        // or adDismissed). Reset when an ad begins, cleared when it ends. Every
+        // entry point (bridge, Editor synchronous path, mock popup) goes through
+        // the Invoke* methods, so this one flag gives each ad exactly one
+        // outcome: a second one is dropped, and an afterAd that arrives with
+        // none is reported as adDismissed first.
+        private static bool _rewardedOutcomeDelivered;
+
         // Watchdog. If the platform accepts a show but never completes it, the
         // in-flight latch would otherwise reject every later ad for the rest of
         // the session. The ad gets AdStartTimeoutSeconds to reach beforeAd (the
@@ -199,10 +207,13 @@ namespace Yes2SDK
         /// <param name="description">Human-readable description of the ad placement.</param>
         /// <param name="beforeAd">Called before the ad is shown. Pause your game here.</param>
         /// <param name="afterAd">Called after the ad completes. Resume your game here.</param>
-        /// <param name="adDismissed">Called when the player dismisses the ad before completion. Do not reward.</param>
+        /// <param name="adDismissed">Called when the player dismisses the ad before completion, or when the platform completes the ad without reporting an outcome. Do not reward.</param>
         /// <param name="adViewed">Called when the player successfully watched the ad. Grant the reward here.</param>
         /// <param name="onError">Called if an error occurs while showing the ad.</param>
         /// <remarks>
+        /// Each ad reports exactly one outcome: adViewed, adDismissed, or onError.
+        /// afterAd follows adViewed and adDismissed, never onError.
+        ///
         /// In the Unity Editor, a mock ad popup is shown by default (toggle it in
         /// Yes2SDK > Build Window > Play Mode Testing): Claim Reward triggers adViewed,
         /// Skip triggers adDismissed. With the popup disabled, callbacks fire instantly
@@ -639,32 +650,65 @@ namespace Yes2SDK
         /// <summary>
         /// Called by Bridge when rewarded afterAd callback is received from JS.
         /// Completes the ad: releases the in-flight latch and clears the callbacks.
-        /// Arrives after adViewed or adDismissed, so it is the last callback of a
-        /// successful rewarded ad and the one that tears the ad down.
+        /// It is the last callback of a successful rewarded ad and the one that
+        /// tears the ad down.
         /// </summary>
+        /// <remarks>
+        /// The binding guarantees exactly one outcome per ad. If the platform
+        /// completes the ad without reporting adViewed or adDismissed, the
+        /// stored adDismissed runs first, after teardown and before afterAd, and
+        /// a warning is logged. An ambiguous ad is never reported as viewed, so
+        /// it never grants a reward. A throwing adDismissed does not stop afterAd.
+        /// </remarks>
         internal static void InvokeRewardedAfterAd()
         {
+            bool synthesizeDismiss = IsRewardedAdInFlight() && !_rewardedOutcomeDelivered;
             var afterAd = _rewardedAfterAdCallback;
+            var adDismissed = synthesizeDismiss ? _rewardedAdDismissedCallback : null;
             ClearRewardedCallbacks();
             EndAd();
-            afterAd?.Invoke();
+
+            if (!synthesizeDismiss)
+            {
+                afterAd?.Invoke();
+                return;
+            }
+
+            Yes2Log.Warning("Rewarded ad completed without an outcome; reporting it as dismissed (no reward).");
+            // Same discipline as the Editor path: teardown has already run, so a
+            // throwing adDismissed cannot latch the ad on, and the finally still
+            // delivers afterAd while letting the throw reach game code.
+            try
+            {
+                adDismissed?.Invoke();
+            }
+            finally
+            {
+                afterAd?.Invoke();
+            }
         }
 
         /// <summary>
         /// Called by Bridge when rewarded adDismissed callback is received from JS.
         /// Does not complete the ad: afterAd still follows and tears it down.
+        /// This is the ad's outcome: if one was already delivered, this is
+        /// dropped with a warning, so each ad reports exactly one outcome.
         /// </summary>
         internal static void InvokeRewardedAdDismissed()
         {
+            if (!TryTakeRewardedOutcome("adDismissed")) return;
             _rewardedAdDismissedCallback?.Invoke();
         }
 
         /// <summary>
         /// Called by Bridge when rewarded adViewed callback is received from JS.
         /// Does not complete the ad: afterAd still follows and tears it down.
+        /// This is the ad's outcome: if one was already delivered, this is
+        /// dropped with a warning, so a dismissed ad never also grants a reward.
         /// </summary>
         internal static void InvokeRewardedAdViewed()
         {
+            if (!TryTakeRewardedOutcome("adViewed")) return;
             _rewardedAdViewedCallback?.Invoke();
         }
 
@@ -752,6 +796,7 @@ namespace Yes2SDK
             _adInFlight = true;
             _adIsRewarded = rewarded;
             _adStarted = false;
+            _rewardedOutcomeDelivered = false;
             _adDeadline = _activeSeconds + AdStartTimeoutSeconds;
             return _adRequestId;
         }
@@ -778,7 +823,29 @@ namespace Yes2SDK
             _adInFlight = false;
             _adRequestId = 0;
             _adStarted = false;
+            _rewardedOutcomeDelivered = false;
             _adDeadline = float.PositiveInfinity;
+        }
+
+        private static bool IsRewardedAdInFlight()
+        {
+            return _adInFlight && _adIsRewarded;
+        }
+
+        // Claims the in-flight rewarded ad's single outcome. The flag is set
+        // before the game callback runs, so a throwing outcome still counts as
+        // delivered and an outcome fired from inside it is dropped. With no
+        // rewarded ad in flight there is nothing to deliver to.
+        private static bool TryTakeRewardedOutcome(string outcome)
+        {
+            if (!IsRewardedAdInFlight()) return false;
+            if (_rewardedOutcomeDelivered)
+            {
+                Yes2Log.Warning($"Ads: dropped a second outcome ({outcome}) for a rewarded ad that already reported one.");
+                return false;
+            }
+            _rewardedOutcomeDelivered = true;
+            return true;
         }
 
         private static bool IsForCurrentAd(string message, out string payload)
