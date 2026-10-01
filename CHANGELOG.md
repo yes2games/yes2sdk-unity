@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
 * **ads:** guarantee exactly one outcome per rewarded ad ([#118](https://github.com/yes2games/yes2sdk-unity/issues/118)) ([788835a](https://github.com/yes2games/yes2sdk-unity/commit/788835a8627798d3a21c885972c8ae69b9e6c60f)), closes [#117](https://github.com/yes2games/yes2sdk-unity/issues/117)
+  * A rewarded ad that ends without reporting an outcome now reaches the game as `adDismissed` before `afterAd`, and a second outcome for the same ad is dropped. `adViewed` is never reported unless the platform reports it.
 * **ads:** release an ad the platform never completes ([#113](https://github.com/yes2games/yes2sdk-unity/issues/113)) ([45596c7](https://github.com/yes2games/yes2sdk-unity/commit/45596c747bf3d4fdd522163802ceeca3566581f4))
+  * An ad that never starts within 30 seconds, or never finishes within 180 seconds of starting, is ended with `onError` so the game is not left paused.
 * **crazygames:** stop double-firing the gameplay signal ([#111](https://github.com/yes2games/yes2sdk-unity/issues/111)) ([b40a643](https://github.com/yes2games/yes2sdk-unity/commit/b40a643dcc0909737a4382ea94d8bced85eec4cd)), closes [#77](https://github.com/yes2games/yes2sdk-unity/issues/77)
 * **data:** route each confirmed write result to its own call ([#116](https://github.com/yes2games/yes2sdk-unity/issues/116)) ([2e56cb0](https://github.com/yes2games/yes2sdk-unity/commit/2e56cb0cdea61519c65509ad89ee1f1e9959ad89))
 * **error:** map platform runtime error codes to ErrorCode ([#115](https://github.com/yes2games/yes2sdk-unity/issues/115)) ([a681dfc](https://github.com/yes2games/yes2sdk-unity/commit/a681dfc035929eb31724d585c0dc69def958ca43))
