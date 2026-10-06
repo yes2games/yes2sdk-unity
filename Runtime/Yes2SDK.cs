@@ -175,7 +175,7 @@ namespace Yes2SDK
         private static Yes2SDKIAP _iap;
 
         /// <summary>
-        /// In-App Purchase API. Stub — returns FeatureNotSupported on Poki.
+        /// In-App Purchase API. Check IsSupported() first: platforms without IAP report FeatureNotSupported.
         /// </summary>
         public static Yes2SDKIAP IAP
         {

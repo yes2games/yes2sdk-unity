@@ -180,7 +180,8 @@ namespace Yes2SDK
         /// <summary>
         /// Whether the player is signed in (registered) on the platform.
         /// False before the SDK is initialized, on platforms without player
-        /// accounts, and on any error.
+        /// accounts, on platforms without a synchronous login state, and on any
+        /// error.
         /// </summary>
         public bool IsAuthenticated()
         {
