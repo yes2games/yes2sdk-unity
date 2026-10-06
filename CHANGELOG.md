@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.9.0...v2.10.0) (2026-10-06)
+
+
+### Features
+
+* add a Referrals module to share a referral link and list the players who joined ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* add the OnExitRequested lifecycle event ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* **auth:** add ShowRegistrationPrompt and IsAuthenticated ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* **context:** share an image with Context.ShareAsync and ShareImageAsync ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* **editor:** add Play Mode mocks for referrals, subscriptions, notifications, registration, signed player, image share and exit requests ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* **iap:** add a typed Purchase with IsSandbox and SignedRequest ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* **iap:** add subscriptions with typed results ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* **notifications:** schedule notifications by id or by day, with call-to-action text, priority and an image ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* **session:** add GetEntryPointDataDictionary ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+
+
+### Bug Fixes
+
+* **error:** report a closed checkout as UserCancelled ([617d263](https://github.com/yes2games/yes2sdk-unity/commit/617d2638d27016a0bd10f3d7980b6771e346c1f2))
+* **session:** pass SetSessionData to the platform as an object, not a string ([3ff33e4](https://github.com/yes2games/yes2sdk-unity/commit/3ff33e44043f80af072f33c9c615fc356baa265a))
+* **session:** return entry point data and traffic source as JSON ([3ff33e4](https://github.com/yes2games/yes2sdk-unity/commit/3ff33e44043f80af072f33c9c615fc356baa265a))
+
 ## [2.9.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.8.1...v2.9.0) (2026-10-01)
 
 
