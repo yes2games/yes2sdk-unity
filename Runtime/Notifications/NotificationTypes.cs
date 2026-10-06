@@ -26,21 +26,24 @@ namespace Yes2SDK
     {
         /// <summary>
         /// Optional stable id. Scheduling again with the same id replaces the notification on
-        /// platforms that support it. Generated when null.
+        /// platforms that support it. Generated when null; an empty string is rejected.
         /// </summary>
         [JsonProperty("id", NullValueHandling = NullValueHandling.Ignore)]
         public string Id;
 
-        /// <summary>Required. Title of the notification.</summary>
+        /// <summary>Required. Title of the notification (at most 200 characters).</summary>
         [JsonProperty("title")]
         public string Title;
 
-        /// <summary>Body text of the notification. Sent as an empty string when null.</summary>
+        /// <summary>
+        /// Body text of the notification (1 to 2000 characters). Sent as an empty string when null,
+        /// which platforms that deliver notifications reject with InvalidParams.
+        /// </summary>
         [JsonIgnore]
         public string Body;
 
         /// <summary>
-        /// Delay in seconds before the notification is shown (positive). Set this OR
+        /// Delay in seconds before the notification is shown (positive, at most 7 days). Set this OR
         /// <see cref="ScheduledInDays"/>, not both.
         /// </summary>
         [JsonProperty("delaySeconds", NullValueHandling = NullValueHandling.Ignore)]
@@ -146,6 +149,79 @@ namespace Yes2SDK
             return message == null;
         }
 
+        // Limits of the platforms that deliver notifications. The messages are generic on purpose.
+        internal const int MaxTitleLength = 200;
+        internal const int MaxBodyLength = 2000;
+        internal const int MaxCtaTextLength = 50;
+        internal const long MaxDelaySeconds = 7L * 86_400L;
+        internal const string DefaultCtaText = "Play";
+
+        internal const string EmptyIdMessage = "Notification id must be a non-empty string when provided";
+        internal const string BodyLengthMessage = "Notification body must be 1 to 2000 characters";
+        internal const string TitleLengthMessage = "Notification title must be at most 200 characters";
+        internal const string CtaLengthMessage = "Notification ctaText must be 1 to 50 characters";
+        internal const string ImageFormatMessage = "imageDataUrl must be a PNG, JPEG or WebP base64 data URL with a lowercase prefix";
+        internal const string ImageSizeMessage = "imageDataUrl must be at most 2 MiB encoded";
+        internal const string DelayTooLongMessage = "Notifications must be scheduled within 7 days";
+
+        private static readonly string[] ImageDataUrlPrefixes =
+        {
+            "data:image/png;base64,",
+            "data:image/jpeg;base64,",
+            "data:image/webp;base64,"
+        };
+
+        /// <summary>
+        /// Checks the limits that platforms delivering notifications apply after
+        /// <see cref="TryValidate"/> (and after the registered player check), in the same order,
+        /// so the Editor mock fails where a platform build would. Lengths count UTF-16 code units,
+        /// as the platform does.
+        /// </summary>
+        internal static bool TryValidatePlatformLimits(NotificationOptions options, out string message)
+        {
+            message = null;
+            string body = options.Body ?? string.Empty;
+            string ctaText = options.CtaText ?? DefaultCtaText;
+            if (options.Id != null && options.Id.Length == 0)
+            {
+                message = EmptyIdMessage;
+            }
+            else if (body.Length < 1 || body.Length > MaxBodyLength)
+            {
+                message = BodyLengthMessage;
+            }
+            else if (options.Title != null && options.Title.Length > MaxTitleLength)
+            {
+                message = TitleLengthMessage;
+            }
+            else if (ctaText.Length < 1 || ctaText.Length > MaxCtaTextLength)
+            {
+                message = CtaLengthMessage;
+            }
+            else if (options.ImageDataUrl != null && !HasImagePrefix(options.ImageDataUrl))
+            {
+                message = ImageFormatMessage;
+            }
+            else if (options.ImageDataUrl != null && options.ImageDataUrl.Length > Yes2SDKImage.MaxDataUrlLength)
+            {
+                message = ImageSizeMessage;
+            }
+            else if (options.DelaySeconds.HasValue && options.DelaySeconds.Value > MaxDelaySeconds)
+            {
+                message = DelayTooLongMessage;
+            }
+            return message == null;
+        }
+
+        private static bool HasImagePrefix(string dataUrl)
+        {
+            foreach (string prefix in ImageDataUrlPrefixes)
+            {
+                if (dataUrl.StartsWith(prefix, StringComparison.Ordinal)) return true;
+            }
+            return false;
+        }
+
         private static bool IsBlank(string value) => value == null || value.Trim().Length == 0;
 
         private static string PriorityName(NotificationPriority priority)
@@ -155,6 +231,7 @@ namespace Yes2SDK
                 case NotificationPriority.Low: return "low";
                 case NotificationPriority.High: return "high";
                 case NotificationPriority.Critical: return "critical";
+                // An out-of-range value cast to the enum falls back to the platform default.
                 default: return "medium";
             }
         }

@@ -220,15 +220,18 @@ namespace Yes2SDK.Tests
 
         [TestCase("")]
         [TestCase("null")]
-        [TestCase("not json")]
-        public void UnreadableScheduleResult_IsReportedAsAPlatformError(string payload)
+        [TestCase("not json SECRET-PAYLOAD")]
+        [TestCase("{\"id\":\"SECRET-PAYLOAD\",\"scheduledAt\":\"later\"}")]
+        public void UnreadableScheduleResult_IsReportedAsUnknownWithoutThePayload(string payload)
         {
             Error received = default;
             int a = Yes2SDKNotifications.RegisterScheduleForTests(_ => Assert.Fail("no success expected"), e => received = e);
 
             DeliverSuccess(Yes2SDKNotifications.Operation.Schedule, a, payload);
 
-            Assert.AreEqual("PlatformError", received.Code);
+            Assert.AreEqual("Unknown", received.Code);
+            Assert.IsFalse(string.IsNullOrEmpty(received.Message));
+            StringAssert.DoesNotContain("SECRET-PAYLOAD", received.Message);
             Assert.AreEqual(0, Yes2SDKNotifications.PendingCountForTests);
         }
 
@@ -365,6 +368,76 @@ namespace Yes2SDK.Tests
             Assert.AreEqual(expected, message);
         }
 
+        // --- Platform limits (applied by the Editor mock, enforced by the platform at runtime) ---
+
+        private static NotificationOptions Limits(Action<NotificationOptions> change)
+        {
+            var options = Valid();
+            change(options);
+            return options;
+        }
+
+        private static IEnumerable<TestCaseData> WithinLimits()
+        {
+            yield return new TestCaseData(Valid()).SetName("Plain options");
+            yield return new TestCaseData(Limits(o => o.Body = new string('b', 2000))).SetName("Body 2000");
+            yield return new TestCaseData(Limits(o => o.Title = new string('t', 200))).SetName("Title 200");
+            yield return new TestCaseData(Limits(o => o.CtaText = new string('c', 50))).SetName("Cta 50");
+            yield return new TestCaseData(Limits(o => o.CtaText = "c")).SetName("Cta 1");
+            yield return new TestCaseData(Limits(o => o.DelaySeconds = 7 * 86_400)).SetName("Delay exactly 7 days");
+            yield return new TestCaseData(Limits(o => { o.DelaySeconds = null; o.ScheduledInDays = 7; })).SetName("Days 7");
+            yield return new TestCaseData(Limits(o => o.ImageDataUrl = "data:image/png;base64,AAAA")).SetName("Png data url");
+            yield return new TestCaseData(Limits(o => o.ImageDataUrl = "data:image/jpeg;base64,AAAA")).SetName("Jpeg data url");
+            yield return new TestCaseData(Limits(o => o.ImageDataUrl = "data:image/webp;base64,AAAA")).SetName("Webp data url");
+            yield return new TestCaseData(Limits(o => o.ImageDataUrl = "data:image/png;base64," + new string('A', Yes2SDKImage.MaxDataUrlLength - 22))).SetName("Data url at the size limit");
+            yield return new TestCaseData(Limits(o => o.Id = "daily")).SetName("Given id");
+        }
+
+        [TestCaseSource(nameof(WithinLimits))]
+        public void TryValidatePlatformLimits_Accepts(NotificationOptions options)
+        {
+            Assert.IsTrue(NotificationOptions.TryValidatePlatformLimits(options, out string message), message);
+        }
+
+        private static IEnumerable<TestCaseData> OverLimits()
+        {
+            yield return new TestCaseData(Limits(o => o.Id = ""), NotificationOptions.EmptyIdMessage).SetName("Empty id");
+            yield return new TestCaseData(Limits(o => o.Body = null), NotificationOptions.BodyLengthMessage).SetName("Null body");
+            yield return new TestCaseData(Limits(o => o.Body = ""), NotificationOptions.BodyLengthMessage).SetName("Empty body");
+            yield return new TestCaseData(Limits(o => o.Body = new string('b', 2001)), NotificationOptions.BodyLengthMessage).SetName("Body 2001");
+            yield return new TestCaseData(Limits(o => o.Title = new string('t', 201)), NotificationOptions.TitleLengthMessage).SetName("Title 201");
+            yield return new TestCaseData(Limits(o => o.CtaText = ""), NotificationOptions.CtaLengthMessage).SetName("Empty cta");
+            yield return new TestCaseData(Limits(o => o.CtaText = new string('c', 51)), NotificationOptions.CtaLengthMessage).SetName("Cta 51");
+            yield return new TestCaseData(Limits(o => o.ImageDataUrl = "data:image/gif;base64,AAAA"), NotificationOptions.ImageFormatMessage).SetName("Gif data url");
+            yield return new TestCaseData(Limits(o => o.ImageDataUrl = "DATA:IMAGE/PNG;BASE64,AAAA"), NotificationOptions.ImageFormatMessage).SetName("Uppercase prefix");
+            yield return new TestCaseData(Limits(o => o.ImageDataUrl = "https://example.com/a.png"), NotificationOptions.ImageFormatMessage).SetName("Plain url");
+            yield return new TestCaseData(Limits(o => o.ImageDataUrl = "data:image/png;base64," + new string('A', Yes2SDKImage.MaxDataUrlLength - 21)), NotificationOptions.ImageSizeMessage).SetName("Data url over the size limit");
+            yield return new TestCaseData(Limits(o => o.DelaySeconds = 7 * 86_400 + 1), NotificationOptions.DelayTooLongMessage).SetName("Delay over 7 days");
+            yield return new TestCaseData(Limits(o => o.DelaySeconds = int.MaxValue), NotificationOptions.DelayTooLongMessage).SetName("Delay int max");
+        }
+
+        [TestCaseSource(nameof(OverLimits))]
+        public void TryValidatePlatformLimits_Rejects(NotificationOptions options, string expected)
+        {
+            Assert.IsFalse(NotificationOptions.TryValidatePlatformLimits(options, out string message));
+            Assert.AreEqual(expected, message);
+        }
+
+        [Test]
+        public void PlatformLimitMessages_NameNoPlatform()
+        {
+            string[] messages =
+            {
+                NotificationOptions.EmptyIdMessage, NotificationOptions.BodyLengthMessage, NotificationOptions.TitleLengthMessage,
+                NotificationOptions.CtaLengthMessage, NotificationOptions.ImageFormatMessage, NotificationOptions.ImageSizeMessage,
+                NotificationOptions.DelayTooLongMessage
+            };
+            foreach (string message in messages)
+            {
+                StringAssert.DoesNotContain(" on ", message);
+            }
+        }
+
         [Test]
         public void ScheduledInDays_IsAWholeNumberType_SoFractionalDaysCannotBeSent()
         {
@@ -383,6 +456,26 @@ namespace Yes2SDK.Tests
             Assert.AreEqual(1, errors.Count);
             Assert.AreEqual("InvalidParams", errors[0].Code);
             Assert.AreEqual(ErrorCode.InvalidParams, errors[0].ErrorCode);
+            Assert.AreEqual(0, Yes2SDKNotifications.PendingCountForTests);
+        }
+
+        private static NotificationOptions WithCyclicData()
+        {
+            var options = Valid();
+            options.Data = new Dictionary<string, object>();
+            options.Data["self"] = options.Data;
+            return options;
+        }
+
+        [Test]
+        public void ScheduleAsync_CyclicData_FailsSynchronouslyWithInvalidParams()
+        {
+            var errors = new List<Error>();
+
+            Yes2SDK.Notifications.ScheduleAsync(WithCyclicData(), _ => Assert.Fail("no success expected"), errors.Add);
+
+            Assert.AreEqual(1, errors.Count);
+            Assert.AreEqual("InvalidParams", errors[0].Code);
             Assert.AreEqual(0, Yes2SDKNotifications.PendingCountForTests);
         }
 
@@ -556,13 +649,80 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
-        public void Mock_Schedule_GuestStillSucceeds()
+        public void Mock_Schedule_CyclicData_FailsWithInvalidParams()
         {
-            int successes = 0;
+            Error received = default;
 
-            Yes2SDKNotifications.MockScheduleForTests(Valid(), false, _ => successes++, e => Assert.Fail(e.ToString()));
+            Yes2SDKNotifications.MockScheduleForTests(WithCyclicData(), true, _ => Assert.Fail("no success expected"), e => received = e);
 
-            Assert.AreEqual(1, successes);
+            Assert.AreEqual("InvalidParams", received.Code);
+            Assert.AreEqual(0, Yes2SDKNotifications.MockScheduledForTests.Count);
+            Assert.AreEqual(0, Yes2SDKNotifications.PendingCountForTests);
+        }
+
+        [Test]
+        public void Mock_Schedule_Guest_FailsWithPlayerNotAuthenticated()
+        {
+            Error received = default;
+
+            Yes2SDKNotifications.MockScheduleForTests(Valid(), false, _ => Assert.Fail("no success expected"), e => received = e);
+
+            Assert.AreEqual("PLAYER_NOT_AUTHENTICATED", received.Code);
+            Assert.AreEqual(0, Yes2SDKNotifications.MockScheduledForTests.Count);
+            Assert.AreEqual(0, Yes2SDKNotifications.PendingCountForTests);
+        }
+
+        [Test]
+        public void Mock_Schedule_Guest_WithInvalidOptions_GetsInvalidParamsFirst()
+        {
+            Error received = default;
+
+            Yes2SDKNotifications.MockScheduleForTests(new NotificationOptions { Title = " ", Body = "b", DelaySeconds = 5 }, false,
+                _ => Assert.Fail("no success expected"), e => received = e);
+
+            Assert.AreEqual("InvalidParams", received.Code);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        public void Mock_Schedule_EmptyBody_FailsWithInvalidParams(string body)
+        {
+            Error received = default;
+            var options = Valid();
+            options.Body = body;
+
+            Yes2SDKNotifications.MockScheduleForTests(options, true, _ => Assert.Fail("no success expected"), e => received = e);
+
+            Assert.AreEqual("InvalidParams", received.Code);
+            Assert.AreEqual(NotificationOptions.BodyLengthMessage, received.Message);
+            Assert.AreEqual(0, Yes2SDKNotifications.MockScheduledForTests.Count);
+        }
+
+        [Test]
+        public void Mock_Schedule_EmptyId_FailsWithInvalidParams()
+        {
+            Error received = default;
+            var options = Valid();
+            options.Id = "";
+
+            Yes2SDKNotifications.MockScheduleForTests(options, true, _ => Assert.Fail("no success expected"), e => received = e);
+
+            Assert.AreEqual("InvalidParams", received.Code);
+            Assert.AreEqual(NotificationOptions.EmptyIdMessage, received.Message);
+            Assert.AreEqual(0, Yes2SDKNotifications.MockScheduledForTests.Count);
+        }
+
+        [Test]
+        public void Mock_Schedule_DelayOverSevenDays_FailsWithInvalidParams()
+        {
+            Error received = default;
+            var options = Valid();
+            options.DelaySeconds = 7 * 86_400 + 1;
+
+            Yes2SDKNotifications.MockScheduleForTests(options, true, _ => Assert.Fail("no success expected"), e => received = e);
+
+            Assert.AreEqual("InvalidParams", received.Code);
+            Assert.AreEqual(NotificationOptions.DelayTooLongMessage, received.Message);
         }
 
         [Test]

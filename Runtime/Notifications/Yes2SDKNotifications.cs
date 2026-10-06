@@ -99,31 +99,24 @@ namespace Yes2SDK
 
         /// <summary>
         /// Schedule a notification. onSuccess receives the notification the platform accepted;
-        /// keep its <see cref="ScheduledNotification.Id"/> to cancel it later. Null options call
-        /// onError synchronously with InvalidParams; other option rules are checked by the platform
-        /// and fail with InvalidParams through onError.
+        /// keep its <see cref="ScheduledNotification.Id"/> to cancel it later. Null options, or
+        /// <see cref="NotificationOptions.Data"/> that cannot be written as JSON (for example a
+        /// dictionary that contains itself), call onError synchronously with InvalidParams; other
+        /// option rules are checked by the platform and fail with InvalidParams through onError.
+        /// A guest player gets an error with code "PLAYER_NOT_AUTHENTICATED" on platforms that only
+        /// notify registered players.
         /// </summary>
         public void ScheduleAsync(
             NotificationOptions options,
             Action<ScheduledNotification> onSuccess = null,
             Action<Error> onError = null)
         {
-            if (options == null)
-            {
-                Yes2Log.Warning("Notifications.ScheduleAsync: options must not be null");
-                onError?.Invoke(new Error
-                {
-                    Code = "InvalidParams",
-                    Message = "options must be a valid object",
-                    Context = ScheduleContext
-                });
-                return;
-            }
+            if (!TrySerialize(options, onError, out string json)) return;
 
             int requestId = Register(Operation.Schedule, TypedSchedule(onSuccess, onError), onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_Notifications_ScheduleAsyncJS(requestId, options.ToJson());
+            Yes2SDK_Notifications_ScheduleAsyncJS(requestId, json);
 #else
 #if UNITY_EDITOR
             if (MockActive)
@@ -139,8 +132,10 @@ namespace Yes2SDK
 
         /// <summary>
         /// Schedule a notification after <paramref name="delaySec"/> seconds. onSuccess receives the
-        /// notification id. <paramref name="dataJson"/> must be a JSON object; anything else is
-        /// dropped with a warning. Prefer the <see cref="NotificationOptions"/> overload.
+        /// notification id. <paramref name="delaySec"/> must be positive: zero or less fails with
+        /// InvalidParams. A null <paramref name="body"/> is sent as an empty string, which platforms
+        /// that deliver notifications reject. <paramref name="dataJson"/> must be a JSON object;
+        /// anything else is dropped with a warning. Prefer the <see cref="NotificationOptions"/> overload.
         /// </summary>
         public void ScheduleAsync(string title, string body, int delaySec, string dataJson, Action<string> onSuccess = null, Action<Error> onError = null)
         {
@@ -317,6 +312,7 @@ namespace Yes2SDK
             Action<ScheduledNotification> onSuccess,
             Action<Error> onError)
         {
+            if (!TrySerialize(options, onError, out _)) return;
             int requestId = Register(Operation.Schedule, TypedSchedule(onSuccess, onError), onError);
             MockSchedule(requestId, options, registered);
         }
@@ -349,23 +345,32 @@ namespace Yes2SDK
         private static bool MockActive =>
             Yes2SDKEditorMock.PlatformServicesEnabled && Yes2SDKEditorMock.CanShowPopups;
 
+        // Mirrors the platform order: option rules first, then the registered player check,
+        // then the platform limits.
         private static void MockSchedule(int requestId, NotificationOptions options, bool registered)
         {
             if (!NotificationOptions.TryValidate(options, out string message))
             {
-                Yes2Log.Log($"Mock: Notifications.ScheduleAsync() - InvalidParams: {message}");
-                CompleteError(Operation.Schedule, requestId, new Error
-                {
-                    Code = "InvalidParams",
-                    Message = message,
-                    Context = ScheduleContext
-                });
+                MockInvalidParams(requestId, message);
                 return;
             }
 
             if (!registered)
             {
-                Yes2Log.Warning("Mock: Notifications.ScheduleAsync() - the player is a guest; guests cannot receive notifications on some platforms");
+                Yes2Log.Log("Mock: Notifications.ScheduleAsync() - PLAYER_NOT_AUTHENTICATED: the player is a guest");
+                CompleteError(Operation.Schedule, requestId, new Error
+                {
+                    Code = "PLAYER_NOT_AUTHENTICATED",
+                    Message = "Notifications require a registered player (mock: the player is a guest)",
+                    Context = ScheduleContext
+                });
+                return;
+            }
+
+            if (!NotificationOptions.TryValidatePlatformLimits(options, out message))
+            {
+                MockInvalidParams(requestId, message);
+                return;
             }
 
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -374,9 +379,9 @@ namespace Yes2SDK
                 : now + options.ScheduledInDays.GetValueOrDefault() * MillisecondsPerDay;
             var notification = new ScheduledNotification
             {
-                Id = string.IsNullOrEmpty(options.Id) ? "mock-notification-" + (++_mockIdCounter) : options.Id,
+                Id = options.Id ?? "mock-notification-" + (++_mockIdCounter),
                 Title = options.Title,
-                Body = options.Body ?? string.Empty,
+                Body = options.Body,
                 ScheduledAt = scheduledAt
             };
 
@@ -386,6 +391,12 @@ namespace Yes2SDK
 
             Yes2Log.Log($"Mock: Notifications.ScheduleAsync('{notification.Id}') - scheduled");
             CompleteSuccess(Operation.Schedule, requestId, JsonConvert.SerializeObject(notification));
+        }
+
+        private static void MockInvalidParams(int requestId, string message)
+        {
+            Yes2Log.Log($"Mock: Notifications.ScheduleAsync() - InvalidParams: {message}");
+            CompleteError(Operation.Schedule, requestId, InvalidScheduleParams(message));
         }
 
         private static void MockCancel(int requestId, string notificationId)
@@ -441,7 +452,7 @@ namespace Yes2SDK
                     }
                     catch (Exception ex)
                     {
-                        Yes2Log.Warning($"Notifications: could not parse ScheduledNotification ({ex.Message})");
+                        Yes2Log.Warning($"Notifications: could not parse ScheduledNotification ({ex.GetType().Name})");
                     }
                 }
 
@@ -451,14 +462,50 @@ namespace Yes2SDK
                 }
                 else
                 {
+                    // The raw payload stays out of the message: it can carry game data.
                     onError?.Invoke(new Error
                     {
-                        Code = "PlatformError",
-                        Message = "Could not read the platform response: '" + payload + "'",
+                        Code = "Unknown",
+                        Message = "Could not read the scheduled notification returned by the platform",
                         Context = ScheduleContext
                     });
                 }
             };
+        }
+
+        /// <summary>
+        /// Writes the options JSON before any request is registered. Null options or options that
+        /// cannot be written (a cyclic or unsupported Data value) complete onError synchronously
+        /// with InvalidParams, so no request is left pending.
+        /// </summary>
+        private static bool TrySerialize(NotificationOptions options, Action<Error> onError, out string json)
+        {
+            json = null;
+            if (options == null)
+            {
+                Yes2Log.Warning("Notifications.ScheduleAsync: options must not be null");
+                onError?.Invoke(InvalidScheduleParams("options must be a valid object"));
+                return false;
+            }
+
+            try
+            {
+                json = options.ToJson();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Yes2Log.Warning($"Notifications.ScheduleAsync: options could not be written as JSON ({ex.GetType().Name})");
+            }
+
+            onError?.Invoke(InvalidScheduleParams(
+                "options could not be written as JSON; check that Data holds no cycles or unsupported values"));
+            return false;
+        }
+
+        private static Error InvalidScheduleParams(string message)
+        {
+            return new Error { Code = "InvalidParams", Message = message, Context = ScheduleContext };
         }
 
         private static Action<string> Untyped(Action onSuccess)
