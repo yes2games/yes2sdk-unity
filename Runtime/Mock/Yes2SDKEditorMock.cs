@@ -27,7 +27,7 @@ namespace Yes2SDK
         private const string ReferralConversionsKey = "Yes2SDK.EditorMock.ReferralConversions";
 
         /// <summary>Maximum value accepted by <see cref="ReferralConversions"/>.</summary>
-        internal const int MaxReferralConversions = 20;
+        public const int MaxReferralConversions = 20;
 
         /// <summary>
         /// What ShowInterstitial / ShowRewarded resolve to in Play Mode.
@@ -113,6 +113,13 @@ namespace Yes2SDK
             get => EditorPrefs.GetString(EntryPointDataKey, "{}");
             set => EditorPrefs.SetString(EntryPointDataKey, string.IsNullOrEmpty(value) ? "{}" : value);
         }
+
+        /// <summary>
+        /// True when <paramref name="json"/> is acceptable as entry point
+        /// data: empty (treated as "{}") or a JSON object.
+        /// </summary>
+        public static bool IsValidEntryPointData(string json) =>
+            string.IsNullOrWhiteSpace(json) || Yes2SDKSession.IsJsonObject(json);
 
         /// <summary>
         /// When enabled, the referral and notification mocks are active in

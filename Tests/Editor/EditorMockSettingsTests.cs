@@ -15,5 +15,23 @@ namespace Yes2SDK.Tests
         {
             Assert.AreEqual(expected, Yes2SDKEditorMock.ClampConversions(input));
         }
+
+        [TestCase("", true)]
+        [TestCase("{}", true)]
+        [TestCase("{\"ref\":\"abc\",\"n\":{\"a\":1}}", true)]
+        [TestCase("[1,2]", false)]
+        [TestCase("\"text\"", false)]
+        [TestCase("12", false)]
+        [TestCase("{bad", false)]
+        public void IsValidEntryPointData_AcceptsOnlyEmptyOrJsonObjects(string json, bool expected)
+        {
+            Assert.AreEqual(expected, Yes2SDKEditorMock.IsValidEntryPointData(json));
+        }
+
+        [Test]
+        public void MaxReferralConversions_IsTwenty()
+        {
+            Assert.AreEqual(20, Yes2SDKEditorMock.MaxReferralConversions);
+        }
     }
 }

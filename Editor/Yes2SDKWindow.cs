@@ -24,6 +24,8 @@ namespace Yes2SDK.Editor
         private string _buildPath;
         private bool _isSetupComplete;
         private bool _settingsExpanded;
+        private string _entryPointDraft;
+        private bool _entryPointInvalid;
 
         [MenuItem("Yes2SDK/Build Window", false, 0)]
         public static void ShowWindow()
@@ -210,7 +212,10 @@ namespace Yes2SDK.Editor
                 new GUIContent("Mock in-app purchases",
                     "On: IAP.IsSupported() returns true in Play Mode, GetCatalogAsync returns a sample " +
                     "catalog, and PurchaseAsync shows a Buy / Cancel dialog (any product id is accepted). " +
+                    "Cancelling the dialog lets you test the dismissed path. " +
                     "Purchases last for the current play session only. " +
+                    "Subscriptions follow this same toggle, and guest players see no subscriptions " +
+                    "(turn on \"Player is registered\" below to see them). " +
                     "Off: IAP reports unsupported (legacy behavior)."),
                 Yes2SDKEditorMock.IAPEnabled);
             if (EditorGUI.EndChangeCheck())
@@ -225,11 +230,106 @@ namespace Yes2SDK.Editor
             if (EditorGUI.EndChangeCheck())
                 Yes2SDKEditorMock.IAPFailPurchases = iapFail;
 
+            // Mocks for referrals, registration, entry point data and exit requests.
+            EditorGUILayout.Space(4);
+
+            EditorGUI.BeginChangeCheck();
+            bool registered = EditorGUILayout.ToggleLeft(
+                new GUIContent("Player is registered",
+                    "On: the mock player counts as signed in, so subscriptions are listed and the " +
+                    "authentication check passes. Off: the player is a guest. " +
+                    "A mock registration prompt that succeeds also registers the player for the current " +
+                    "play session."),
+                Yes2SDKEditorMock.PlayerRegistered);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.PlayerRegistered = registered;
+
+            DrawEntryPointField();
+
+            EditorGUI.BeginChangeCheck();
+            bool services = EditorGUILayout.ToggleLeft(
+                new GUIContent("Mock referrals and notifications",
+                    "On: referral sharing, referral conversions and scheduled notifications are mocked " +
+                    "in Play Mode. Off: they report unsupported."),
+                Yes2SDKEditorMock.PlatformServicesEnabled);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.PlatformServicesEnabled = services;
+
+            EditorGUI.BeginChangeCheck();
+            var shareResult = (Yes2SDKEditorMock.ShareOutcome)EditorGUILayout.Popup(
+                new GUIContent("Referral share result",
+                    "Shared: the share succeeds and the reference is recorded. " +
+                    "Cancelled: the player dismisses the share. " +
+                    "Error: the share fails with an error."),
+                (int)Yes2SDKEditorMock.ReferralShareResult,
+                new[]
+                {
+                    new GUIContent("Shared"),
+                    new GUIContent("Cancelled"),
+                    new GUIContent("Error")
+                });
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.ReferralShareResult = shareResult;
+
+            EditorGUI.BeginChangeCheck();
+            int conversions = EditorGUILayout.IntSlider(
+                new GUIContent("Referral conversions",
+                    "Conversions reported for each shared reference (0 to " +
+                    Yes2SDKEditorMock.MaxReferralConversions + "). " +
+                    "A reference with 0 conversions is left out of the list, as on a real platform."),
+                Yes2SDKEditorMock.ReferralConversions,
+                0,
+                Yes2SDKEditorMock.MaxReferralConversions);
+            if (EditorGUI.EndChangeCheck())
+                Yes2SDKEditorMock.ReferralConversions = conversions;
+
+            using (new EditorGUI.DisabledScope(!Application.isPlaying))
+            {
+                if (GUILayout.Button(new GUIContent("Simulate exit request",
+                        "Play Mode only. Raises the exit request event, then saves game data, like the " +
+                        "platform does when it asks the game to close.")))
+                {
+                    Yes2SDKEditorMock.SimulateExitRequest();
+                }
+            }
+
             EditorGUILayout.LabelField(
                 "Editor Play Mode only. Platform builds always use the real platform SDK.",
                 EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.EndVertical();
+        }
+
+        // Entry point data field: the draft is only saved when it is empty or a
+        // JSON object; invalid input shows an inline error and is never saved.
+        private void DrawEntryPointField()
+        {
+            if (_entryPointDraft == null)
+            {
+                _entryPointDraft = Yes2SDKEditorMock.EntryPointDataJson;
+                _entryPointInvalid = false;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            string text = EditorGUILayout.TextField(
+                new GUIContent("Entry point data (JSON)",
+                    "JSON object returned by Session.GetEntryPointData() in Play Mode, for example " +
+                    "{\"ref\":\"abc\"}. Only a valid JSON object is saved."),
+                _entryPointDraft);
+            if (EditorGUI.EndChangeCheck())
+            {
+                _entryPointDraft = text;
+                _entryPointInvalid = !Yes2SDKEditorMock.IsValidEntryPointData(text);
+                if (!_entryPointInvalid)
+                    Yes2SDKEditorMock.EntryPointDataJson = text;
+            }
+
+            if (_entryPointInvalid)
+            {
+                EditorGUILayout.HelpBox(
+                    "Not a JSON object. The previous value is still in use.",
+                    MessageType.Error);
+            }
         }
 
         private void DrawSetup()
