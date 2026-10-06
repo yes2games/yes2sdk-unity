@@ -144,6 +144,16 @@ namespace Yes2SDK
             ["OnDataSetStringError"] = data => Yes2SDKData.HandleErrorMessage(Yes2SDKData.Operation.SetString, data, ParseError),
             ["OnDataFlushError"] = data => Yes2SDKData.HandleErrorMessage(Yes2SDKData.Operation.Flush, data, ParseError),
 
+            // Notifications. Messages carry a request id, so errors are
+            // unwrapped here too rather than in _errorHandlers.
+            ["OnNotificationScheduleSuccess"] = data => Yes2SDKNotifications.HandleSuccessMessage(Yes2SDKNotifications.Operation.Schedule, data),
+            ["OnNotificationScheduleError"] = data => Yes2SDKNotifications.HandleErrorMessage(Yes2SDKNotifications.Operation.Schedule, data, ParseError),
+            ["OnNotificationCancelSuccess"] = data => Yes2SDKNotifications.HandleSuccessMessage(Yes2SDKNotifications.Operation.Cancel, data),
+            ["OnNotificationCancelError"] = data => Yes2SDKNotifications.HandleErrorMessage(Yes2SDKNotifications.Operation.Cancel, data, ParseError),
+            ["OnNotificationCancelAllSuccess"] = data => Yes2SDKNotifications.HandleSuccessMessage(Yes2SDKNotifications.Operation.CancelAll, data),
+            ["OnNotificationCancelAllError"] = data => Yes2SDKNotifications.HandleErrorMessage(Yes2SDKNotifications.Operation.CancelAll, data, ParseError),
+            // End notifications
+
             // Leaderboard
             ["OnGetLeaderboardSuccess"] = Yes2SDKLeaderboard.InvokeGetLeaderboardSuccess,
             ["OnSetScoreSuccess"] = Yes2SDKLeaderboard.InvokeSetScoreSuccess,
@@ -358,6 +368,15 @@ namespace Yes2SDK
         public void OnDataSetStringError(string msg) => Handle(msg);
         public void OnDataFlushSuccess(string msg) => Handle(msg);
         public void OnDataFlushError(string msg) => Handle(msg);
+
+        // Notifications
+        public void OnNotificationScheduleSuccess(string msg) => Handle(msg);
+        public void OnNotificationScheduleError(string msg) => Handle(msg);
+        public void OnNotificationCancelSuccess(string msg) => Handle(msg);
+        public void OnNotificationCancelError(string msg) => Handle(msg);
+        public void OnNotificationCancelAllSuccess(string msg) => Handle(msg);
+        public void OnNotificationCancelAllError(string msg) => Handle(msg);
+        // End notifications
 
         // Leaderboard
         public void OnGetLeaderboardSuccess(string msg) => Handle(msg);

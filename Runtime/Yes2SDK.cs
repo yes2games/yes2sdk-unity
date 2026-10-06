@@ -217,7 +217,8 @@ namespace Yes2SDK
         private static Yes2SDKNotifications _notifications;
 
         /// <summary>
-        /// Notifications API. Stub — returns FeatureNotSupported on Poki.
+        /// Notifications API: schedule and cancel notifications.
+        /// Reports FeatureNotSupported on platforms without notifications.
         /// </summary>
         public static Yes2SDKNotifications Notifications
         {

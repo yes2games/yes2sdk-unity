@@ -235,6 +235,142 @@ test('lifecycle exitRequested sends OnExitRequested to Bridge after init', async
 });
 // ---- end Lifecycle: exitRequested ----------------------------------------------------------
 
+// ---- Notifications: request-id envelope (task: notification options) -----------------------
+const notifPayload = (sb) => {
+  const [, , payload] = sb.sent[0];
+  return { id: payload.slice(0, payload.indexOf('|')), body: payload.slice(payload.indexOf('|') + 1) };
+};
+
+test('notifications ScheduleAsync passes the parsed options and sends JSON.stringify(notification)', async () => {
+  const seen = [];
+  const notification = { id: 'daily', title: 'T', body: 'B', scheduledAt: 1767225600000 };
+  const sb = createSandbox(['Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { notifications: { scheduleAsync: (o) => { seen.push(o); return Promise.resolve(notification); } } },
+  });
+  sb.call('Yes2SDK_Notifications_ScheduleAsyncJS', 4, sb.str('{"title":"T","body":"B","scheduledInDays":0,"priority":"high"}'));
+  await flush();
+  // options are parsed inside the sandbox realm, so compare by value
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(seen)), [{ title: 'T', body: 'B', scheduledInDays: 0, priority: 'high' }]);
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnNotificationScheduleSuccess', '4|' + JSON.stringify(notification)]]);
+});
+
+test('notifications ScheduleAsync rejection sends the error envelope with the platform code', async () => {
+  const sb = createSandbox(['Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { notifications: { scheduleAsync: () => Promise.reject({ code: 'INVALID_PARAM', message: 'bad days' }) } },
+  });
+  sb.call('Yes2SDK_Notifications_ScheduleAsyncJS', 6, sb.str('{"title":"T"}'));
+  await flush();
+  assert.equal(sb.sent[0][1], 'OnNotificationScheduleError');
+  const { id, body } = notifPayload(sb);
+  assert.equal(id, '6');
+  assert.deepStrictEqual(JSON.parse(body), { code: 'INVALID_PARAM', message: 'bad days', context: 'Yes2SDK.Notifications.ScheduleAsync' });
+});
+
+test('notifications ScheduleAsync with bad options JSON sends INVALID_PARAM without calling the platform', async () => {
+  let called = false;
+  const sb = createSandbox(['Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { notifications: { scheduleAsync: () => { called = true; return Promise.resolve({}); } } },
+  });
+  sb.call('Yes2SDK_Notifications_ScheduleAsyncJS', 2, sb.str('{bad'));
+  await flush();
+  assert.equal(called, false);
+  assert.equal(sb.sent[0][1], 'OnNotificationScheduleError');
+  assert.equal(JSON.parse(notifPayload(sb).body).code, 'INVALID_PARAM');
+});
+
+test('notifications ScheduleAsync turns a synchronous throw into an error envelope', async () => {
+  const sb = createSandbox(['Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { notifications: { scheduleAsync: () => { throw { code: 'NOT_INITIALIZED', message: 'not yet' }; } } },
+  });
+  sb.call('Yes2SDK_Notifications_ScheduleAsyncJS', 8, sb.str('{}'));
+  await flush();
+  assert.equal(sb.sent.length, 1);
+  assert.equal(sb.sent[0][1], 'OnNotificationScheduleError');
+  assert.equal(JSON.parse(notifPayload(sb).body).code, 'NOT_INITIALIZED');
+});
+
+test('notifications CancelAsync passes the id and sends an empty payload', async () => {
+  const seen = [];
+  const sb = createSandbox(['Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { notifications: { cancelAsync: (id) => { seen.push(id); return Promise.resolve(); } } },
+  });
+  sb.call('Yes2SDK_Notifications_CancelAsyncJS', 3, sb.str('daily'));
+  await flush();
+  assert.deepStrictEqual(seen, ['daily']);
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnNotificationCancelSuccess', '3|']]);
+});
+
+test('notifications CancelAsync rejection sends the error envelope', async () => {
+  const sb = createSandbox(['Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { notifications: { cancelAsync: () => Promise.reject(new Error('gone')) } },
+  });
+  sb.call('Yes2SDK_Notifications_CancelAsyncJS', 5, sb.str('x'));
+  await flush();
+  assert.equal(sb.sent[0][1], 'OnNotificationCancelError');
+  assert.deepStrictEqual(JSON.parse(notifPayload(sb).body), { code: 'Unknown', message: 'gone', context: 'Yes2SDK.Notifications.CancelAsync' });
+});
+
+test('notifications CancelAllAsync success and failure use their own channel', async () => {
+  const ok = createSandbox(['Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { notifications: { cancelAllAsync: () => Promise.resolve() } },
+  });
+  ok.call('Yes2SDK_Notifications_CancelAllAsyncJS', 10);
+  await flush();
+  assert.deepStrictEqual(ok.sent, [['Bridge', 'OnNotificationCancelAllSuccess', '10|']]);
+
+  const bad = createSandbox(['Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { notifications: { cancelAllAsync: () => Promise.reject({ code: 'PLATFORM_ERROR', message: 'no' }) } },
+  });
+  bad.call('Yes2SDK_Notifications_CancelAllAsyncJS', 11);
+  await flush();
+  assert.equal(bad.sent[0][1], 'OnNotificationCancelAllError');
+  assert.equal(notifPayload(bad).id, '11');
+});
+
+test('notifications calls without the SDK report NotInitialized, without the module FEATURE_NOT_SUPPORTED', async () => {
+  const none = createSandbox(['Yes2SDKNotifications.jslib']);
+  none.call('Yes2SDK_Notifications_CancelAllAsyncJS', 1);
+  assert.equal(JSON.parse(notifPayload(none).body).code, 'NotInitialized');
+
+  const old = createSandbox(['Yes2SDKNotifications.jslib'], { Yes2SDK: {} });
+  old.call('Yes2SDK_Notifications_ScheduleAsyncJS', 2, old.str('{}'));
+  old.call('Yes2SDK_Notifications_CancelAsyncJS', 3, old.str('x'));
+  assert.deepStrictEqual(old.sent.map((s) => s[1]), ['OnNotificationScheduleError', 'OnNotificationCancelError']);
+  for (const [, , payload] of old.sent) {
+    assert.equal(JSON.parse(payload.slice(payload.indexOf('|') + 1)).code, 'FEATURE_NOT_SUPPORTED');
+  }
+});
+
+test('notifications IsSupported reflects the platform and never throws', async () => {
+  const yes = createSandbox(['Yes2SDKNotifications.jslib'], { Yes2SDK: { notifications: { isSupported: () => true } } });
+  assert.equal(yes.call('Yes2SDK_Notifications_IsSupportedJS'), 1);
+  const no = createSandbox(['Yes2SDKNotifications.jslib'], { Yes2SDK: { notifications: { isSupported: () => false } } });
+  assert.equal(no.call('Yes2SDK_Notifications_IsSupportedJS'), 0);
+  const throws = createSandbox(['Yes2SDKNotifications.jslib'], { Yes2SDK: { notifications: { isSupported: throwing } } });
+  assert.equal(throws.call('Yes2SDK_Notifications_IsSupportedJS'), 0);
+  assert.equal(createSandbox(['Yes2SDKNotifications.jslib']).call('Yes2SDK_Notifications_IsSupportedJS'), 0);
+});
+
+test('notifications wrapper stubs report unsupported with the wrapper message', async () => {
+  const sb = createSandbox(['Yes2SDKPlatformInit.jslib', 'Yes2SDKNotifications.jslib']);
+  sb.window.CrazyGames = { SDK: {} };
+  sb.window.__y2 = { log() {}, warn() {}, error() {} };
+  sb.window.__yes2PlatformInit();
+  assert.equal(sb.call('Yes2SDK_Notifications_IsSupportedJS'), 0);
+  sb.call('Yes2SDK_Notifications_ScheduleAsyncJS', 1, sb.str('{"title":"t","delaySeconds":5}'));
+  sb.call('Yes2SDK_Notifications_CancelAsyncJS', 2, sb.str('x'));
+  sb.call('Yes2SDK_Notifications_CancelAllAsyncJS', 3);
+  await flush();
+  assert.deepStrictEqual(sb.sent.map((s) => s[1]),
+    ['OnNotificationScheduleError', 'OnNotificationCancelError', 'OnNotificationCancelAllError']);
+  for (const [, , payload] of sb.sent) {
+    const err = JSON.parse(payload.slice(payload.indexOf('|') + 1));
+    assert.equal(err.code, 'FEATURE_NOT_SUPPORTED');
+    assert.match(err.message, /^Notifications\.\w+ is not supported on the current platform\.$/);
+  }
+});
+// ---- end Notifications ---------------------------------------------------------------------
+
 // ---- runner --------------------------------------------------------------------------------
 let failed = 0;
 for (const { name, fn } of tests) {
