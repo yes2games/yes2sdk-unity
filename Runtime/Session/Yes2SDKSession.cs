@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace Yes2SDK
@@ -126,16 +129,81 @@ namespace Yes2SDK
 
         /// <summary>
         /// Get the entry point data as a JSON string (the payload the game was launched with).
-        /// Returns "{}" when there is none.
+        /// Data from the link that opened the game, including data attached to a referral share
+        /// or a registration prompt. Returns "{}" when there is none.
         /// </summary>
         public string GetEntryPointData()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
             return Yes2SDK_GetEntryPointDataJS();
+#elif UNITY_EDITOR
+            string json = Yes2SDKEditorMock.EntryPointDataJson;
+            if (!IsJsonObject(json))
+            {
+                json = "{}";
+            }
+            Yes2Log.Log("Mock: GetEntryPointData() - returning " + json);
+            return json;
 #else
-            Yes2Log.Log("Mock: GetEntryPointData() — returning empty JSON");
+            Yes2Log.Log("Mock: GetEntryPointData() - returning empty JSON");
             return "{}";
 #endif
+        }
+
+        /// <summary>
+        /// Get the entry point data as a dictionary. Data from the link that opened the game,
+        /// including data attached to a referral share or a registration prompt.
+        /// Nested objects are returned as <c>JObject</c> and arrays as <c>JArray</c>.
+        /// Numbers come back as <c>long</c> or <c>double</c>; date-like strings stay strings.
+        /// Returns an empty dictionary when there is no data or it is not a JSON object.
+        /// </summary>
+        public Dictionary<string, object> GetEntryPointDataDictionary()
+        {
+            return ParseEntryPointData(GetEntryPointData());
+        }
+
+        private static JToken ParseToken(string json)
+        {
+            // DateParseHandling.None keeps ISO date strings as strings.
+            return JsonConvert.DeserializeObject<JToken>(json, new JsonSerializerSettings
+            {
+                DateParseHandling = DateParseHandling.None
+            });
+        }
+
+        internal static bool IsJsonObject(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return false;
+            try
+            {
+                return ParseToken(json) is JObject;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        internal static Dictionary<string, object> ParseEntryPointData(string json)
+        {
+            var result = new Dictionary<string, object>();
+            if (string.IsNullOrWhiteSpace(json)) return result;
+            try
+            {
+                JObject obj = ParseToken(json) as JObject;
+                if (obj == null) return result;
+                foreach (KeyValuePair<string, JToken> pair in obj)
+                {
+                    JToken v = pair.Value;
+                    if (v is JValue jv) result[pair.Key] = jv.Value;
+                    else result[pair.Key] = v;
+                }
+            }
+            catch (Exception)
+            {
+                result.Clear();
+            }
+            return result;
         }
 
         /// <summary>
