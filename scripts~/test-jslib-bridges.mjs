@@ -219,6 +219,22 @@ test('harness UTF8ToString throws on a raw string so a missing UTF8ToString cann
   assert.throws(() => sb.call('Fake_UseJS', 'hi'), /pointer/);
 });
 
+// ---- Lifecycle: exitRequested event (task: OnExitRequested) -------------------------------
+test('lifecycle exitRequested sends OnExitRequested to Bridge after init', async () => {
+  const handlers = {};
+  const sb = createSandbox([], { Yes2SDK: {
+    initializeAsync: () => Promise.resolve(),
+    on: (name, fn) => { handlers[name] = fn; },
+  } });
+  sb.call('Yes2SDK_InitializeJS');
+  await flush();
+  assert.equal(typeof handlers.exitRequested, 'function', 'exitRequested is subscribed through on()');
+  sb.sent.length = 0;
+  handlers.exitRequested();
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnExitRequested', '']]);
+});
+// ---- end Lifecycle: exitRequested ----------------------------------------------------------
+
 // ---- runner --------------------------------------------------------------------------------
 let failed = 0;
 for (const { name, fn } of tests) {
