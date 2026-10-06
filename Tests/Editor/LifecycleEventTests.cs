@@ -14,6 +14,7 @@ namespace Yes2SDK.Tests
     public class LifecycleEventTests
     {
         private int _raised;
+        private Bridge _bridge;
 
         private void CountRaise() { _raised++; }
         private static void Throw() { throw new InvalidOperationException("exit handler failed"); }
@@ -22,12 +23,14 @@ namespace Yes2SDK.Tests
         public void SetUp()
         {
             _raised = 0;
+            _bridge = new GameObject("BridgeTest").AddComponent<Bridge>();
             Yes2SDK.OnExitRequested += CountRaise;
         }
 
         [TearDown]
         public void TearDown()
         {
+            if (_bridge != null) UnityEngine.Object.DestroyImmediate(_bridge.gameObject);
             Yes2SDK.OnExitRequested -= CountRaise;
             Yes2SDK.OnExitRequested -= Throw;
         }
@@ -35,7 +38,7 @@ namespace Yes2SDK.Tests
         [Test]
         public void OnExitRequested_BridgeMessage_RaisesEventOnce()
         {
-            Bridge.Instance.OnExitRequested("");
+            _bridge.OnExitRequested("");
 
             Assert.AreEqual(1, _raised);
         }
@@ -46,7 +49,7 @@ namespace Yes2SDK.Tests
             Yes2SDK.OnExitRequested += Throw;
             LogAssert.Expect(LogType.Error, new Regex("callback 'OnExitRequested' threw"));
 
-            Assert.DoesNotThrow(() => Bridge.Instance.OnExitRequested(""));
+            Assert.DoesNotThrow(() => _bridge.OnExitRequested(""));
         }
 
         [Test]
