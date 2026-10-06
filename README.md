@@ -523,11 +523,22 @@ if (Yes2SDK.Player.IsConnectedPlayersSupported())
 }
 ```
 
+#### Server verification
+
+On platforms that support it, `GetSignedPlayerInfoAsync` returns a signed proof of who the player is. `onSuccess` receives a JSON object with `playerId` and `signature`; send both to your server and verify the signature there before trusting the id. On platforms without signed player info the call fails with `FeatureNotSupported` through `onError`. In the Editor it returns a mock (`mock-player` and `mock-signature`).
+
+```csharp
+Yes2SDK.Player.GetSignedPlayerInfoAsync(
+    "my-payload",
+    onSuccess: json => SendToServer(json),   // {"playerId":"...","signature":"..."}
+    onError:   err => Debug.LogWarning(err));
+```
+
 ### In-App Purchases
 
 `Yes2SDK.IAP.IsSupported()` tells you at runtime whether the current platform can take payments. Check it before showing a shop, a "buy" button, or any mechanic that depends on paid items. When it returns `false`, hide that UI instead of letting the player hit an error.
 
-Currently only **Yandex** supports IAP. On every other platform `IsSupported()` returns `false` and the calls fail through `onError`. On Yandex, payments must also be enabled for your game in the Yandex Games console, otherwise the calls fail with a platform error.
+IAP is available on some platforms only. `IsSupported()` returns `false` where it is not, and the calls fail through `onError`. On Yandex, payments must also be enabled for your game in the Yandex Games console, otherwise the calls fail with a platform error.
 
 ```csharp
 if (Yes2SDK.IAP.IsSupported())
@@ -582,7 +593,6 @@ Yes2SDK.IAP.PurchaseAsync("gems_100",
 
 Subscriptions are not available on every platform that supports IAP: gate them with `IsSubscriptionSupported()`, not `IsSupported()`, and read the typed results.
 
-
 ```csharp
 if (Yes2SDK.IAP.IsSubscriptionSupported())
 {
@@ -634,6 +644,14 @@ if (Yes2SDK.Notifications.IsSupported())
 
     Yes2SDK.Notifications.CancelAsync("daily-reward");
 }
+```
+
+A 7-day return loop is one call per day:
+
+```csharp
+for (int d = 1; d <= 7; d++)
+    Yes2SDK.Notifications.ScheduleAsync(
+        new NotificationOptions { Id = $"day{d}", Title = "We miss you", Body = "Your rewards are waiting.", ScheduledInDays = d });
 ```
 
 | Option | Rule |
