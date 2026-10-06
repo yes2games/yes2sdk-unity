@@ -34,8 +34,7 @@ namespace Yes2SDK.Tests
             Yes2SDKEditorMock.PlatformServicesEnabled = true;
             string result = null;
             bool failed = false;
-            string code = null;
-            new Yes2SDKPlayer().GetSignedPlayerInfoAsync("p", json => result = json, err => { failed = true; code = err.Code; });
+            new Yes2SDKPlayer().GetSignedPlayerInfoAsync("p", json => result = json, err => { failed = true; });
             Assert.IsFalse(failed);
             Assert.AreEqual(Yes2SDKPlayer.MockSignedPlayerInfoJson, result);
         }

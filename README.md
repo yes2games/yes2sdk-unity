@@ -525,7 +525,7 @@ if (Yes2SDK.Player.IsConnectedPlayersSupported())
 
 #### Server verification
 
-On platforms that support it, `GetSignedPlayerInfoAsync` returns a signed proof of who the player is. `onSuccess` receives a JSON object with `playerId` and `signature`; send both to your server and verify the signature there before trusting the id. On platforms without signed player info the call fails with `FeatureNotSupported` through `onError`. In the Editor it returns a mock (`mock-player` and `mock-signature`).
+On platforms that support it, `GetSignedPlayerInfoAsync` returns a signed proof of who the player is. `onSuccess` receives a JSON object with `playerId` and `signature`; send both to your server and verify the signature there before trusting the id. On platforms without signed player info the call fails with `FeatureNotSupported` through `onError`. In the Editor it returns a mock (`mock-player` and `mock-signature`) while the "Mock referrals, notifications and signed player" toggle is on.
 
 ```csharp
 Yes2SDK.Player.GetSignedPlayerInfoAsync(

@@ -212,7 +212,7 @@ namespace Yes2SDK
         /// verify the signature on your server. Returns FeatureNotSupported on
         /// platforms without signed player info.
         /// </summary>
-        /// <param name="payload">Custom payload to include in the signed info.</param>
+        /// <param name="payload">Reserved; currently not included in the signed result.</param>
         public void GetSignedPlayerInfoAsync(string payload, Action<string> onSuccess = null, Action<Error> onError = null)
         {
             _getSignedPlayerInfoSuccessCallback = onSuccess;
