@@ -46,7 +46,7 @@ test('iap PurchaseAsync rejection sends the error envelope with the platform cod
   const [target, method, payload] = sb.sent[0];
   assert.deepStrictEqual([target, method], ['Bridge', 'OnPurchaseError']);
   assert.ok(payload.startsWith('3|'));
-  assert.deepStrictEqual(JSON.parse(payload.slice(2)), {
+  assert.deepStrictEqual(JSON.parse(payload.slice(payload.indexOf('|') + 1)), {
     code: 'USER_INPUT', message: 'nope', context: 'Yes2SDK.IAP.PurchaseAsync',
   });
 });
@@ -56,7 +56,7 @@ test('iap call without the module reports NotInitialized', async () => {
   sb.call('Yes2SDK_IAP_GetPurchasesAsyncJS', 9);
   const [, method, payload] = sb.sent[0];
   assert.equal(method, 'OnGetPurchasesError');
-  assert.equal(JSON.parse(payload.slice(2)).code, 'NotInitialized');
+  assert.equal(JSON.parse(payload.slice(payload.indexOf('|') + 1)).code, 'NotInitialized');
 });
 
 // ---- Data: request-id envelope and string getter -------------------------------------------
@@ -77,7 +77,7 @@ test('data FlushAsync rejection sends the error envelope', async () => {
   await flush();
   const [, method, payload] = sb.sent[0];
   assert.equal(method, 'OnDataFlushError');
-  assert.deepStrictEqual(JSON.parse(payload.slice(3)), {
+  assert.deepStrictEqual(JSON.parse(payload.slice(payload.indexOf('|') + 1)), {
     code: 'Unknown', message: 'boom', context: 'Yes2SDK.Data.FlushAsync',
   });
 });
@@ -88,6 +88,33 @@ test('data GetString returns the stored value through returnStr', async () => {
   });
   assert.equal(sb.readStr(sb.call('Yes2SDK_Data_GetStringJS', sb.str('name'), sb.str('def'))), 'zoë');
   assert.equal(sb.readStr(sb.call('Yes2SDK_Data_GetStringJS', sb.str('x'), sb.str('def'))), 'def');
+});
+
+// ---- harness self-checks -------------------------------------------------------------------
+const fakeLib = (deps) => ({
+  name: 'Fake.jslib',
+  source: `mergeInto(LibraryManager.library, {
+    Fake_PingJS: function() { __y2h.has('data'); },
+    ${deps}
+  });`,
+});
+
+test('harness fails a bridge that uses a $helper missing from its __deps', async () => {
+  assert.throws(() => createSandbox([fakeLib('')]), /Fake_PingJS uses \$__y2h/);
+});
+
+test('harness accepts a bridge that lists its $helper in __deps', async () => {
+  createSandbox([fakeLib("Fake_PingJS__deps: ['$__y2h'],")]);
+});
+
+test('harness exposes timers and drops closures over file-level vars', async () => {
+  const sb = createSandbox([{ name: 'Fake.jslib', source: `var hidden = 1;
+    mergeInto(LibraryManager.library, {
+      Fake_TimerJS: function() { return typeof setTimeout + typeof clearInterval; },
+      Fake_ClosureJS: function() { return typeof hidden; }
+    });` }]);
+  assert.equal(sb.call('Fake_TimerJS'), 'functionfunction');
+  assert.equal(sb.call('Fake_ClosureJS'), 'undefined');
 });
 
 // ---- runner --------------------------------------------------------------------------------
