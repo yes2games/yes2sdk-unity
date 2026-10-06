@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Yes2SDK
 {
@@ -21,7 +23,11 @@ namespace Yes2SDK
             GetCatalog,
             Purchase,
             GetPurchases,
-            ConsumePurchase
+            ConsumePurchase,
+            GetSubscriptions,
+            Subscribe,
+            CancelSubscription,
+            ClaimRetentionOffer
         }
 
         private sealed class PendingRequest
@@ -59,6 +65,21 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_IAP_ConsumePurchaseAsyncJS(int requestId, string purchaseToken);
+
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_IAP_IsSubscriptionSupportedJS();
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_IAP_GetSubscriptionsAsyncJS(int requestId);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_IAP_SubscribeAsyncJS(int requestId, string productId);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_IAP_CancelSubscriptionAsyncJS(int requestId, string productId);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_IAP_ClaimRetentionOfferAsyncJS(int requestId, string productId);
 #endif
 
         #endregion
@@ -222,6 +243,284 @@ namespace Yes2SDK
             CompleteSuccess(Operation.ConsumePurchase, requestId, string.Empty);
 #endif
         }
+
+        #endregion
+
+        #region Subscriptions
+
+        /// <summary>
+        /// Whether subscriptions are supported on the current platform.
+        /// </summary>
+        public bool IsSubscriptionSupported()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_IAP_IsSubscriptionSupportedJS();
+#else
+#if UNITY_EDITOR
+            if (SubscriptionMockActive)
+            {
+                Yes2Log.Log("Mock: IAP.IsSubscriptionSupported() - returning true (IAP mock enabled)");
+                return true;
+            }
+#endif
+            Yes2Log.Log("Mock: IAP.IsSubscriptionSupported() - returning false");
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// List the subscription offers with the player's entitlement. Grant
+        /// access for each subscription whose <see cref="Subscription.IsActive"/>
+        /// is true. A guest player may get an empty list.
+        /// </summary>
+        public void GetSubscriptionsAsync(Action<List<Subscription>> onSuccess = null, Action<Error> onError = null)
+        {
+            const string context = "Yes2SDK.IAP.GetSubscriptionsAsync";
+            int requestId = Register(Operation.GetSubscriptions,
+                ParseThen(Subscription.ParseList, onSuccess, onError, context), onError);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_IAP_GetSubscriptionsAsyncJS(requestId);
+#else
+#if UNITY_EDITOR
+            if (SubscriptionMockActive)
+            {
+                // Mirrors the platform: a guest is listed no subscriptions.
+                string json = Yes2SDKEditorMock.IsRegisteredNow ? Yes2SDKMockIAP.SubscriptionsJson : "[]";
+                Yes2Log.Log($"Mock: IAP.GetSubscriptionsAsync() - returning {json}");
+                CompleteSuccess(Operation.GetSubscriptions, requestId, json);
+                return;
+            }
+#endif
+            Yes2Log.Log("Mock: IAP.GetSubscriptionsAsync() - FeatureNotSupported");
+            CompleteError(Operation.GetSubscriptions, requestId, FeatureNotSupportedError(context));
+#endif
+        }
+
+        /// <summary>
+        /// Start a subscription checkout. A closed checkout is a SUCCESS whose
+        /// <see cref="SubscribeResult.Status"/> is Cancelled, not an error.
+        /// A guest player gets an error with code "PLAYER_NOT_AUTHENTICATED".
+        /// Never offer a subscription the player already holds.
+        /// </summary>
+        public void SubscribeAsync(string productId, Action<SubscribeResult> onSuccess = null, Action<Error> onError = null)
+        {
+            const string context = "Yes2SDK.IAP.SubscribeAsync";
+            int requestId = Register(Operation.Subscribe,
+                ParseThen(SubscribeResult.Parse, onSuccess, onError, context), onError);
+            if (RejectEmptyProductId(Operation.Subscribe, requestId, productId, context)) return;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_IAP_SubscribeAsyncJS(requestId, productId);
+#else
+#if UNITY_EDITOR
+            if (SubscriptionMockActive)
+            {
+                if (Yes2SDKMockIAP.TryRejectSubscription(Yes2SDKMockIAP.SubscriptionCall.Subscribe,
+                    productId, Yes2SDKEditorMock.IsRegisteredNow, Yes2SDKMockIAP.SubscriptionActive, context, out var rejected))
+                {
+                    if (rejected.Code == "IAP_ALREADY_PURCHASED")
+                    {
+                        Yes2Log.Warning($"Mock: IAP.SubscribeAsync('{productId}') - the player already holds this subscription. Never re-offer a subscription the player holds.");
+                    }
+                    Yes2Log.Log($"Mock: IAP.SubscribeAsync('{productId}') - {rejected.Code}");
+                    CompleteError(Operation.Subscribe, requestId, rejected);
+                    return;
+                }
+                if (Yes2SDKEditorMock.IAPFailPurchases)
+                {
+                    Yes2Log.Log($"Mock: IAP.SubscribeAsync('{productId}') - simulated failure");
+                    CompleteError(Operation.Subscribe, requestId, new Error
+                    {
+                        Code = "PlatformError",
+                        Message = "Simulated subscription failure (mock)",
+                        Context = context
+                    });
+                    return;
+                }
+                if (Yes2SDKMockOverlay.ShowSubscribe(requestId, productId))
+                {
+                    Yes2Log.Log($"Mock: IAP.SubscribeAsync('{productId}') - showing subscription dialog");
+                    return;
+                }
+                CompleteError(Operation.Subscribe, requestId, new Error
+                {
+                    Code = "PlatformError",
+                    Message = "Another mock popup is already open",
+                    Context = context
+                });
+                return;
+            }
+#endif
+            Yes2Log.Log($"Mock: IAP.SubscribeAsync('{productId}') - FeatureNotSupported");
+            CompleteError(Operation.Subscribe, requestId, FeatureNotSupportedError(context));
+#endif
+        }
+
+        /// <summary>
+        /// Ask the platform to cancel a subscription. onSuccess receives true
+        /// when the player confirmed the cancellation, false when they dismissed
+        /// the dialog. A confirmed cancellation takes effect at the end of the
+        /// current billing period: the player keeps access until then, so do
+        /// not revoke it at once. Cancelling a subscription the player does not
+        /// hold fails with code "INVALID_OPERATION".
+        /// </summary>
+        public void CancelSubscriptionAsync(string productId, Action<bool> onSuccess = null, Action<Error> onError = null)
+        {
+            const string context = "Yes2SDK.IAP.CancelSubscriptionAsync";
+            int requestId = Register(Operation.CancelSubscription,
+                ParseThen(ParseConfirmation, onSuccess, onError, context), onError);
+            if (RejectEmptyProductId(Operation.CancelSubscription, requestId, productId, context)) return;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_IAP_CancelSubscriptionAsyncJS(requestId, productId);
+#else
+#if UNITY_EDITOR
+            if (SubscriptionMockActive)
+            {
+                if (Yes2SDKMockIAP.TryRejectSubscription(Yes2SDKMockIAP.SubscriptionCall.CancelSubscription,
+                    productId, Yes2SDKEditorMock.IsRegisteredNow, Yes2SDKMockIAP.SubscriptionActive, context, out var rejected))
+                {
+                    Yes2Log.Log($"Mock: IAP.CancelSubscriptionAsync('{productId}') - {rejected.Code}");
+                    CompleteError(Operation.CancelSubscription, requestId, rejected);
+                    return;
+                }
+                if (Yes2SDKMockOverlay.ShowCancelSubscription(requestId, productId))
+                {
+                    Yes2Log.Log($"Mock: IAP.CancelSubscriptionAsync('{productId}') - showing cancellation dialog");
+                    return;
+                }
+                CompleteError(Operation.CancelSubscription, requestId, new Error
+                {
+                    Code = "PlatformError",
+                    Message = "Another mock popup is already open",
+                    Context = context
+                });
+                return;
+            }
+#endif
+            Yes2Log.Log($"Mock: IAP.CancelSubscriptionAsync('{productId}') - FeatureNotSupported");
+            CompleteError(Operation.CancelSubscription, requestId, FeatureNotSupportedError(context));
+#endif
+        }
+
+        /// <summary>
+        /// Claim the retention discount for a subscription the player holds.
+        /// onSuccess receives the refreshed subscription. A player who does not
+        /// hold the subscription is not eligible and gets an error with code
+        /// "INVALID_OPERATION". Repeating a claim is safe: it re-confirms the
+        /// same discount and succeeds.
+        /// </summary>
+        public void ClaimRetentionOfferAsync(string productId, Action<Subscription> onSuccess = null, Action<Error> onError = null)
+        {
+            const string context = "Yes2SDK.IAP.ClaimRetentionOfferAsync";
+            int requestId = Register(Operation.ClaimRetentionOffer,
+                ParseThen(Subscription.Parse, onSuccess, onError, context), onError);
+            if (RejectEmptyProductId(Operation.ClaimRetentionOffer, requestId, productId, context)) return;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_IAP_ClaimRetentionOfferAsyncJS(requestId, productId);
+#else
+#if UNITY_EDITOR
+            if (SubscriptionMockActive)
+            {
+                if (Yes2SDKMockIAP.TryRejectSubscription(Yes2SDKMockIAP.SubscriptionCall.ClaimRetentionOffer,
+                    productId, Yes2SDKEditorMock.IsRegisteredNow, Yes2SDKMockIAP.SubscriptionActive, context, out var rejected))
+                {
+                    Yes2Log.Log($"Mock: IAP.ClaimRetentionOfferAsync('{productId}') - {rejected.Code}");
+                    CompleteError(Operation.ClaimRetentionOffer, requestId, rejected);
+                    return;
+                }
+                Yes2Log.Log($"Mock: IAP.ClaimRetentionOfferAsync('{productId}') - claimed");
+                CompleteSuccess(Operation.ClaimRetentionOffer, requestId, Yes2SDKMockIAP.ClaimRetentionOffer());
+                return;
+            }
+#endif
+            Yes2Log.Log($"Mock: IAP.ClaimRetentionOfferAsync('{productId}') - FeatureNotSupported");
+            CompleteError(Operation.ClaimRetentionOffer, requestId, FeatureNotSupportedError(context));
+#endif
+        }
+
+        // Task-returning overloads.
+
+        /// <summary>Task overload of <see cref="GetSubscriptionsAsync(Action{List{Subscription}}, Action{Error})"/>.</summary>
+        public Task<List<Subscription>> GetSubscriptionsAsync(CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<List<Subscription>>(
+                (success, error) => GetSubscriptionsAsync(success, error),
+                cancellationToken);
+
+        /// <summary>Task overload of <see cref="SubscribeAsync(string, Action{SubscribeResult}, Action{Error})"/>.</summary>
+        public Task<SubscribeResult> SubscribeAsync(string productId, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<SubscribeResult>(
+                (success, error) => SubscribeAsync(productId, success, error),
+                cancellationToken);
+
+        /// <summary>Task overload of <see cref="CancelSubscriptionAsync(string, Action{bool}, Action{Error})"/>.</summary>
+        public Task<bool> CancelSubscriptionAsync(string productId, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<bool>(
+                (success, error) => CancelSubscriptionAsync(productId, success, error),
+                cancellationToken);
+
+        /// <summary>Task overload of <see cref="ClaimRetentionOfferAsync(string, Action{Subscription}, Action{Error})"/>.</summary>
+        public Task<Subscription> ClaimRetentionOfferAsync(string productId, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<Subscription>(
+                (success, error) => ClaimRetentionOfferAsync(productId, success, error),
+                cancellationToken);
+
+        /// <summary>
+        /// Wraps a typed callback as the string callback the registry stores.
+        /// Parsing runs inside try/catch and a failure goes to onError; onSuccess
+        /// runs OUTSIDE it, so an exception thrown by game code is not reported
+        /// as a parse failure (it reaches the Bridge's logger instead).
+        /// </summary>
+        internal static Action<string> ParseThen<T>(Func<string, T> parse, Action<T> onSuccess, Action<Error> onError, string context)
+        {
+            return payload =>
+            {
+                T value;
+                try
+                {
+                    value = parse(payload);
+                }
+                catch (Exception ex)
+                {
+                    Yes2Log.Warning($"IAP: could not parse the {context} result ({ex.Message})");
+                    onError?.Invoke(new Error
+                    {
+                        Code = "Unknown",
+                        Message = "Could not read the platform response",
+                        Context = context
+                    });
+                    return;
+                }
+                onSuccess?.Invoke(value);
+            };
+        }
+
+        /// <summary>Parses the "true" / "false" payload of a cancellation.</summary>
+        internal static bool ParseConfirmation(string payload)
+        {
+            if (payload == "true") return true;
+            if (payload == "false") return false;
+            throw new FormatException($"expected true or false, got '{payload}'");
+        }
+
+        private static bool RejectEmptyProductId(Operation operation, int requestId, string productId, string context)
+        {
+            if (!string.IsNullOrEmpty(productId)) return false;
+            CompleteError(operation, requestId, new Error
+            {
+                Code = "InvalidParams",
+                Message = "productId must be a non-empty string",
+                Context = context
+            });
+            return true;
+        }
+
+#if UNITY_EDITOR
+        private static bool SubscriptionMockActive =>
+            Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups;
+#endif
 
         #endregion
 

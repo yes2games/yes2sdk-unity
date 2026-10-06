@@ -647,7 +647,13 @@ mergeInto(LibraryManager.library, {
                         return Promise.reject({ code: 'FeatureNotSupported', message: 'Account link not available', context: 'auth.showAccountLinkPromptAsync' });
                     }
                     return sdk.user.showAccountLinkPrompt();
-                }
+                },
+
+                // ---- registration prompt and isAuthenticated ----
+                // The wrapper has no synchronous user, so it reports a guest.
+                isAuthenticated: function() { return false; },
+                showRegistrationPrompt: function(options) { throw __y2fns('Auth.showRegistrationPrompt'); }
+                // ---- end registration prompt and isAuthenticated ----
             },
 
             // Game module - gameplay lifecycle, invite, settings, clipboard
@@ -867,13 +873,40 @@ mergeInto(LibraryManager.library, {
                 isSupported: function() { return false; }
             },
 
+            // Notifications module - unsupported on CrazyGames
+            notifications: {
+                scheduleAsync: function(options) { return Promise.reject(__y2fns('Notifications.scheduleAsync')); },
+                cancelAsync: function(notificationId) { return Promise.reject(__y2fns('Notifications.cancelAsync')); },
+                cancelAllAsync: function() { return Promise.reject(__y2fns('Notifications.cancelAllAsync')); },
+                isSupported: function() { return false; }
+            },
+            // End notifications module
+
             // IAP module - unsupported on CrazyGames (mirrors Core crazygames-iap-strategy; IAP only functions on Yandex)
             iap: {
                 getCatalogAsync: function() { return Promise.reject(__y2fns('IAP.getCatalogAsync')); },
                 purchaseAsync: function(config) { return Promise.reject(__y2fns('IAP.purchaseAsync')); },
                 getPurchasesAsync: function() { return Promise.reject(__y2fns('IAP.getPurchasesAsync')); },
                 consumePurchaseAsync: function(purchaseToken) { return Promise.reject(__y2fns('IAP.consumePurchaseAsync')); },
+                isSupported: function() { return false; },
+                // Subscriptions - unsupported on CrazyGames
+                getSubscriptionsAsync: function() { return Promise.reject(__y2fns('IAP.getSubscriptionsAsync')); },
+                subscribeAsync: function(productId) { return Promise.reject(__y2fns('IAP.subscribeAsync')); },
+                cancelSubscriptionAsync: function(productId) { return Promise.reject(__y2fns('IAP.cancelSubscriptionAsync')); },
+                claimRetentionOfferAsync: function(productId) { return Promise.reject(__y2fns('IAP.claimRetentionOfferAsync')); },
+                isSubscriptionSupported: function() { return false; }
+            },
+
+            // Referrals module - unsupported on CrazyGames
+            referrals: {
+                shareAsync: function(options) { return Promise.reject(__y2fns('Referrals.shareAsync')); },
+                listAsync: function() { return Promise.reject(__y2fns('Referrals.listAsync')); },
                 isSupported: function() { return false; }
+            },
+
+            // Context module - sharing unsupported by this wrapper
+            context: {
+                shareAsync: function(payload) { return Promise.reject(__y2fns('Context.shareAsync')); }
             }
         };
 

@@ -208,9 +208,11 @@ namespace Yes2SDK
 
         /// <summary>
         /// Get a signed player info payload for server-side verification.
-        /// On Poki, returns FeatureNotSupported.
+        /// onSuccess receives a JSON object with <c>playerId</c> and <c>signature</c>;
+        /// verify the signature on your server. Returns FeatureNotSupported on
+        /// platforms without signed player info.
         /// </summary>
-        /// <param name="payload">Custom payload to include in the signed info.</param>
+        /// <param name="payload">Reserved; currently not included in the signed result.</param>
         public void GetSignedPlayerInfoAsync(string payload, Action<string> onSuccess = null, Action<Error> onError = null)
         {
             _getSignedPlayerInfoSuccessCallback = onSuccess;
@@ -218,11 +220,26 @@ namespace Yes2SDK
 
 #if UNITY_WEBGL && !UNITY_EDITOR
             Yes2SDK_GetSignedPlayerInfoAsyncJS(payload);
+#elif UNITY_EDITOR
+            if (Yes2SDKEditorMock.PlatformServicesEnabled)
+            {
+                Yes2Log.Log("Mock: GetSignedPlayerInfoAsync() returning a mock signed player");
+                InvokeGetSignedPlayerInfoSuccess(MockSignedPlayerInfoJson);
+            }
+            else
+            {
+                Yes2Log.Log("Mock: GetSignedPlayerInfoAsync() reporting FeatureNotSupported");
+                InvokeGetSignedPlayerInfoError(FeatureNotSupportedError("Yes2SDK.Player.GetSignedPlayerInfoAsync"));
+            }
 #else
             Yes2Log.Log("Mock: GetSignedPlayerInfoAsync() — FeatureNotSupported");
             InvokeGetSignedPlayerInfoError(FeatureNotSupportedError("Yes2SDK.Player.GetSignedPlayerInfoAsync"));
 #endif
         }
+
+#if UNITY_EDITOR
+        internal const string MockSignedPlayerInfoJson = "{\"playerId\":\"mock-player\",\"signature\":\"mock-signature\"}";
+#endif
 
         /// <summary>
         /// Get a stable unique identifier for the current player.

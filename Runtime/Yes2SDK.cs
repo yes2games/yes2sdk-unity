@@ -70,6 +70,14 @@ namespace Yes2SDK
         public static event Action OnAccountDialogClose;
 
         /// <summary>
+        /// Fired when the platform starts closing the game. Save progress synchronously inside the handler
+        /// with <c>Yes2SDK.Data.SetString</c>/<c>SetInt</c>/<c>SetFloat</c>; the SDK flushes player data right
+        /// after the handler returns. Async work started here is not awaited. Not raised on platforms that
+        /// do not report an exit.
+        /// </summary>
+        public static event Action OnExitRequested;
+
+        /// <summary>
         /// Called when an SDK error occurs.
         /// </summary>
         public static event Action<Error> OnError;
@@ -167,7 +175,7 @@ namespace Yes2SDK
         private static Yes2SDKIAP _iap;
 
         /// <summary>
-        /// In-App Purchase API. Stub — returns FeatureNotSupported on Poki.
+        /// In-App Purchase API. Check IsSupported() first: platforms without IAP report FeatureNotSupported.
         /// </summary>
         public static Yes2SDKIAP IAP
         {
@@ -177,6 +185,23 @@ namespace Yes2SDK
                 return _iap;
             }
         }
+
+        // Referrals module
+        private static Yes2SDKReferrals _referrals;
+
+        /// <summary>
+        /// Referrals API: share a referral link and list the players who joined through it.
+        /// Reports FeatureNotSupported on platforms without referrals.
+        /// </summary>
+        public static Yes2SDKReferrals Referrals
+        {
+            get
+            {
+                _referrals ??= new Yes2SDKReferrals();
+                return _referrals;
+            }
+        }
+        // End referrals module
 
         private static Yes2SDKAchievements _achievements;
 
@@ -195,7 +220,7 @@ namespace Yes2SDK
         private static Yes2SDKContext _context;
 
         /// <summary>
-        /// Context API. Stub — returns FeatureNotSupported on Poki.
+        /// Context API: share with ShareAsync or share an image with ShareImageAsync. Context switching is not supported.
         /// </summary>
         public static Yes2SDKContext Context
         {
@@ -209,7 +234,8 @@ namespace Yes2SDK
         private static Yes2SDKNotifications _notifications;
 
         /// <summary>
-        /// Notifications API. Stub — returns FeatureNotSupported on Poki.
+        /// Notifications API: schedule and cancel notifications.
+        /// Reports FeatureNotSupported on platforms without notifications.
         /// </summary>
         public static Yes2SDKNotifications Notifications
         {
@@ -548,6 +574,15 @@ namespace Yes2SDK
         {
             Yes2Log.Log("Game resumed");
             OnResume?.Invoke();
+        }
+
+        /// <summary>
+        /// Invokes the OnExitRequested event. Called internally by the bridge.
+        /// </summary>
+        internal static void InvokeExitRequested()
+        {
+            Yes2Log.Log("Exit requested");
+            OnExitRequested?.Invoke();
         }
 
         /// <summary>

@@ -72,6 +72,9 @@ namespace Yes2SDK
             ["OnAudioEnabledChange"] = data => Callbacks.InvokeAudioEnabledChange(data),
             ["OnAccountDialogOpen"] = _ => Callbacks.InvokeAccountDialogOpen(),
             ["OnAccountDialogClose"] = _ => Callbacks.InvokeAccountDialogClose(),
+            // --- exit request lifecycle event ---
+            ["OnExitRequested"] = _ => Callbacks.InvokeExitRequested(),
+            // --- end exit request ---
 
             // Ads
             // Interstitial and rewarded messages carry the ad's request id, so
@@ -109,6 +112,9 @@ namespace Yes2SDK
             ["OnSignInSuccess"] = Yes2SDKAuth.InvokeSignInSuccess,
             ["OnGetTokenSuccess"] = Yes2SDKAuth.InvokeGetTokenSuccess,
             ["OnAccountLinkSuccess"] = Yes2SDKAuth.InvokeAccountLinkSuccess,
+            // --- registration prompt close (payload: prompt id) ---
+            ["OnRegistrationPromptClose"] = Yes2SDKAuth.HandleRegistrationPromptClose,
+            // --- end registration prompt ---
 
             // Game
             ["OnInviteLinkSuccess"] = Yes2SDKGame.InvokeInviteLinkSuccess,
@@ -133,6 +139,29 @@ namespace Yes2SDK
             ["OnGetPurchasesError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.GetPurchases, data, ParseError),
             ["OnConsumePurchaseError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.ConsumePurchase, data, ParseError),
 
+            // Referrals. Messages carry a request id, so errors are unwrapped
+            // here too rather than in _errorHandlers.
+            ["OnReferralShareSuccess"] = data => Yes2SDKReferrals.HandleSuccessMessage(Yes2SDKReferrals.Operation.Share, data),
+            ["OnReferralShareError"] = data => Yes2SDKReferrals.HandleErrorMessage(Yes2SDKReferrals.Operation.Share, data, ParseError),
+            ["OnReferralListSuccess"] = data => Yes2SDKReferrals.HandleSuccessMessage(Yes2SDKReferrals.Operation.List, data),
+            ["OnReferralListError"] = data => Yes2SDKReferrals.HandleErrorMessage(Yes2SDKReferrals.Operation.List, data, ParseError),
+            // End referrals
+            // Context share. Messages carry a request id, so errors are unwrapped
+            // here too rather than in _errorHandlers.
+            ["OnContextShareSuccess"] = data => Yes2SDKContext.HandleSuccessMessage(Yes2SDKContext.Operation.Share, data),
+            ["OnContextShareError"] = data => Yes2SDKContext.HandleErrorMessage(Yes2SDKContext.Operation.Share, data, ParseError),
+            // End context share
+            // IAP subscriptions (same request-id envelope as IAP above)
+            ["OnGetSubscriptionsSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.GetSubscriptions, data),
+            ["OnSubscribeSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.Subscribe, data),
+            ["OnCancelSubscriptionSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.CancelSubscription, data),
+            ["OnClaimRetentionOfferSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.ClaimRetentionOffer, data),
+            ["OnGetSubscriptionsError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.GetSubscriptions, data, ParseError),
+            ["OnSubscribeError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.Subscribe, data, ParseError),
+            ["OnCancelSubscriptionError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.CancelSubscription, data, ParseError),
+            ["OnClaimRetentionOfferError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.ClaimRetentionOffer, data, ParseError),
+            // end IAP subscriptions
+
             // Data (async durable saves)
             // Data confirmed writes carry a request id, so their errors are
             // unwrapped here too rather than in _errorHandlers.
@@ -140,6 +169,16 @@ namespace Yes2SDK
             ["OnDataFlushSuccess"] = data => Yes2SDKData.HandleSuccessMessage(Yes2SDKData.Operation.Flush, data),
             ["OnDataSetStringError"] = data => Yes2SDKData.HandleErrorMessage(Yes2SDKData.Operation.SetString, data, ParseError),
             ["OnDataFlushError"] = data => Yes2SDKData.HandleErrorMessage(Yes2SDKData.Operation.Flush, data, ParseError),
+
+            // Notifications. Messages carry a request id, so errors are
+            // unwrapped here too rather than in _errorHandlers.
+            ["OnNotificationScheduleSuccess"] = data => Yes2SDKNotifications.HandleSuccessMessage(Yes2SDKNotifications.Operation.Schedule, data),
+            ["OnNotificationScheduleError"] = data => Yes2SDKNotifications.HandleErrorMessage(Yes2SDKNotifications.Operation.Schedule, data, ParseError),
+            ["OnNotificationCancelSuccess"] = data => Yes2SDKNotifications.HandleSuccessMessage(Yes2SDKNotifications.Operation.Cancel, data),
+            ["OnNotificationCancelError"] = data => Yes2SDKNotifications.HandleErrorMessage(Yes2SDKNotifications.Operation.Cancel, data, ParseError),
+            ["OnNotificationCancelAllSuccess"] = data => Yes2SDKNotifications.HandleSuccessMessage(Yes2SDKNotifications.Operation.CancelAll, data),
+            ["OnNotificationCancelAllError"] = data => Yes2SDKNotifications.HandleErrorMessage(Yes2SDKNotifications.Operation.CancelAll, data, ParseError),
+            // End notifications
 
             // Leaderboard
             ["OnGetLeaderboardSuccess"] = Yes2SDKLeaderboard.InvokeGetLeaderboardSuccess,
@@ -267,6 +306,9 @@ namespace Yes2SDK
         public void OnAudioEnabledChange(string msg) => Handle(msg);
         public void OnAccountDialogOpen(string msg) => Handle(msg);
         public void OnAccountDialogClose(string msg) => Handle(msg);
+        // --- exit request lifecycle event ---
+        public void OnExitRequested(string msg) => Handle(msg);
+        // --- end exit request ---
 
         // Ads
         public void OnInterstitialBeforeAd(string msg) => Handle(msg);
@@ -319,6 +361,9 @@ namespace Yes2SDK
         public void OnGetTokenError(string msg) => Handle(msg);
         public void OnAccountLinkSuccess(string msg) => Handle(msg);
         public void OnAccountLinkError(string msg) => Handle(msg);
+        // --- registration prompt close ---
+        public void OnRegistrationPromptClose(string msg) => Handle(msg);
+        // --- end registration prompt ---
 
         // Game
         public void OnInviteLinkSuccess(string msg) => Handle(msg);
@@ -347,11 +392,41 @@ namespace Yes2SDK
         public void OnConsumePurchaseSuccess(string msg) => Handle(msg);
         public void OnConsumePurchaseError(string msg) => Handle(msg);
 
+        // Referrals
+        public void OnReferralShareSuccess(string msg) => Handle(msg);
+        public void OnReferralShareError(string msg) => Handle(msg);
+        public void OnReferralListSuccess(string msg) => Handle(msg);
+        public void OnReferralListError(string msg) => Handle(msg);
+        // End referrals
+        // Context share
+        public void OnContextShareSuccess(string msg) => Handle(msg);
+        public void OnContextShareError(string msg) => Handle(msg);
+        // End context share
+        // IAP subscriptions
+        public void OnGetSubscriptionsSuccess(string msg) => Handle(msg);
+        public void OnGetSubscriptionsError(string msg) => Handle(msg);
+        public void OnSubscribeSuccess(string msg) => Handle(msg);
+        public void OnSubscribeError(string msg) => Handle(msg);
+        public void OnCancelSubscriptionSuccess(string msg) => Handle(msg);
+        public void OnCancelSubscriptionError(string msg) => Handle(msg);
+        public void OnClaimRetentionOfferSuccess(string msg) => Handle(msg);
+        public void OnClaimRetentionOfferError(string msg) => Handle(msg);
+        // end IAP subscriptions
+
         // Data (async durable saves)
         public void OnDataSetStringSuccess(string msg) => Handle(msg);
         public void OnDataSetStringError(string msg) => Handle(msg);
         public void OnDataFlushSuccess(string msg) => Handle(msg);
         public void OnDataFlushError(string msg) => Handle(msg);
+
+        // Notifications
+        public void OnNotificationScheduleSuccess(string msg) => Handle(msg);
+        public void OnNotificationScheduleError(string msg) => Handle(msg);
+        public void OnNotificationCancelSuccess(string msg) => Handle(msg);
+        public void OnNotificationCancelError(string msg) => Handle(msg);
+        public void OnNotificationCancelAllSuccess(string msg) => Handle(msg);
+        public void OnNotificationCancelAllError(string msg) => Handle(msg);
+        // End notifications
 
         // Leaderboard
         public void OnGetLeaderboardSuccess(string msg) => Handle(msg);
@@ -461,6 +536,13 @@ namespace Yes2SDK
         {
             Yes2SDK.InvokeResume();
         }
+
+        // --- exit request lifecycle event ---
+        internal static void InvokeExitRequested()
+        {
+            Yes2SDK.InvokeExitRequested();
+        }
+        // --- end exit request ---
 
         internal static void InvokeAccountDialogOpen()
         {
