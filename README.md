@@ -626,7 +626,7 @@ onError: err => {
 | `PlatformError` | The underlying platform SDK rejected the call. | Log `err.Message` and `err.Context` for support; treat the call as failed. |
 | `NetworkError` | A platform call failed network-side (timeout, offline, server error). | Retry with backoff. Don't retry indefinitely. |
 | `RateLimited` | Too many calls in a short window (e.g. ad spam protection). | Back off and try again later — don't retry immediately. |
-| `UserCancelled` | The player closed/dismissed a flow (e.g. login dialog, rewarded ad). | Not an error in the usual sense — silently respect the player's choice, no toast. |
+| `UserCancelled` | The player closed/dismissed a flow (e.g. login dialog, rewarded ad, the player closed a purchase checkout). | Not an error in the usual sense - silently respect the player's choice, no toast. |
 | `Unknown` | The error didn't match any of the above. | Log everything (`err.Code`, `err.Message`, `err.Context`) and treat as a hard failure. |
 | `Timeout` | Raised by the SDK's ad watchdog: an interstitial or rewarded ad never started, or started and never finished. | Treat the ad as failed and resume the game. The next `Show*` works normally. |
 

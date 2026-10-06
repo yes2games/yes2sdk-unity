@@ -28,6 +28,7 @@ namespace Yes2SDK.Tests
         [TestCase("FEATURE_NOT_SUPPORTED", ErrorCode.FeatureNotSupported)]
         [TestCase("PLATFORM_ERROR", ErrorCode.PlatformError)]
         [TestCase("ADS_BLOCKED", ErrorCode.PlatformError)]
+        [TestCase("IAP_PURCHASE_CANCELLED", ErrorCode.UserCancelled)]
         [TestCase("NETWORK_FAILURE", ErrorCode.NetworkError)]
         [TestCase("ADS_FREQUENCY_LIMITED", ErrorCode.RateLimited)]
         [TestCase("TIMEOUT", ErrorCode.Timeout)]
