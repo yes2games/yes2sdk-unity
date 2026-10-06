@@ -210,6 +210,15 @@ test('session wrapper setSessionDataFromJson parses a string and warns on bad JS
   assert.equal(JSON.stringify(session._data), '{"k":2}');
 });
 
+test('harness UTF8ToString throws on a raw string so a missing UTF8ToString cannot pass', async () => {
+  const sb = createSandbox([{ name: 'Fake.jslib', source: `mergeInto(LibraryManager.library, {
+    Fake_ForgetJS: function(p) { return p; },
+    Fake_UseJS: function(p) { return UTF8ToString(p); }
+  });` }]);
+  assert.equal(sb.call('Fake_UseJS', sb.str('hi')), 'hi');
+  assert.throws(() => sb.call('Fake_UseJS', 'hi'), /pointer/);
+});
+
 // ---- runner --------------------------------------------------------------------------------
 let failed = 0;
 for (const { name, fn } of tests) {
