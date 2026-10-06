@@ -772,7 +772,7 @@ In the Unity Editor, SDK calls run against mock implementations:
 - **Subscriptions follow the IAP mock**: `SubscribeAsync` opens a Subscribe / Close dialog and `CancelSubscriptionAsync` a confirm dialog. The mock applies the platform rules (guest, already held, not held) so those error paths are testable.
 - **Player is registered** sets whether the mock player is signed in (off, a guest, by default). It drives `IsAuthenticated()`, the subscription list and the guest errors. The registration prompt is mocked without UI: `Login()` registers the player for the current play session and `Close()` closes the prompt.
 - **Entry point data (JSON)** is what `Session.GetEntryPointData()` returns in Play Mode. Only a valid JSON object is saved.
-- **Mock referrals, notifications and signed player** turns on those mocks, including the image share mock and the signed player mock, which always succeeds. **Referral share result** picks Shared / Cancelled / Error, and **Referral conversions** sets how many players joined through each shared reference; with 0, references are left out of `ListAsync` results, as on a real platform.
+- **Mock referrals, notifications and signed player** turns on those mocks and the image share mock (Play Mode). The image share and signed player mocks always succeed. **Referral share result** picks Shared / Cancelled / Error, and **Referral conversions** sets how many players joined through each shared reference; with 0, references are left out of `ListAsync` results, as on a real platform.
 - **Simulate exit request** (Play Mode only) raises `OnExitRequested`, then saves game data the way the platform flush does.
 - `Data` uses `PlayerPrefs`
 - Other optional APIs return `FeatureNotSupported`
