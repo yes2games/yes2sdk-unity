@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System;
 using UnityEditor;
 using UnityEngine;
 
@@ -170,7 +171,22 @@ namespace Yes2SDK
                 Debug.LogWarning("[Yes2SDK] SimulateExitRequest only works in Play Mode.");
                 return;
             }
-            Yes2SDK.InvokeExitRequested();
+            RaiseExitRequestAndFlush();
+        }
+
+        // Handler exceptions are logged and the flush always runs, like the
+        // device path where the bridge logs a throwing handler and the SDK
+        // still flushes player data afterwards.
+        internal static void RaiseExitRequestAndFlush()
+        {
+            try
+            {
+                Yes2SDK.InvokeExitRequested();
+            }
+            catch (Exception e)
+            {
+                Yes2Log.Error($"OnExitRequested handler threw: {e}");
+            }
             PlayerPrefs.Save();
         }
 

@@ -107,7 +107,11 @@ mergeInto(LibraryManager.library, {
                 window.Yes2SDK.on('accountDialogClose', function() {
                     SendMessage('Bridge', 'OnAccountDialogClose', '');
                 });
-                window.__y2.log('[Lifecycle] pause/resume/audioEnabledChange/accountDialogOpen/accountDialogClose wired to Bridge');
+                // Exit request: the platform is closing the game; Unity saves in the handler, Core flushes after.
+                window.Yes2SDK.on('exitRequested', function() {
+                    SendMessage('Bridge', 'OnExitRequested', '');
+                });
+                window.__y2.log('[Lifecycle] pause/resume/audioEnabledChange/accountDialogOpen/accountDialogClose/exitRequested wired to Bridge');
             } catch(error) {
                 window.__y2.error('[Lifecycle] failed to wire lifecycle events:', error);
             }

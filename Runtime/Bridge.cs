@@ -72,6 +72,9 @@ namespace Yes2SDK
             ["OnAudioEnabledChange"] = data => Callbacks.InvokeAudioEnabledChange(data),
             ["OnAccountDialogOpen"] = _ => Callbacks.InvokeAccountDialogOpen(),
             ["OnAccountDialogClose"] = _ => Callbacks.InvokeAccountDialogClose(),
+            // --- exit request lifecycle event ---
+            ["OnExitRequested"] = _ => Callbacks.InvokeExitRequested(),
+            // --- end exit request ---
 
             // Ads
             // Interstitial and rewarded messages carry the ad's request id, so
@@ -267,6 +270,9 @@ namespace Yes2SDK
         public void OnAudioEnabledChange(string msg) => Handle(msg);
         public void OnAccountDialogOpen(string msg) => Handle(msg);
         public void OnAccountDialogClose(string msg) => Handle(msg);
+        // --- exit request lifecycle event ---
+        public void OnExitRequested(string msg) => Handle(msg);
+        // --- end exit request ---
 
         // Ads
         public void OnInterstitialBeforeAd(string msg) => Handle(msg);
@@ -461,6 +467,13 @@ namespace Yes2SDK
         {
             Yes2SDK.InvokeResume();
         }
+
+        // --- exit request lifecycle event ---
+        internal static void InvokeExitRequested()
+        {
+            Yes2SDK.InvokeExitRequested();
+        }
+        // --- end exit request ---
 
         internal static void InvokeAccountDialogOpen()
         {
