@@ -249,7 +249,7 @@ namespace Yes2SDK.Editor
             EditorGUI.BeginChangeCheck();
             bool services = EditorGUILayout.ToggleLeft(
                 new GUIContent("Mock referrals and notifications",
-                    "On: referral sharing, referral conversions and scheduled notifications are mocked " +
+                    "On: referral sharing, referral conversions, image sharing and scheduled notifications are mocked " +
                     "in Play Mode. Off: they report unsupported."),
                 Yes2SDKEditorMock.PlatformServicesEnabled);
             if (EditorGUI.EndChangeCheck())

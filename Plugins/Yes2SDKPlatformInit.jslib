@@ -902,6 +902,11 @@ mergeInto(LibraryManager.library, {
                 shareAsync: function(options) { return Promise.reject(__y2fns('Referrals.shareAsync')); },
                 listAsync: function() { return Promise.reject(__y2fns('Referrals.listAsync')); },
                 isSupported: function() { return false; }
+            },
+
+            // Context module - sharing unsupported by this wrapper
+            context: {
+                shareAsync: function(payload) { return Promise.reject(__y2fns('Context.shareAsync')); }
             }
         };
 

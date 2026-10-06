@@ -220,7 +220,7 @@ namespace Yes2SDK
         private static Yes2SDKContext _context;
 
         /// <summary>
-        /// Context API. Stub — returns FeatureNotSupported on Poki.
+        /// Context API: share an image with ShareAsync. Context switching is not supported.
         /// </summary>
         public static Yes2SDKContext Context
         {

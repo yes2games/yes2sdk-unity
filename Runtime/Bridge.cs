@@ -146,6 +146,11 @@ namespace Yes2SDK
             ["OnReferralListSuccess"] = data => Yes2SDKReferrals.HandleSuccessMessage(Yes2SDKReferrals.Operation.List, data),
             ["OnReferralListError"] = data => Yes2SDKReferrals.HandleErrorMessage(Yes2SDKReferrals.Operation.List, data, ParseError),
             // End referrals
+            // Context share. Messages carry a request id, so errors are unwrapped
+            // here too rather than in _errorHandlers.
+            ["OnContextShareSuccess"] = data => Yes2SDKContext.HandleSuccessMessage(Yes2SDKContext.Operation.Share, data),
+            ["OnContextShareError"] = data => Yes2SDKContext.HandleErrorMessage(Yes2SDKContext.Operation.Share, data, ParseError),
+            // End context share
             // IAP subscriptions (same request-id envelope as IAP above)
             ["OnGetSubscriptionsSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.GetSubscriptions, data),
             ["OnSubscribeSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.Subscribe, data),
@@ -393,6 +398,10 @@ namespace Yes2SDK
         public void OnReferralListSuccess(string msg) => Handle(msg);
         public void OnReferralListError(string msg) => Handle(msg);
         // End referrals
+        // Context share
+        public void OnContextShareSuccess(string msg) => Handle(msg);
+        public void OnContextShareError(string msg) => Handle(msg);
+        // End context share
         // IAP subscriptions
         public void OnGetSubscriptionsSuccess(string msg) => Handle(msg);
         public void OnGetSubscriptionsError(string msg) => Handle(msg);

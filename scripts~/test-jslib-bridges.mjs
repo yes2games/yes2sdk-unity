@@ -518,6 +518,107 @@ test('referrals wrapper stubs reject FEATURE_NOT_SUPPORTED through the bridge', 
   });
 });
 // ---- end Referrals --------------------------------------------------------------------------
+// ---- Context: share an image (request-id envelope, empty success payload) -----------------
+const ctxError = (sb, i = 0) => {
+  const p = sb.sent[i][2];
+  return [p.slice(0, p.indexOf('|')), JSON.parse(p.slice(p.indexOf('|') + 1))];
+};
+
+test('context ShareAsync passes the parsed payload and sends an empty success envelope', async () => {
+  const seen = [];
+  const sb = createSandbox(['Yes2SDKContext.jslib'], {
+    Yes2SDK: { context: { shareAsync: (p) => { seen.push(p); return Promise.resolve(); } } },
+  });
+  sb.call('Yes2SDK_Context_ShareAsyncJS', 5, sb.str('{"intent":"SHARE","image":"data:image/png;base64,AAAA","data":{"coupon":"X"}}'));
+  await flush();
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(seen)), [{ intent: 'SHARE', image: 'data:image/png;base64,AAAA', data: { coupon: 'X' } }]);
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnContextShareSuccess', '5|']]);
+});
+
+test('context ShareAsync ignores whatever the platform resolves with', async () => {
+  const sb = createSandbox(['Yes2SDKContext.jslib'], {
+    Yes2SDK: { context: { shareAsync: () => Promise.resolve({ canceled: true }) } },
+  });
+  sb.call('Yes2SDK_Context_ShareAsyncJS', 6, sb.str('{"intent":"SHARE"}'));
+  await flush();
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnContextShareSuccess', '6|']]);
+});
+
+test('context ShareAsync rejection sends the error envelope with the platform code', async () => {
+  const sb = createSandbox(['Yes2SDKContext.jslib'], {
+    Yes2SDK: { context: { shareAsync: () => Promise.reject({ code: 'PLATFORM_ERROR', message: 'sheet failed' }) } },
+  });
+  sb.call('Yes2SDK_Context_ShareAsyncJS', 8, sb.str('{"intent":"SHARE"}'));
+  await flush();
+  assert.equal(sb.sent.length, 1);
+  assert.equal(sb.sent[0][1], 'OnContextShareError');
+  assert.deepStrictEqual(ctxError(sb), ['8', { code: 'PLATFORM_ERROR', message: 'sheet failed', context: 'Yes2SDK.Context.ShareAsync' }]);
+});
+
+test('context ShareAsync with bad payload JSON sends INVALID_PARAM and never calls the platform', async () => {
+  let called = 0;
+  const sb = createSandbox(['Yes2SDKContext.jslib'], {
+    Yes2SDK: { context: { shareAsync: () => { called++; return Promise.resolve(); } } },
+  });
+  sb.call('Yes2SDK_Context_ShareAsyncJS', 2, sb.str('{not json'));
+  await flush();
+  assert.equal(called, 0);
+  assert.equal(sb.sent.length, 1);
+  assert.equal(sb.sent[0][1], 'OnContextShareError');
+  const [id, err] = ctxError(sb);
+  assert.equal(id, '2');
+  assert.equal(err.code, 'INVALID_PARAM');
+});
+
+test('context ShareAsync turns a synchronous platform throw into an error envelope', async () => {
+  const sb = createSandbox(['Yes2SDKContext.jslib'], {
+    Yes2SDK: { context: { shareAsync: () => { throw new Error('sync boom'); } } },
+  });
+  sb.call('Yes2SDK_Context_ShareAsyncJS', 3, sb.str('{"intent":"SHARE"}'));
+  await flush();
+  assert.equal(sb.sent[0][1], 'OnContextShareError');
+  assert.deepStrictEqual(ctxError(sb)[1], { code: 'Unknown', message: 'sync boom', context: 'Yes2SDK.Context.ShareAsync' });
+});
+
+test('context ShareAsync never throws into wasm, even when reporting the error throws', () => {
+  const sb = createSandbox(['Yes2SDKContext.jslib'], {
+    Yes2SDK: { context: { shareAsync: () => { throw new Error('sync boom'); } } },
+  });
+  sb.sent.push = () => { throw new Error('SendMessage failed'); };
+  assert.doesNotThrow(() => sb.call('Yes2SDK_Context_ShareAsyncJS', 4, sb.str('{"intent":"SHARE"}')));
+});
+
+test('context ShareAsync reports FEATURE_NOT_SUPPORTED when the module or the method is missing', async () => {
+  const noModule = createSandbox(['Yes2SDKContext.jslib'], { Yes2SDK: {} });
+  noModule.call('Yes2SDK_Context_ShareAsyncJS', 1, noModule.str('{"intent":"SHARE"}'));
+  const noMethod = createSandbox(['Yes2SDKContext.jslib'], { Yes2SDK: { context: {} } });
+  noMethod.call('Yes2SDK_Context_ShareAsyncJS', 2, noMethod.str('{"intent":"SHARE"}'));
+  assert.equal(noModule.sent[0][1], 'OnContextShareError');
+  assert.deepStrictEqual(ctxError(noModule).map((v, i) => (i ? v.code : v)), ['1', 'FEATURE_NOT_SUPPORTED']);
+  assert.equal(noMethod.sent[0][1], 'OnContextShareError');
+  assert.deepStrictEqual(ctxError(noMethod).map((v, i) => (i ? v.code : v)), ['2', 'FEATURE_NOT_SUPPORTED']);
+});
+
+test('context ShareAsync without the SDK reports NotInitialized', async () => {
+  const sb = createSandbox(['Yes2SDKContext.jslib']);
+  sb.call('Yes2SDK_Context_ShareAsyncJS', 1, sb.str('{"intent":"SHARE"}'));
+  assert.deepStrictEqual(ctxError(sb), ['1', { code: 'NotInitialized', message: 'Yes2SDK not loaded', context: 'Yes2SDK.Context.ShareAsync' }]);
+});
+
+test('context wrapper stub rejects FEATURE_NOT_SUPPORTED through the bridge', async () => {
+  const sb = createSandbox(['Yes2SDKPlatformInit.jslib', 'Yes2SDKContext.jslib']);
+  sb.window.CrazyGames = { SDK: {} };
+  sb.window.__y2 = { log() {}, warn() {}, error() {} };
+  sb.window.__yes2PlatformInit();
+  sb.call('Yes2SDK_Context_ShareAsyncJS', 31, sb.str('{"intent":"SHARE"}'));
+  await flush();
+  assert.deepStrictEqual(sb.sent.map((s) => s[1]), ['OnContextShareError']);
+  // the wrapper's own stub answers (not the bridge's module-missing path)
+  assert.deepStrictEqual(ctxError(sb), ['31', {
+    code: 'FEATURE_NOT_SUPPORTED', message: 'Context.shareAsync is not supported on the current platform.', context: 'Yes2SDK.Context.ShareAsync',
+  }]);
+});
+// ---- end Context ---------------------------------------------------------------------------
 
 // ---- Auth: registration prompt handle and isAuthenticated (task: registration prompt) ------
 const regAuth = (overrides) => ({ auth: Object.assign({ isSupported: () => true }, overrides) });
