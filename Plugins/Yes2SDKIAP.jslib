@@ -87,6 +87,109 @@ mergeInto(LibraryManager.library, {
                 __y2iap.send('OnConsumePurchaseSuccess', requestId, '');
             })
             .catch(__y2iap.handleCatch('OnConsumePurchaseError', requestId, 'ConsumePurchase failed', 'Yes2SDK.IAP.ConsumePurchaseAsync'));
+    },
+
+    // ---- Subscriptions ----------------------------------------------------------------
+    // Same "<requestId>|<payload>" envelope. A runtime without the method (older Core)
+    // reports FEATURE_NOT_SUPPORTED, and a synchronous throw is reported, never thrown
+    // into wasm.
+
+    Yes2SDK_IAP_IsSubscriptionSupportedJS__deps: ['$__y2h'],
+    Yes2SDK_IAP_IsSubscriptionSupportedJS: function() {
+        try {
+            if (!__y2h.has('iap')) return 0;
+            if (typeof window.Yes2SDK.iap.isSubscriptionSupported !== 'function') return 0;
+            return window.Yes2SDK.iap.isSubscriptionSupported() ? 1 : 0;
+        } catch (e) { return 0; }
+    },
+
+    Yes2SDK_IAP_GetSubscriptionsAsyncJS__deps: ['$__y2h', '$__y2iap'],
+    Yes2SDK_IAP_GetSubscriptionsAsyncJS: function(requestId) {
+        var context = 'Yes2SDK.IAP.GetSubscriptionsAsync';
+        var onError = __y2iap.handleCatch('OnGetSubscriptionsError', requestId, 'GetSubscriptions failed', context);
+        try {
+            if (!__y2h.has('iap')) {
+                __y2iap.sendError('OnGetSubscriptionsError', requestId, 'NotInitialized', 'Yes2SDK IAP module not loaded', context);
+                return;
+            }
+            if (typeof window.Yes2SDK.iap.getSubscriptionsAsync !== 'function') {
+                __y2iap.sendError('OnGetSubscriptionsError', requestId, 'FEATURE_NOT_SUPPORTED', 'Subscriptions are not supported by this runtime', context);
+                return;
+            }
+            window.Yes2SDK.iap.getSubscriptionsAsync()
+                .then(function(list) {
+                    __y2iap.send('OnGetSubscriptionsSuccess', requestId, JSON.stringify(list || []));
+                })
+                .catch(onError);
+        } catch (e) { onError(e); }
+    },
+
+    Yes2SDK_IAP_SubscribeAsyncJS__deps: ['$__y2h', '$__y2iap'],
+    Yes2SDK_IAP_SubscribeAsyncJS: function(requestId, productIdPtr) {
+        var context = 'Yes2SDK.IAP.SubscribeAsync';
+        var onError = __y2iap.handleCatch('OnSubscribeError', requestId, 'Subscribe failed', context);
+        try {
+            if (!__y2h.has('iap')) {
+                __y2iap.sendError('OnSubscribeError', requestId, 'NotInitialized', 'Yes2SDK IAP module not loaded', context);
+                return;
+            }
+            if (typeof window.Yes2SDK.iap.subscribeAsync !== 'function') {
+                __y2iap.sendError('OnSubscribeError', requestId, 'FEATURE_NOT_SUPPORTED', 'Subscriptions are not supported by this runtime', context);
+                return;
+            }
+            var productId = UTF8ToString(productIdPtr);
+            // A closed checkout resolves { status: 'cancelled' }: a success, not an error.
+            window.Yes2SDK.iap.subscribeAsync(productId)
+                .then(function(result) {
+                    __y2iap.send('OnSubscribeSuccess', requestId, JSON.stringify(result));
+                })
+                .catch(onError);
+        } catch (e) { onError(e); }
+    },
+
+    Yes2SDK_IAP_CancelSubscriptionAsyncJS__deps: ['$__y2h', '$__y2iap'],
+    Yes2SDK_IAP_CancelSubscriptionAsyncJS: function(requestId, productIdPtr) {
+        var context = 'Yes2SDK.IAP.CancelSubscriptionAsync';
+        var onError = __y2iap.handleCatch('OnCancelSubscriptionError', requestId, 'CancelSubscription failed', context);
+        try {
+            if (!__y2h.has('iap')) {
+                __y2iap.sendError('OnCancelSubscriptionError', requestId, 'NotInitialized', 'Yes2SDK IAP module not loaded', context);
+                return;
+            }
+            if (typeof window.Yes2SDK.iap.cancelSubscriptionAsync !== 'function') {
+                __y2iap.sendError('OnCancelSubscriptionError', requestId, 'FEATURE_NOT_SUPPORTED', 'Subscriptions are not supported by this runtime', context);
+                return;
+            }
+            var productId = UTF8ToString(productIdPtr);
+            window.Yes2SDK.iap.cancelSubscriptionAsync(productId)
+                .then(function(confirmed) {
+                    __y2iap.send('OnCancelSubscriptionSuccess', requestId, confirmed ? 'true' : 'false');
+                })
+                .catch(onError);
+        } catch (e) { onError(e); }
+    },
+
+    Yes2SDK_IAP_ClaimRetentionOfferAsyncJS__deps: ['$__y2h', '$__y2iap'],
+    Yes2SDK_IAP_ClaimRetentionOfferAsyncJS: function(requestId, productIdPtr) {
+        var context = 'Yes2SDK.IAP.ClaimRetentionOfferAsync';
+        var onError = __y2iap.handleCatch('OnClaimRetentionOfferError', requestId, 'ClaimRetentionOffer failed', context);
+        try {
+            if (!__y2h.has('iap')) {
+                __y2iap.sendError('OnClaimRetentionOfferError', requestId, 'NotInitialized', 'Yes2SDK IAP module not loaded', context);
+                return;
+            }
+            if (typeof window.Yes2SDK.iap.claimRetentionOfferAsync !== 'function') {
+                __y2iap.sendError('OnClaimRetentionOfferError', requestId, 'FEATURE_NOT_SUPPORTED', 'Subscriptions are not supported by this runtime', context);
+                return;
+            }
+            var productId = UTF8ToString(productIdPtr);
+            window.Yes2SDK.iap.claimRetentionOfferAsync(productId)
+                .then(function(subscription) {
+                    __y2iap.send('OnClaimRetentionOfferSuccess', requestId, JSON.stringify(subscription));
+                })
+                .catch(onError);
+        } catch (e) { onError(e); }
     }
+    // ---- end Subscriptions ------------------------------------------------------------
 
 });

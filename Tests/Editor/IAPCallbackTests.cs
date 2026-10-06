@@ -23,7 +23,11 @@ namespace Yes2SDK.Tests
             nameof(Yes2SDKIAP.Operation.GetCatalog),
             nameof(Yes2SDKIAP.Operation.Purchase),
             nameof(Yes2SDKIAP.Operation.GetPurchases),
-            nameof(Yes2SDKIAP.Operation.ConsumePurchase)
+            nameof(Yes2SDKIAP.Operation.ConsumePurchase),
+            nameof(Yes2SDKIAP.Operation.GetSubscriptions),
+            nameof(Yes2SDKIAP.Operation.Subscribe),
+            nameof(Yes2SDKIAP.Operation.CancelSubscription),
+            nameof(Yes2SDKIAP.Operation.ClaimRetentionOffer)
         };
 
         private static Yes2SDKIAP.Operation Op(string name)

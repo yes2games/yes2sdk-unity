@@ -37,6 +37,135 @@ namespace Yes2SDK
             [JsonProperty("isSandbox")] public bool IsSandbox = true;
         }
 
+        internal class MockOffer
+        {
+            [JsonProperty("priceAmount")] public double PriceAmount;
+            [JsonProperty("durationPeriods")] public int DurationPeriods;
+        }
+
+        // Same JSON shape as the platform Subscription, so games parse the
+        // fields they will see on a real platform build.
+        internal class MockSubscription
+        {
+            [JsonProperty("productId")] public string ProductId;
+            [JsonProperty("title")] public string Title;
+            [JsonProperty("description")] public string Description;
+            [JsonProperty("price")] public string Price;
+            [JsonProperty("priceAmount")] public double PriceAmount;
+            [JsonProperty("priceCurrencyCode")] public string PriceCurrencyCode = "USD";
+            [JsonProperty("billingPeriod")] public string BillingPeriod;
+            [JsonProperty("isActive")] public bool IsActive;
+            [JsonProperty("trialEligible")] public bool TrialEligible;
+            [JsonProperty("introOffer")] public MockOffer IntroOffer;
+            [JsonProperty("retentionOffer")] public MockOffer RetentionOffer;
+            // A sandbox player never gets intro or retention offers on the
+            // platform, and the mock carries offers so games can test those
+            // flows, so the mock reports a non-sandbox subscription. The flag
+            // is omitted when false, as the platform omits it.
+            [JsonProperty("isSandbox", NullValueHandling = NullValueHandling.Ignore)]
+            public bool? IsSandbox;
+            [JsonProperty("signedRequest")] public string SignedRequest = "mock-signed-request";
+        }
+
+        /// <summary>The one mock subscription product id.</summary>
+        internal const string MockSubscriptionId = "yes2.mock.vip.monthly";
+
+        // Session-only subscription state, reset on each play.
+        internal static bool SubscriptionActive;
+        internal static bool RetentionClaimed;
+        // A confirmed cancel keeps SubscriptionActive: the player keeps access
+        // until the end of the current billing period. Tracked for logging.
+        internal static bool SubscriptionCancelled;
+
+        /// <summary>The subscription calls the mock decides on.</summary>
+        internal enum SubscriptionCall { Subscribe, CancelSubscription, ClaimRetentionOffer }
+
+        /// <summary>
+        /// The platform rules for one mock subscription call. Returns true and
+        /// the error the platform reports when the call is rejected, false when
+        /// it may proceed: a guest gets PLAYER_NOT_AUTHENTICATED; an unknown
+        /// product gets IAP_NOT_AVAILABLE (INVALID_OPERATION for a claim, which
+        /// has no "not found" case); subscribing to a held subscription gets
+        /// IAP_ALREADY_PURCHASED; cancelling or claiming without holding it gets
+        /// INVALID_OPERATION. A repeated claim on a held subscription proceeds.
+        /// </summary>
+        internal static bool TryRejectSubscription(SubscriptionCall call, string productId, bool registered, bool held,
+            string context, out Error error)
+        {
+            error = default;
+            if (!registered)
+            {
+                error = new Error
+                {
+                    Code = "PLAYER_NOT_AUTHENTICATED",
+                    Message = "Subscriptions require a registered player (mock). Turn on \"Player is registered\" in the Build Window.",
+                    Context = context
+                };
+                return true;
+            }
+
+            bool known = IsKnownSubscription(productId);
+            switch (call)
+            {
+                case SubscriptionCall.Subscribe:
+                    if (!known)
+                    {
+                        error = NotAvailable(productId, context);
+                        return true;
+                    }
+                    if (held)
+                    {
+                        error = new Error
+                        {
+                            Code = "IAP_ALREADY_PURCHASED",
+                            Message = $"The player already holds subscription \"{productId}\" (mock).",
+                            Context = context
+                        };
+                        return true;
+                    }
+                    return false;
+                case SubscriptionCall.CancelSubscription:
+                    if (!known)
+                    {
+                        error = NotAvailable(productId, context);
+                        return true;
+                    }
+                    if (!held)
+                    {
+                        error = new Error
+                        {
+                            Code = "INVALID_OPERATION",
+                            Message = $"The player does not hold an active \"{productId}\" subscription (mock).",
+                            Context = context
+                        };
+                        return true;
+                    }
+                    return false;
+                default:
+                    if (!known || !held)
+                    {
+                        error = new Error
+                        {
+                            Code = "INVALID_OPERATION",
+                            Message = $"The player is not eligible for a retention offer on \"{productId}\" (mock).",
+                            Context = context
+                        };
+                        return true;
+                    }
+                    return false;
+            }
+        }
+
+        private static Error NotAvailable(string productId, string context)
+        {
+            return new Error
+            {
+                Code = "IAP_NOT_AVAILABLE",
+                Message = $"Subscription \"{productId}\" is not available (mock). Use \"{MockSubscriptionId}\".",
+                Context = context
+            };
+        }
+
         // Sample catalog returned by GetCatalogAsync. PurchaseAsync accepts
         // ANY product id (not just these) so games can test with their real
         // ids before the platform catalog exists.
@@ -82,6 +211,67 @@ namespace Yes2SDK
             return JsonConvert.SerializeObject(purchase);
         }
 
+        internal static bool IsKnownSubscription(string productId) => productId == MockSubscriptionId;
+
+        /// <summary>The mock subscription with the current session state.</summary>
+        internal static MockSubscription CurrentSubscription()
+        {
+            return new MockSubscription
+            {
+                ProductId = MockSubscriptionId,
+                Title = "VIP Monthly",
+                Description = "Mock monthly subscription.",
+                Price = "4.99 USD",
+                PriceAmount = 4.99,
+                BillingPeriod = "monthly",
+                IsActive = SubscriptionActive,
+                // Trial and intro pricing only apply before the first subscription.
+                TrialEligible = !SubscriptionActive,
+                IntroOffer = SubscriptionActive ? null : new MockOffer { PriceAmount = 0.99, DurationPeriods = 1 },
+                // Non-null only while the player holds the subscription and has
+                // not claimed it. The platform also hides it during an intro
+                // window; the mock ignores that so the retention flow stays
+                // testable right after subscribing.
+                RetentionOffer = SubscriptionActive && !RetentionClaimed
+                    ? new MockOffer { PriceAmount = 1.99, DurationPeriods = 3 }
+                    : null
+            };
+        }
+
+        /// <summary>JSON array returned by GetSubscriptionsAsync for a registered player.</summary>
+        internal static string SubscriptionsJson => JsonConvert.SerializeObject(new[] { CurrentSubscription() });
+
+        /// <summary>Mark the subscription active and return the subscribed result JSON.</summary>
+        internal static string Subscribe()
+        {
+            SubscriptionActive = true;
+            return JsonConvert.SerializeObject(new { status = "subscribed", subscription = CurrentSubscription() });
+        }
+
+        /// <summary>Result JSON for a closed checkout.</summary>
+        internal const string CancelledResultJson = "{\"status\":\"cancelled\"}";
+
+        /// <summary>
+        /// Use up the retention offer and return the refreshed subscription JSON.
+        /// Repeating a claim re-confirms the same discount and returns the same result.
+        /// </summary>
+        internal static string ClaimRetentionOffer()
+        {
+            RetentionClaimed = true;
+            return JsonConvert.SerializeObject(CurrentSubscription());
+        }
+
+        /// <summary>
+        /// Record a confirmed cancellation and return the "true" payload. The
+        /// subscription stays active: the player keeps access until the end of
+        /// the current billing period, so games must not revoke it at once.
+        /// </summary>
+        internal static string CancelSubscription()
+        {
+            SubscriptionCancelled = true;
+            return "true";
+        }
+
         internal static void Consume(string purchaseToken)
         {
             Purchases.RemoveAll(p => p.PurchaseToken == purchaseToken);
@@ -90,10 +280,13 @@ namespace Yes2SDK
         // Statics survive Play Mode restarts when Domain Reload is disabled
         // (Enter Play Mode Options), so reset explicitly on each play.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetState()
+        internal static void ResetState()
         {
             Purchases.Clear();
             _paymentCounter = 0;
+            SubscriptionActive = false;
+            RetentionClaimed = false;
+            SubscriptionCancelled = false;
         }
     }
 }

@@ -40,11 +40,16 @@ test('iap GetCatalogAsync success sends the envelope', async () => {
 });
 
 test('iap PurchaseAsync rejection sends the error envelope with the platform code', async () => {
+  const configs = [];
   const sb = createSandbox(['Yes2SDKIAP.jslib'], {
-    Yes2SDK: { iap: { purchaseAsync: () => Promise.reject({ code: 'USER_INPUT', message: 'nope' }) } },
+    Yes2SDK: { iap: { purchaseAsync: (config) => { configs.push(config); return Promise.reject({ code: 'USER_INPUT', message: 'nope' }); } } },
   });
   sb.call('Yes2SDK_IAP_PurchaseAsyncJS', 3, sb.str('gem'), sb.str(''));
   await flush();
+  // An empty developer payload is left out, and the product id arrives decoded.
+  assert.equal(configs.length, 1);
+  assert.deepStrictEqual(Object.keys(configs[0]), ['productId']);
+  assert.equal(configs[0].productId, 'gem');
   assert.equal(sb.sent.length, 1);
   const [target, method, payload] = sb.sent[0];
   assert.deepStrictEqual([target, method], ['Bridge', 'OnPurchaseError']);
@@ -61,6 +66,136 @@ test('iap call without the module reports NotInitialized', async () => {
   assert.equal(method, 'OnGetPurchasesError');
   assert.equal(JSON.parse(payload.slice(payload.indexOf('|') + 1)).code, 'NotInitialized');
 });
+
+// ---- IAP subscriptions: request-id envelope, missing method, synchronous throw --------------
+const subscriptionSample = {
+  productId: 'vip', title: 'VIP', description: '', price: '4.99 USD', priceAmount: 4.99,
+  priceCurrencyCode: 'USD', billingPeriod: 'monthly', isActive: true, trialEligible: false,
+  introOffer: null, retentionOffer: { priceAmount: 1.99, durationPeriods: 2 }, signedRequest: 'sig',
+};
+const subscriptionCases = [
+  // [JS function, Core method, callback base, takes a product id, Core result, expected payload]
+  ['Yes2SDK_IAP_GetSubscriptionsAsyncJS', 'getSubscriptionsAsync', 'OnGetSubscriptions', false,
+    [subscriptionSample], JSON.stringify([subscriptionSample])],
+  ['Yes2SDK_IAP_SubscribeAsyncJS', 'subscribeAsync', 'OnSubscribe', true,
+    { status: 'subscribed', subscription: subscriptionSample }, JSON.stringify({ status: 'subscribed', subscription: subscriptionSample })],
+  ['Yes2SDK_IAP_CancelSubscriptionAsyncJS', 'cancelSubscriptionAsync', 'OnCancelSubscription', true, true, 'true'],
+  ['Yes2SDK_IAP_ClaimRetentionOfferAsyncJS', 'claimRetentionOfferAsync', 'OnClaimRetentionOffer', true,
+    subscriptionSample, JSON.stringify(subscriptionSample)],
+];
+const subArgs = (sb, takesId) => (takesId ? [21, sb.str('vip')] : [21]);
+const errorBody = (payload) => JSON.parse(payload.slice(payload.indexOf('|') + 1));
+
+for (const [fn, method, callback, takesId, result, expected] of subscriptionCases) {
+  test(`iap ${method} success sends "<id>|<payload>"`, async () => {
+    const args = [];
+    const sb = createSandbox(['Yes2SDKIAP.jslib'], {
+      Yes2SDK: { iap: { [method]: (...a) => { args.push(a); return Promise.resolve(result); } } },
+    });
+    sb.call(fn, ...subArgs(sb, takesId));
+    await flush();
+    assert.deepStrictEqual(sb.sent, [['Bridge', callback + 'Success', '21|' + expected]]);
+    assert.deepStrictEqual(args, [takesId ? ['vip'] : []]);
+  });
+
+  test(`iap ${method} rejection sends the error envelope with the platform code`, async () => {
+    const sb = createSandbox(['Yes2SDKIAP.jslib'], {
+      Yes2SDK: { iap: { [method]: () => Promise.reject({ code: 'PLAYER_NOT_AUTHENTICATED', message: 'sign in' }) } },
+    });
+    sb.call(fn, ...subArgs(sb, takesId));
+    await flush();
+    assert.equal(sb.sent.length, 1);
+    assert.equal(sb.sent[0][1], callback + 'Error');
+    assert.ok(sb.sent[0][2].startsWith('21|'));
+    assert.equal(errorBody(sb.sent[0][2]).code, 'PLAYER_NOT_AUTHENTICATED');
+    assert.equal(errorBody(sb.sent[0][2]).message, 'sign in');
+  });
+
+  test(`iap ${method} missing on an older runtime sends FEATURE_NOT_SUPPORTED`, async () => {
+    const sb = createSandbox(['Yes2SDKIAP.jslib'], { Yes2SDK: { iap: {} } });
+    sb.call(fn, ...subArgs(sb, takesId));
+    await flush();
+    assert.equal(sb.sent.length, 1);
+    assert.equal(sb.sent[0][1], callback + 'Error');
+    assert.ok(sb.sent[0][2].startsWith('21|'));
+    assert.equal(errorBody(sb.sent[0][2]).code, 'FEATURE_NOT_SUPPORTED');
+  });
+
+  test(`iap ${method} synchronous throw is reported, never thrown into wasm`, async () => {
+    const sb = createSandbox(['Yes2SDKIAP.jslib'], {
+      Yes2SDK: { iap: { [method]: () => { throw { code: 'NOT_INITIALIZED', message: 'early' }; } } },
+    });
+    sb.call(fn, ...subArgs(sb, takesId));
+    await flush();
+    assert.equal(sb.sent.length, 1);
+    assert.equal(sb.sent[0][1], callback + 'Error');
+    assert.equal(errorBody(sb.sent[0][2]).code, 'NOT_INITIALIZED');
+  });
+
+  test(`iap ${method} without the module reports NotInitialized`, async () => {
+    const sb = createSandbox(['Yes2SDKIAP.jslib'], { Yes2SDK: {} });
+    sb.call(fn, ...subArgs(sb, takesId));
+    assert.equal(sb.sent[0][1], callback + 'Error');
+    assert.equal(errorBody(sb.sent[0][2]).code, 'NotInitialized');
+  });
+}
+
+test('iap CancelSubscriptionAsync sends "false" when the player dismisses', async () => {
+  const sb = createSandbox(['Yes2SDKIAP.jslib'], {
+    Yes2SDK: { iap: { cancelSubscriptionAsync: () => Promise.resolve(false) } },
+  });
+  sb.call('Yes2SDK_IAP_CancelSubscriptionAsyncJS', 4, sb.str('vip'));
+  await flush();
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnCancelSubscriptionSuccess', '4|false']]);
+});
+
+test('iap SubscribeAsync passes a closed checkout through as a success', async () => {
+  const sb = createSandbox(['Yes2SDKIAP.jslib'], {
+    Yes2SDK: { iap: { subscribeAsync: () => Promise.resolve({ status: 'cancelled' }) } },
+  });
+  sb.call('Yes2SDK_IAP_SubscribeAsyncJS', 5, sb.str('vip'));
+  await flush();
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnSubscribeSuccess', '5|{"status":"cancelled"}']]);
+});
+
+test('iap GetSubscriptionsAsync sends [] for an empty result', async () => {
+  const sb = createSandbox(['Yes2SDKIAP.jslib'], {
+    Yes2SDK: { iap: { getSubscriptionsAsync: () => Promise.resolve(undefined) } },
+  });
+  sb.call('Yes2SDK_IAP_GetSubscriptionsAsyncJS', 6);
+  await flush();
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnGetSubscriptionsSuccess', '6|[]']]);
+});
+
+for (const [label, iap, expected] of [
+  ['true', { isSubscriptionSupported: () => true }, 1],
+  ['false', { isSubscriptionSupported: () => false }, 0],
+  ['missing method', {}, 0],
+  ['throwing', { isSubscriptionSupported: () => { throw new Error('boom'); } }, 0],
+]) {
+  test(`iap IsSubscriptionSupported with ${label} result returns ${expected}`, async () => {
+    const sb = createSandbox(['Yes2SDKIAP.jslib'], { Yes2SDK: { iap } });
+    assert.equal(sb.call('Yes2SDK_IAP_IsSubscriptionSupportedJS'), expected);
+  });
+}
+
+test('iap IsSubscriptionSupported returns 0 without the module', async () => {
+  const sb = createSandbox(['Yes2SDKIAP.jslib'], { Yes2SDK: {} });
+  assert.equal(sb.call('Yes2SDK_IAP_IsSubscriptionSupportedJS'), 0);
+});
+
+test('iap wrapper reports subscriptions unsupported and rejects every subscription call', async () => {
+  const sb = createSandbox(['Yes2SDKPlatformInit.jslib']);
+  sb.window.CrazyGames = { SDK: {} };
+  sb.window.__y2 = { log() {}, warn() {}, error() {} };
+  sb.window.__yes2PlatformInit();
+  const iap = sb.window.Yes2SDK.iap;
+  assert.equal(iap.isSubscriptionSupported(), false);
+  for (const m of ['getSubscriptionsAsync', 'subscribeAsync', 'cancelSubscriptionAsync', 'claimRetentionOfferAsync']) {
+    await assert.rejects(iap[m]('vip'), (e) => e.code === 'FEATURE_NOT_SUPPORTED');
+  }
+});
+// ---- end IAP subscriptions -----------------------------------------------------------------
 
 // ---- Data: request-id envelope and string getter -------------------------------------------
 test('data SetStringAsync success sends "<id>|true"', async () => {

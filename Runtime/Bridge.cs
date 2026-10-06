@@ -143,6 +143,16 @@ namespace Yes2SDK
             ["OnReferralListSuccess"] = data => Yes2SDKReferrals.HandleSuccessMessage(Yes2SDKReferrals.Operation.List, data),
             ["OnReferralListError"] = data => Yes2SDKReferrals.HandleErrorMessage(Yes2SDKReferrals.Operation.List, data, ParseError),
             // End referrals
+            // IAP subscriptions (same request-id envelope as IAP above)
+            ["OnGetSubscriptionsSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.GetSubscriptions, data),
+            ["OnSubscribeSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.Subscribe, data),
+            ["OnCancelSubscriptionSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.CancelSubscription, data),
+            ["OnClaimRetentionOfferSuccess"] = data => Yes2SDKIAP.HandleSuccessMessage(Yes2SDKIAP.Operation.ClaimRetentionOffer, data),
+            ["OnGetSubscriptionsError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.GetSubscriptions, data, ParseError),
+            ["OnSubscribeError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.Subscribe, data, ParseError),
+            ["OnCancelSubscriptionError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.CancelSubscription, data, ParseError),
+            ["OnClaimRetentionOfferError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.ClaimRetentionOffer, data, ParseError),
+            // end IAP subscriptions
 
             // Data (async durable saves)
             // Data confirmed writes carry a request id, so their errors are
@@ -367,6 +377,16 @@ namespace Yes2SDK
         public void OnReferralListSuccess(string msg) => Handle(msg);
         public void OnReferralListError(string msg) => Handle(msg);
         // End referrals
+        // IAP subscriptions
+        public void OnGetSubscriptionsSuccess(string msg) => Handle(msg);
+        public void OnGetSubscriptionsError(string msg) => Handle(msg);
+        public void OnSubscribeSuccess(string msg) => Handle(msg);
+        public void OnSubscribeError(string msg) => Handle(msg);
+        public void OnCancelSubscriptionSuccess(string msg) => Handle(msg);
+        public void OnCancelSubscriptionError(string msg) => Handle(msg);
+        public void OnClaimRetentionOfferSuccess(string msg) => Handle(msg);
+        public void OnClaimRetentionOfferError(string msg) => Handle(msg);
+        // end IAP subscriptions
 
         // Data (async durable saves)
         public void OnDataSetStringSuccess(string msg) => Handle(msg);

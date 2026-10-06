@@ -873,7 +873,13 @@ mergeInto(LibraryManager.library, {
                 purchaseAsync: function(config) { return Promise.reject(__y2fns('IAP.purchaseAsync')); },
                 getPurchasesAsync: function() { return Promise.reject(__y2fns('IAP.getPurchasesAsync')); },
                 consumePurchaseAsync: function(purchaseToken) { return Promise.reject(__y2fns('IAP.consumePurchaseAsync')); },
-                isSupported: function() { return false; }
+                isSupported: function() { return false; },
+                // Subscriptions - unsupported on CrazyGames
+                getSubscriptionsAsync: function() { return Promise.reject(__y2fns('IAP.getSubscriptionsAsync')); },
+                subscribeAsync: function(productId) { return Promise.reject(__y2fns('IAP.subscribeAsync')); },
+                cancelSubscriptionAsync: function(productId) { return Promise.reject(__y2fns('IAP.cancelSubscriptionAsync')); },
+                claimRetentionOfferAsync: function(productId) { return Promise.reject(__y2fns('IAP.claimRetentionOfferAsync')); },
+                isSubscriptionSupported: function() { return false; }
             },
 
             // Referrals module - unsupported on CrazyGames
