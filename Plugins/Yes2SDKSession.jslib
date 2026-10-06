@@ -37,7 +37,10 @@ mergeInto(LibraryManager.library, {
     $__y2toJson: function(value, fallback) {
         try {
             if (typeof value === 'string') return value;
-            if (value !== null && typeof value === 'object') return JSON.stringify(value);
+            if (value !== null && typeof value === 'object') {
+                var s = JSON.stringify(value);
+                if (typeof s === 'string') return s;
+            }
         } catch (e) {}
         return fallback;
     },
@@ -68,9 +71,8 @@ mergeInto(LibraryManager.library, {
         try {
             var dataJson = UTF8ToString(dataJsonPtr);
             if (!__y2h.has('session')) return;
-            var session = window.Yes2SDK.session;
-            if (typeof session.setSessionDataFromJson === 'function') session.setSessionDataFromJson(dataJson);
-            else session.setSessionData(dataJson);
+            if (typeof window.Yes2SDK.session.setSessionDataFromJson === 'function') window.Yes2SDK.session.setSessionDataFromJson(dataJson);
+            else window.Yes2SDK.session.setSessionData(dataJson);
         } catch (e) {}
     },
 

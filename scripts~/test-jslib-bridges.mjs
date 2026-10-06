@@ -195,6 +195,21 @@ test('session SetSessionData never throws when Core throws', async () => {
   sb.call('Yes2SDK_SetSessionDataJS', sb.str('{}'));
 });
 
+test('session wrapper setSessionDataFromJson parses a string and warns on bad JSON without throwing', async () => {
+  const sb = createSandbox(['Yes2SDKPlatformInit.jslib']);
+  sb.window.CrazyGames = { SDK: {} };
+  sb.window.__y2 = { log() {}, warn: (...a) => warns.push(a), error() {} };
+  const warns = [];
+  sb.window.__yes2PlatformInit();
+  const session = sb.window.Yes2SDK && sb.window.Yes2SDK.session;
+  assert.ok(session, 'wrapper session module created');
+  session.setSessionDataFromJson('{"k":2}');
+  assert.equal(JSON.stringify(session._data), '{"k":2}');
+  session.setSessionDataFromJson('{bad');
+  assert.equal(warns.length, 1);
+  assert.equal(JSON.stringify(session._data), '{"k":2}');
+});
+
 // ---- runner --------------------------------------------------------------------------------
 let failed = 0;
 for (const { name, fn } of tests) {
