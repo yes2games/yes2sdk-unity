@@ -19,6 +19,14 @@ namespace Yes2SDK
         private const string IAPKey = "Yes2SDK.EditorMock.IAP";
         private const string AdResultKey = "Yes2SDK.EditorMock.AdResult";
         private const string IAPFailKey = "Yes2SDK.EditorMock.IAPFail";
+        private const string PlayerRegisteredKey = "Yes2SDK.EditorMock.PlayerRegistered";
+        private const string EntryPointDataKey = "Yes2SDK.EditorMock.EntryPointData";
+        private const string PlatformServicesKey = "Yes2SDK.EditorMock.PlatformServices";
+        private const string ReferralShareResultKey = "Yes2SDK.EditorMock.ReferralShareResult";
+        private const string ReferralConversionsKey = "Yes2SDK.EditorMock.ReferralConversions";
+
+        /// <summary>Maximum value accepted by <see cref="ReferralConversions"/>.</summary>
+        internal const int MaxReferralConversions = 20;
 
         /// <summary>
         /// What ShowInterstitial / ShowRewarded resolve to in Play Mode.
@@ -75,6 +83,95 @@ namespace Yes2SDK
         {
             get => EditorPrefs.GetBool(IAPFailKey, false);
             set => EditorPrefs.SetBool(IAPFailKey, value);
+        }
+
+        /// <summary>What a mock referral share resolves to in Play Mode.</summary>
+        public enum ShareOutcome
+        {
+            Shared = 0,
+            Cancelled = 1,
+            Error = 2
+        }
+
+        /// <summary>
+        /// When enabled, the mock player counts as registered (signed in).
+        /// Default off, which is a guest player.
+        /// </summary>
+        public static bool PlayerRegistered
+        {
+            get => EditorPrefs.GetBool(PlayerRegisteredKey, false);
+            set => EditorPrefs.SetBool(PlayerRegisteredKey, value);
+        }
+
+        /// <summary>
+        /// JSON object returned by Session.GetEntryPointData() in Play Mode.
+        /// Default "{}".
+        /// </summary>
+        public static string EntryPointDataJson
+        {
+            get => EditorPrefs.GetString(EntryPointDataKey, "{}");
+            set => EditorPrefs.SetString(EntryPointDataKey, string.IsNullOrEmpty(value) ? "{}" : value);
+        }
+
+        /// <summary>
+        /// When enabled, the referral and notification mocks are active in
+        /// Play Mode. When disabled they report unsupported. Default on.
+        /// </summary>
+        public static bool PlatformServicesEnabled
+        {
+            get => EditorPrefs.GetBool(PlatformServicesKey, true);
+            set => EditorPrefs.SetBool(PlatformServicesKey, value);
+        }
+
+        /// <summary>Simulated result of a referral share in Play Mode. Default Shared.</summary>
+        public static ShareOutcome ReferralShareResult
+        {
+            get => (ShareOutcome)EditorPrefs.GetInt(ReferralShareResultKey, (int)ShareOutcome.Shared);
+            set => EditorPrefs.SetInt(ReferralShareResultKey, (int)value);
+        }
+
+        /// <summary>
+        /// Conversions returned per shared reference in Play Mode, clamped
+        /// to 0..20. Default 1.
+        /// </summary>
+        public static int ReferralConversions
+        {
+            get => ClampConversions(EditorPrefs.GetInt(ReferralConversionsKey, 1));
+            set => EditorPrefs.SetInt(ReferralConversionsKey, ClampConversions(value));
+        }
+
+        internal static int ClampConversions(int value) =>
+            Mathf.Clamp(value, 0, MaxReferralConversions);
+
+        /// <summary>
+        /// Session-only override set when a mock registration prompt login
+        /// succeeds. Not persisted; reset when Play Mode starts.
+        /// </summary>
+        internal static bool SessionRegisteredOverride;
+
+        /// <summary>True when the mock player is registered right now.</summary>
+        internal static bool IsRegisteredNow => SessionRegisteredOverride || PlayerRegistered;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetSessionState()
+        {
+            SessionRegisteredOverride = false;
+        }
+
+        /// <summary>
+        /// Simulates the platform asking the game to close (Play Mode only):
+        /// raises <see cref="Yes2SDK.OnExitRequested"/>, then flushes saved
+        /// data the way the platform does right after the event.
+        /// </summary>
+        public static void SimulateExitRequest()
+        {
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning("[Yes2SDK] SimulateExitRequest only works in Play Mode.");
+                return;
+            }
+            Yes2SDK.InvokeExitRequested();
+            PlayerPrefs.Save();
         }
 
         /// <summary>

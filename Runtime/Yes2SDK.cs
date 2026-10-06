@@ -70,6 +70,14 @@ namespace Yes2SDK
         public static event Action OnAccountDialogClose;
 
         /// <summary>
+        /// Fired when the platform starts closing the game. Save progress synchronously inside the handler
+        /// with <c>Yes2SDK.Data.SetString</c>/<c>SetInt</c>/<c>SetFloat</c>; the SDK flushes player data right
+        /// after the handler returns. Async work started here is not awaited. Not raised on platforms that
+        /// do not report an exit.
+        /// </summary>
+        public static event Action OnExitRequested;
+
+        /// <summary>
         /// Called when an SDK error occurs.
         /// </summary>
         public static event Action<Error> OnError;
@@ -548,6 +556,15 @@ namespace Yes2SDK
         {
             Yes2Log.Log("Game resumed");
             OnResume?.Invoke();
+        }
+
+        /// <summary>
+        /// Invokes the OnExitRequested event. Called internally by the bridge.
+        /// </summary>
+        internal static void InvokeExitRequested()
+        {
+            Yes2Log.Log("Exit requested");
+            OnExitRequested?.Invoke();
         }
 
         /// <summary>
