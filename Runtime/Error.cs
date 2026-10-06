@@ -73,6 +73,7 @@ namespace Yes2SDK
             ["ADS_BLOCKED"] = ErrorCode.PlatformError,
             ["IAP_PURCHASE_FAILED"] = ErrorCode.PlatformError,
             ["IAP_ALREADY_PURCHASED"] = ErrorCode.PlatformError,
+            ["IAP_PURCHASE_CANCELLED"] = ErrorCode.UserCancelled,
             ["STORAGE_ERROR"] = ErrorCode.PlatformError,
             ["STORAGE_QUOTA_EXCEEDED"] = ErrorCode.PlatformError,
             ["PLAYER_DATA_CORRUPTED"] = ErrorCode.PlatformError,
