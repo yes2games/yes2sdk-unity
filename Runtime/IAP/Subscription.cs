@@ -71,10 +71,17 @@ namespace Yes2SDK
         [JsonProperty("signedRequest")]
         public string SignedRequest;
 
+        // DateParseHandling.None keeps date-like strings (titles, signed
+        // requests) exactly as sent instead of reformatting them via DateTime.
+        internal static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
+        {
+            DateParseHandling = DateParseHandling.None
+        };
+
         /// <summary>Parses one subscription. Throws when the input is not a subscription object.</summary>
         internal static Subscription Parse(string json)
         {
-            var subscription = string.IsNullOrEmpty(json) ? null : JsonConvert.DeserializeObject<Subscription>(json);
+            var subscription = string.IsNullOrEmpty(json) ? null : JsonConvert.DeserializeObject<Subscription>(json, JsonSettings);
             if (subscription == null) throw new FormatException("payload is not a subscription");
             return subscription;
         }
@@ -83,7 +90,7 @@ namespace Yes2SDK
         internal static List<Subscription> ParseList(string json)
         {
             if (string.IsNullOrEmpty(json)) throw new FormatException("payload is not a subscription list");
-            return JsonConvert.DeserializeObject<List<Subscription>>(json) ?? new List<Subscription>();
+            return JsonConvert.DeserializeObject<List<Subscription>>(json, JsonSettings) ?? new List<Subscription>();
         }
 
         public override string ToString()
@@ -137,7 +144,7 @@ namespace Yes2SDK
         internal static SubscribeResult Parse(string json)
         {
             if (string.IsNullOrEmpty(json)) throw new FormatException("payload is not a subscribe result");
-            var root = JToken.Parse(json) as JObject;
+            var root = JsonConvert.DeserializeObject<JToken>(json, Subscription.JsonSettings) as JObject;
             if (root == null) throw new FormatException("payload is not a subscribe result");
 
             string status = (string)root["status"];
@@ -149,7 +156,7 @@ namespace Yes2SDK
                     return new SubscribeResult
                     {
                         Status = SubscribeStatus.Subscribed,
-                        Subscription = subscription.ToObject<Subscription>()
+                        Subscription = subscription.ToObject<Subscription>(JsonSerializer.Create(Subscription.JsonSettings))
                     };
                 case "cancelled":
                     return new SubscribeResult { Status = SubscribeStatus.Cancelled };

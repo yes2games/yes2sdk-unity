@@ -215,6 +215,32 @@ namespace Yes2SDK.Tests
             Assert.AreEqual(0, Yes2SDKIAP.PendingCountForTests);
         }
 
+        // Date-like strings must reach string fields unchanged (no DateTime
+        // round trip that reformats them).
+        private const string DateLike = "2026-10-06T12:34:56Z";
+
+        private static string DateLikeSubscription =>
+            "{\"productId\":\"vip_monthly\",\"title\":\"" + DateLike + "\",\"description\":\"" + DateLike + "\"," +
+            "\"price\":\"4.99 USD\",\"priceAmount\":4.99,\"priceCurrencyCode\":\"USD\"," +
+            "\"billingPeriod\":\"monthly\",\"isActive\":true,\"trialEligible\":false," +
+            "\"introOffer\":null,\"retentionOffer\":null,\"signedRequest\":\"" + DateLike + "\"}";
+
+        [Test]
+        public void DateLikeStrings_RoundTripUnchanged_InEveryParser()
+        {
+            var fromResult = SubscribeResult.Parse(
+                "{\"status\":\"subscribed\",\"subscription\":" + DateLikeSubscription + "}").Subscription;
+            var fromSingle = Subscription.Parse(DateLikeSubscription);
+            var fromList = Subscription.ParseList("[" + DateLikeSubscription + "]")[0];
+
+            foreach (var s in new[] { fromResult, fromSingle, fromList })
+            {
+                Assert.AreEqual(DateLike, s.Title);
+                Assert.AreEqual(DateLike, s.Description);
+                Assert.AreEqual(DateLike, s.SignedRequest);
+            }
+        }
+
         [TestCase("true", true)]
         [TestCase("false", false)]
         public void CancelSubscription_PayloadIsTheConfirmation(string payload, bool expected)

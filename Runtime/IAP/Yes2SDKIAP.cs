@@ -316,15 +316,15 @@ namespace Yes2SDK
 #if UNITY_EDITOR
             if (SubscriptionMockActive)
             {
-                if (!Yes2SDKEditorMock.IsRegisteredNow)
+                if (Yes2SDKMockIAP.TryRejectSubscription(Yes2SDKMockIAP.SubscriptionCall.Subscribe,
+                    productId, Yes2SDKEditorMock.IsRegisteredNow, Yes2SDKMockIAP.SubscriptionActive, context, out var rejected))
                 {
-                    Yes2Log.Log($"Mock: IAP.SubscribeAsync('{productId}') - guest player, PLAYER_NOT_AUTHENTICATED");
-                    CompleteError(Operation.Subscribe, requestId, new Error
+                    if (rejected.Code == "IAP_ALREADY_PURCHASED")
                     {
-                        Code = "PLAYER_NOT_AUTHENTICATED",
-                        Message = "Subscriptions require a registered player (mock). Turn on \"Player is registered\" in the Build Window.",
-                        Context = context
-                    });
+                        Yes2Log.Warning($"Mock: IAP.SubscribeAsync('{productId}') - the player already holds this subscription. Never re-offer a subscription the player holds.");
+                    }
+                    Yes2Log.Log($"Mock: IAP.SubscribeAsync('{productId}') - {rejected.Code}");
+                    CompleteError(Operation.Subscribe, requestId, rejected);
                     return;
                 }
                 if (Yes2SDKEditorMock.IAPFailPurchases)
@@ -337,15 +337,6 @@ namespace Yes2SDK
                         Context = context
                     });
                     return;
-                }
-                if (!Yes2SDKMockIAP.IsKnownSubscription(productId))
-                {
-                    CompleteError(Operation.Subscribe, requestId, UnknownMockSubscription(productId, context));
-                    return;
-                }
-                if (Yes2SDKMockIAP.SubscriptionActive)
-                {
-                    Yes2Log.Warning($"Mock: IAP.SubscribeAsync('{productId}') - the player already holds this subscription. Never re-offer a subscription the player holds.");
                 }
                 if (Yes2SDKMockOverlay.ShowSubscribe(requestId, productId))
                 {
@@ -369,7 +360,10 @@ namespace Yes2SDK
         /// <summary>
         /// Ask the platform to cancel a subscription. onSuccess receives true
         /// when the player confirmed the cancellation, false when they dismissed
-        /// the dialog.
+        /// the dialog. A confirmed cancellation takes effect at the end of the
+        /// current billing period: the player keeps access until then, so do
+        /// not revoke it at once. Cancelling a subscription the player does not
+        /// hold fails with code "INVALID_OPERATION".
         /// </summary>
         public void CancelSubscriptionAsync(string productId, Action<bool> onSuccess = null, Action<Error> onError = null)
         {
@@ -384,14 +378,24 @@ namespace Yes2SDK
 #if UNITY_EDITOR
             if (SubscriptionMockActive)
             {
-                if (!Yes2SDKMockIAP.IsKnownSubscription(productId))
+                if (Yes2SDKMockIAP.TryRejectSubscription(Yes2SDKMockIAP.SubscriptionCall.CancelSubscription,
+                    productId, Yes2SDKEditorMock.IsRegisteredNow, Yes2SDKMockIAP.SubscriptionActive, context, out var rejected))
                 {
-                    CompleteError(Operation.CancelSubscription, requestId, UnknownMockSubscription(productId, context));
+                    Yes2Log.Log($"Mock: IAP.CancelSubscriptionAsync('{productId}') - {rejected.Code}");
+                    CompleteError(Operation.CancelSubscription, requestId, rejected);
                     return;
                 }
-                Yes2SDKMockIAP.SubscriptionActive = false;
-                Yes2Log.Log($"Mock: IAP.CancelSubscriptionAsync('{productId}') - confirmed");
-                CompleteSuccess(Operation.CancelSubscription, requestId, "true");
+                if (Yes2SDKMockOverlay.ShowCancelSubscription(requestId, productId))
+                {
+                    Yes2Log.Log($"Mock: IAP.CancelSubscriptionAsync('{productId}') - showing cancellation dialog");
+                    return;
+                }
+                CompleteError(Operation.CancelSubscription, requestId, new Error
+                {
+                    Code = "PlatformError",
+                    Message = "Another mock popup is already open",
+                    Context = context
+                });
                 return;
             }
 #endif
@@ -401,9 +405,11 @@ namespace Yes2SDK
         }
 
         /// <summary>
-        /// Claim the one-time retention discount for a subscription. onSuccess
-        /// receives the refreshed subscription. A second claim fails with code
-        /// "INVALID_OPERATION".
+        /// Claim the retention discount for a subscription the player holds.
+        /// onSuccess receives the refreshed subscription. A player who does not
+        /// hold the subscription is not eligible and gets an error with code
+        /// "INVALID_OPERATION". Repeating a claim is safe: it re-confirms the
+        /// same discount and succeeds.
         /// </summary>
         public void ClaimRetentionOfferAsync(string productId, Action<Subscription> onSuccess = null, Action<Error> onError = null)
         {
@@ -418,20 +424,11 @@ namespace Yes2SDK
 #if UNITY_EDITOR
             if (SubscriptionMockActive)
             {
-                if (!Yes2SDKMockIAP.IsKnownSubscription(productId))
+                if (Yes2SDKMockIAP.TryRejectSubscription(Yes2SDKMockIAP.SubscriptionCall.ClaimRetentionOffer,
+                    productId, Yes2SDKEditorMock.IsRegisteredNow, Yes2SDKMockIAP.SubscriptionActive, context, out var rejected))
                 {
-                    CompleteError(Operation.ClaimRetentionOffer, requestId, UnknownMockSubscription(productId, context));
-                    return;
-                }
-                if (Yes2SDKMockIAP.RetentionClaimed)
-                {
-                    Yes2Log.Log($"Mock: IAP.ClaimRetentionOfferAsync('{productId}') - already claimed, INVALID_OPERATION");
-                    CompleteError(Operation.ClaimRetentionOffer, requestId, new Error
-                    {
-                        Code = "INVALID_OPERATION",
-                        Message = $"The player is not eligible for a retention offer on \"{productId}\" (mock: already claimed).",
-                        Context = context
-                    });
+                    Yes2Log.Log($"Mock: IAP.ClaimRetentionOfferAsync('{productId}') - {rejected.Code}");
+                    CompleteError(Operation.ClaimRetentionOffer, requestId, rejected);
                     return;
                 }
                 Yes2Log.Log($"Mock: IAP.ClaimRetentionOfferAsync('{productId}') - claimed");
@@ -519,17 +516,6 @@ namespace Yes2SDK
 #if UNITY_EDITOR
         private static bool SubscriptionMockActive =>
             Yes2SDKEditorMock.IAPEnabled && Yes2SDKEditorMock.CanShowPopups;
-
-        private static Error UnknownMockSubscription(string productId, string context)
-        {
-            Yes2Log.Log($"Mock: IAP subscription '{productId}' is not in the mock list (use '{Yes2SDKMockIAP.MockSubscriptionId}') - IAP_NOT_AVAILABLE");
-            return new Error
-            {
-                Code = "IAP_NOT_AVAILABLE",
-                Message = $"Subscription \"{productId}\" is not available (mock).",
-                Context = context
-            };
-        }
 #endif
 
         #endregion
