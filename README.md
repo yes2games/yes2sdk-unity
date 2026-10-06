@@ -372,6 +372,8 @@ void ShowSignUpPanel()
         onError: err => HideSignUpPanel());
     if (prompt == null) return;   // onError already ran
 
+    signUpButton.onClick.RemoveAllListeners();
+    notNowButton.onClick.RemoveAllListeners();
     signUpButton.onClick.AddListener(prompt.Login);
     notNowButton.onClick.AddListener(() => { prompt.Close(); HideSignUpPanel(); });
 }
@@ -379,8 +381,8 @@ void ShowSignUpPanel()
 
 - `Login()` hands off to the platform's registration flow, which may reload the game, so save before you prompt. Registration can finish outside the game: check `IsAuthenticated()` the next time the game opens. `Data` comes back through `Session.GetEntryPointData()` after registration.
 - `onClose` fires at most once per prompt, when the platform reports it closed. Hide your own UI yourself after `Close()` rather than waiting for it. `Login()` and `Close()` on a closed prompt (`IsOpen == false`) log a warning and do nothing.
-- `Message` is optional. When set it must be at most 140 characters and contain `{{registrationCode}}` exactly once.
-- When you show your own prompt, turn off automatic login reminders in the Yes2Games Dashboard so the player is not asked twice.
+- `Message` is optional. When set it must be non-blank, at most 140 characters, and contain `{{registrationCode}}` exactly once.
+- When you show your own prompt, ask the Yes2Games team to turn off automatic login reminders for your game so the player is not asked twice.
 
 ### Friends
 
@@ -428,7 +430,7 @@ if (Yes2SDK.Referrals.IsSupported())
 
 - `Reference` is required: a stable campaign key that groups the conversions. Null options or an empty reference fail with `InvalidParams` right away.
 - `Data` reaches the invited player through `Session.GetEntryPointData()`.
-- `ImageDataUrl` takes a PNG, JPEG or WebP base64 data URL of at most 2 MB (see `Yes2SDKImage.ToPngDataUrl` under [Notifications](#notifications)).
+- `ImageDataUrl` takes a PNG, JPEG or WebP base64 data URL of at most 2 MiB (see `Yes2SDKImage.ToPngDataUrl` under [Notifications](#notifications)).
 - A closed share dialog is a success with `Canceled == true`, not an error.
 - `ListAsync` groups `ReferralConversion`s (`PlayerId`, `JoinedAt`) by reference. A reference nobody joined through is absent. Verify `SignedRequest` on your server before granting a reward.
 
@@ -577,6 +579,8 @@ Yes2SDK.IAP.PurchaseAsync("gems_100",
 - In the Editor, IAP is mocked in Play Mode (see [Editor Testing](#editor-testing)), so you can test your shop and your `IsSupported()` gating without a platform build.
 
 #### Subscriptions
+
+Subscriptions are not available on every platform that supports IAP: gate them with `IsSubscriptionSupported()`, not `IsSupported()`.
 
 Subscriptions have their own check, `IAP.IsSubscriptionSupported()`, and typed results.
 
