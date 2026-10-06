@@ -111,7 +111,7 @@ namespace Yes2SDK
         public static string EntryPointDataJson
         {
             get => EditorPrefs.GetString(EntryPointDataKey, "{}");
-            set => EditorPrefs.SetString(EntryPointDataKey, string.IsNullOrEmpty(value) ? "{}" : value);
+            set => EditorPrefs.SetString(EntryPointDataKey, string.IsNullOrWhiteSpace(value) ? "{}" : value);
         }
 
         /// <summary>

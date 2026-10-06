@@ -121,7 +121,7 @@ mergeInto(LibraryManager.library, {
                     __y2iap.send('OnGetSubscriptionsSuccess', requestId, JSON.stringify(list || []));
                 })
                 .catch(onError);
-        } catch (e) { onError(e); }
+        } catch (e) { try { onError(e); } catch (_) {} }
     },
 
     Yes2SDK_IAP_SubscribeAsyncJS__deps: ['$__y2h', '$__y2iap'],
@@ -144,7 +144,7 @@ mergeInto(LibraryManager.library, {
                     __y2iap.send('OnSubscribeSuccess', requestId, JSON.stringify(result));
                 })
                 .catch(onError);
-        } catch (e) { onError(e); }
+        } catch (e) { try { onError(e); } catch (_) {} }
     },
 
     Yes2SDK_IAP_CancelSubscriptionAsyncJS__deps: ['$__y2h', '$__y2iap'],
@@ -166,7 +166,7 @@ mergeInto(LibraryManager.library, {
                     __y2iap.send('OnCancelSubscriptionSuccess', requestId, confirmed ? 'true' : 'false');
                 })
                 .catch(onError);
-        } catch (e) { onError(e); }
+        } catch (e) { try { onError(e); } catch (_) {} }
     },
 
     Yes2SDK_IAP_ClaimRetentionOfferAsyncJS__deps: ['$__y2h', '$__y2iap'],
@@ -188,7 +188,7 @@ mergeInto(LibraryManager.library, {
                     __y2iap.send('OnClaimRetentionOfferSuccess', requestId, JSON.stringify(subscription));
                 })
                 .catch(onError);
-        } catch (e) { onError(e); }
+        } catch (e) { try { onError(e); } catch (_) {} }
     }
     // ---- end Subscriptions ------------------------------------------------------------
 

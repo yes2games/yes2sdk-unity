@@ -33,16 +33,18 @@ namespace Yes2SDK
         public string Text;
 
         /// <summary>
-        /// Optional image as a base64 data URL (PNG, JPEG or WebP), at most 2 MB,
+        /// Optional image as a base64 data URL (PNG, JPEG or WebP), at most 2 MiB,
         /// for example "data:image/png;base64,...".
         /// </summary>
         [JsonProperty("image", NullValueHandling = NullValueHandling.Ignore)]
         public string ImageDataUrl;
 
+        /// <summary>Creates empty options; set the fields you need.</summary>
         public ReferralShareOptions()
         {
         }
 
+        /// <summary>Creates options with the given reference.</summary>
         public ReferralShareOptions(string reference)
         {
             Reference = reference;

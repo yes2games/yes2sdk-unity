@@ -66,7 +66,7 @@ mergeInto(LibraryManager.library, {
                 })
                 .catch(onError);
         } catch (e) {
-            onError(e);
+            try { onError(e); } catch (_) {}
         }
     },
 
@@ -84,7 +84,7 @@ mergeInto(LibraryManager.library, {
                 })
                 .catch(onError);
         } catch (e) {
-            onError(e);
+            try { onError(e); } catch (_) {}
         }
     },
 
@@ -101,7 +101,7 @@ mergeInto(LibraryManager.library, {
                 })
                 .catch(onError);
         } catch (e) {
-            onError(e);
+            try { onError(e); } catch (_) {}
         }
     }
 

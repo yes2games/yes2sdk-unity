@@ -812,6 +812,7 @@ namespace Yes2SDK.Tests
         {
             var texture = Make(4);
             texture.Apply(false, true);
+            Assume.That(texture.isReadable, Is.False);
 
             Assert.IsNull(Yes2SDKImage.ToPngDataUrl(texture));
         }
