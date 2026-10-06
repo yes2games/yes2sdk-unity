@@ -8,7 +8,7 @@
 //   - library functions are re-created from their source text (as Emscripten does), so closures over
 //     file-level variables of a .jslib do not survive here either
 //   - host setTimeout/setInterval/clearTimeout/clearInterval are available to the bridges
-//   - SendMessage (recorded), UTF8ToString, lengthBytesUTF8, stringToUTF8, _malloc
+//   - SendMessage (recorded), UTF8ToString (pointer only, throws on non-numbers), lengthBytesUTF8, stringToUTF8, _malloc
 // Strings returned to C# via __y2h.returnStr are readable with sb.readStr(handle).
 // Each createSandbox() call builds a fresh vm context, so tests never share state.
 import { readFileSync } from 'node:fs';
@@ -46,7 +46,10 @@ export function createSandbox(files, opts = {}) {
       error: (...a) => logs.push(['error', a]),
     },
     SendMessage: (target, method, payload) => sent.push([target, method, payload]),
-    UTF8ToString: (v) => (typeof v === 'number' ? memory.get(v) ?? '' : v),
+    UTF8ToString: (v) => {
+      if (typeof v !== 'number') throw new TypeError('UTF8ToString expects a pointer (number), got ' + typeof v);
+      return memory.get(v) ?? '';
+    },
     lengthBytesUTF8: (s) => Buffer.byteLength(s, 'utf8'),
     stringToUTF8: (s, ptr) => { memory.set(ptr, s); },
     _malloc: () => nextHandle++,
@@ -140,8 +143,8 @@ export function createSandbox(files, opts = {}) {
     },
     /** Read a string that a bridge returned through __y2h.returnStr. */
     readStr: (handle) => memory.get(handle),
-    /** Make a C# string argument: the harness UTF8ToString is identity on JS strings. */
-    str: (s) => s,
+    /** Make a C# string argument: allocate a handle in the harness memory and return the pointer. */
+    str: (s) => { const ptr = nextHandle++; memory.set(ptr, s); return ptr; },
   };
 }
 

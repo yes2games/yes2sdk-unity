@@ -32,27 +32,48 @@ mergeInto(LibraryManager.library, {
         return __y2h.returnStr(orientation);
     },
 
-    // Get traffic source as JSON
-    Yes2SDK_GetTrafficSourceJS__deps: ['$__y2h'],
+    // Normalise a Core/wrapper value to a JSON string: strings pass through, non-null objects
+    // are stringified, anything else (undefined before init, null) yields the fallback.
+    $__y2toJson: function(value, fallback) {
+        try {
+            if (typeof value === 'string') return value;
+            if (value !== null && typeof value === 'object') {
+                var s = JSON.stringify(value);
+                if (typeof s === 'string') return s;
+            }
+        } catch (e) {}
+        return fallback;
+    },
+
+    // Get traffic source as JSON. The shape is platform-defined.
+    Yes2SDK_GetTrafficSourceJS__deps: ['$__y2h', '$__y2toJson'],
     Yes2SDK_GetTrafficSourceJS: function() {
         var json = '{"referrer":"","params":{}}';
-        if (__y2h.has('session')) json = window.Yes2SDK.session.getTrafficSource() || json;
+        try {
+            if (__y2h.has('session')) json = __y2toJson(window.Yes2SDK.session.getTrafficSource(), json);
+        } catch (e) {}
         return __y2h.returnStr(json);
     },
 
-    // Get entry point data (URL params) as JSON
-    Yes2SDK_GetEntryPointDataJS__deps: ['$__y2h'],
+    // Get entry point data as JSON
+    Yes2SDK_GetEntryPointDataJS__deps: ['$__y2h', '$__y2toJson'],
     Yes2SDK_GetEntryPointDataJS: function() {
         var json = '{}';
-        if (__y2h.has('session')) json = window.Yes2SDK.session.getEntryPointData() || json;
+        try {
+            if (__y2h.has('session')) json = __y2toJson(window.Yes2SDK.session.getEntryPointData(), json);
+        } catch (e) {}
         return __y2h.returnStr(json);
     },
 
     // Store session data in memory
     Yes2SDK_SetSessionDataJS__deps: ['$__y2h'],
     Yes2SDK_SetSessionDataJS: function(dataJsonPtr) {
-        var dataJson = UTF8ToString(dataJsonPtr);
-        if (__y2h.has('session')) window.Yes2SDK.session.setSessionData(dataJson);
+        try {
+            var dataJson = UTF8ToString(dataJsonPtr);
+            if (!__y2h.has('session')) return;
+            if (typeof window.Yes2SDK.session.setSessionDataFromJson === 'function') window.Yes2SDK.session.setSessionDataFromJson(dataJson);
+            else window.Yes2SDK.session.setSessionData(dataJson);
+        } catch (e) {}
     },
 
     // Get entry point asynchronously

@@ -154,6 +154,71 @@ test('harness exposes timers and drops closures over file-level vars', async () 
   assert.equal(sb.call('Fake_ClosureJS'), 'undefined');
 });
 
+// ---- Session: entry point data, traffic source and session data as JSON --------------------
+const throwing = () => { throw new Error('boom'); };
+const jsonCases = [
+  ['object', () => ({ a: 1 }), '{"a":1}'],
+  ['string', () => '{"a":1}', '{"a":1}'],
+  ['undefined', () => undefined, null],
+  ['throwing', throwing, null],
+];
+for (const [label, getter, expected] of jsonCases) {
+  test(`session GetEntryPointData with ${label} result`, async () => {
+    const sb = createSandbox(['Yes2SDKSession.jslib'], { Yes2SDK: { session: { getEntryPointData: getter } } });
+    assert.equal(sb.readStr(sb.call('Yes2SDK_GetEntryPointDataJS')), expected === null ? '{}' : expected);
+  });
+  test(`session GetTrafficSource with ${label} result`, async () => {
+    const sb = createSandbox(['Yes2SDKSession.jslib'], { Yes2SDK: { session: { getTrafficSource: getter } } });
+    assert.equal(sb.readStr(sb.call('Yes2SDK_GetTrafficSourceJS')), expected === null ? '{"referrer":"","params":{}}' : expected);
+  });
+}
+
+test('session SetSessionData prefers setSessionDataFromJson and passes the raw JSON string', async () => {
+  const calls = [];
+  const sb = createSandbox(['Yes2SDKSession.jslib'], { Yes2SDK: { session: {
+    setSessionDataFromJson: (j) => calls.push(['fromJson', j]),
+    setSessionData: (j) => calls.push(['plain', j]),
+  } } });
+  sb.call('Yes2SDK_SetSessionDataJS', sb.str('{"k":2}'));
+  assert.deepStrictEqual(calls, [['fromJson', '{"k":2}']]);
+});
+
+test('session SetSessionData falls back to setSessionData when the alias is absent', async () => {
+  const calls = [];
+  const sb = createSandbox(['Yes2SDKSession.jslib'], { Yes2SDK: { session: { setSessionData: (j) => calls.push(j) } } });
+  sb.call('Yes2SDK_SetSessionDataJS', sb.str('{"k":2}'));
+  assert.deepStrictEqual(calls, ['{"k":2}']);
+});
+
+test('session SetSessionData never throws when Core throws', async () => {
+  const sb = createSandbox(['Yes2SDKSession.jslib'], { Yes2SDK: { session: { setSessionDataFromJson: throwing } } });
+  sb.call('Yes2SDK_SetSessionDataJS', sb.str('{}'));
+});
+
+test('session wrapper setSessionDataFromJson parses a string and warns on bad JSON without throwing', async () => {
+  const sb = createSandbox(['Yes2SDKPlatformInit.jslib']);
+  sb.window.CrazyGames = { SDK: {} };
+  sb.window.__y2 = { log() {}, warn: (...a) => warns.push(a), error() {} };
+  const warns = [];
+  sb.window.__yes2PlatformInit();
+  const session = sb.window.Yes2SDK && sb.window.Yes2SDK.session;
+  assert.ok(session, 'wrapper session module created');
+  session.setSessionDataFromJson('{"k":2}');
+  assert.equal(JSON.stringify(session._data), '{"k":2}');
+  session.setSessionDataFromJson('{bad');
+  assert.equal(warns.length, 1);
+  assert.equal(JSON.stringify(session._data), '{"k":2}');
+});
+
+test('harness UTF8ToString throws on a raw string so a missing UTF8ToString cannot pass', async () => {
+  const sb = createSandbox([{ name: 'Fake.jslib', source: `mergeInto(LibraryManager.library, {
+    Fake_ForgetJS: function(p) { return p; },
+    Fake_UseJS: function(p) { return UTF8ToString(p); }
+  });` }]);
+  assert.equal(sb.call('Fake_UseJS', sb.str('hi')), 'hi');
+  assert.throws(() => sb.call('Fake_UseJS', 'hi'), /pointer/);
+});
+
 // ---- runner --------------------------------------------------------------------------------
 let failed = 0;
 for (const { name, fn } of tests) {
