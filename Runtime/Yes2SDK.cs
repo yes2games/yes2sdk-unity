@@ -186,6 +186,23 @@ namespace Yes2SDK
             }
         }
 
+        // Referrals module
+        private static Yes2SDKReferrals _referrals;
+
+        /// <summary>
+        /// Referrals API: share a referral link and list the players who joined through it.
+        /// Reports FeatureNotSupported on platforms without referrals.
+        /// </summary>
+        public static Yes2SDKReferrals Referrals
+        {
+            get
+            {
+                _referrals ??= new Yes2SDKReferrals();
+                return _referrals;
+            }
+        }
+        // End referrals module
+
         private static Yes2SDKAchievements _achievements;
 
         /// <summary>
