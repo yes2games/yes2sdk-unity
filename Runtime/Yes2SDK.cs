@@ -220,7 +220,7 @@ namespace Yes2SDK
         private static Yes2SDKContext _context;
 
         /// <summary>
-        /// Context API: share an image with ShareAsync. Context switching is not supported.
+        /// Context API: share with ShareAsync or share an image with ShareImageAsync. Context switching is not supported.
         /// </summary>
         public static Yes2SDKContext Context
         {
