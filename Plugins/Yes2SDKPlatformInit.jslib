@@ -873,6 +873,15 @@ mergeInto(LibraryManager.library, {
                 isSupported: function() { return false; }
             },
 
+            // Notifications module - unsupported on CrazyGames
+            notifications: {
+                scheduleAsync: function(options) { return Promise.reject(__y2fns('Notifications.scheduleAsync')); },
+                cancelAsync: function(notificationId) { return Promise.reject(__y2fns('Notifications.cancelAsync')); },
+                cancelAllAsync: function() { return Promise.reject(__y2fns('Notifications.cancelAllAsync')); },
+                isSupported: function() { return false; }
+            },
+            // End notifications module
+
             // IAP module - unsupported on CrazyGames (mirrors Core crazygames-iap-strategy; IAP only functions on Yandex)
             iap: {
                 getCatalogAsync: function() { return Promise.reject(__y2fns('IAP.getCatalogAsync')); },
