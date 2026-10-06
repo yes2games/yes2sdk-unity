@@ -160,6 +160,19 @@ Yes2SDK.OnPause  += () => { Time.timeScale = 0; AudioListener.pause = true;  };
 Yes2SDK.OnResume += () => { Time.timeScale = 1; AudioListener.pause = false; };
 ```
 
+Save progress when the platform closes the game. `OnExitRequested` is raised only on platforms that report an exit, and the SDK flushes player data right after the handler returns:
+
+```csharp
+Yes2SDK.OnExitRequested += () =>
+{
+    // Synchronous writes only.
+    Yes2SDK.Data.SetString("save", SerializeProgress());
+    Yes2SDK.Data.SetInt("level", currentLevel);
+};
+```
+
+> Async work started in the handler (`SetStringAsync`, `FlushAsync`, a coroutine) is not awaited and may never finish. `PlayerPrefs.Save()` is not a substitute either: write through `Yes2SDK.Data` so the flush picks it up.
+
 ### Ads (required)
 
 Interstitial ads run at natural break points. Rewarded ads run only when the player opts in.
@@ -295,7 +308,15 @@ Yes2SDK.Analytics.LogScore(1500);
 ```csharp
 string locale = Yes2SDK.Session.GetLocale();  // e.g. "en", "fr"
 string device = Yes2SDK.Session.GetDevice();   // "desktop" or "mobile"
+
+// Data from the link that opened the game, such as referral share data or
+// registration prompt data. "{}" or an empty dictionary when there is none.
+string entryJson = Yes2SDK.Session.GetEntryPointData();
+Dictionary<string, object> entry = Yes2SDK.Session.GetEntryPointDataDictionary();
+if (entry.TryGetValue("roomId", out object roomId)) JoinRoom(roomId as string);
 ```
+
+In the dictionary, nested objects come back as `JObject`, arrays as `JArray`, numbers as `long` or `double`, and date-like strings stay strings.
 
 > Treat session info as a hint, not a guarantee. Don't branch your core game logic on it.
 
@@ -303,7 +324,7 @@ string device = Yes2SDK.Session.GetDevice();   // "desktop" or "mobile"
 
 ## Optional APIs
 
-These modules add extra player-facing features. They are **not guaranteed** to be available at runtime: guard with `IsSupported()` (available on `Auth`, `Friends`, `Banners`, `Score`, `Player`, and `IAP`), and always handle `FeatureNotSupported` errors gracefully. Don't make your core gameplay depend on them.
+These modules add extra player-facing features. They are **not guaranteed** to be available at runtime: guard with `IsSupported()` (available on `Auth`, `Friends`, `Banners`, `Score`, `Player`, `IAP`, `Referrals` and `Notifications`), and always handle `FeatureNotSupported` errors gracefully. Don't make your core gameplay depend on them.
 
 ### Auth
 
@@ -320,7 +341,46 @@ if (Yes2SDK.Auth.IsSupported())
         onError:   err  => Debug.LogError(err)
     );
 }
+
+// Synchronous: false for guests, before init, on platforms without accounts, and on any error.
+bool registered = Yes2SDK.Auth.IsAuthenticated();
 ```
+
+#### Registration prompt
+
+`ShowRegistrationPrompt` shows the platform's sign-up prompt to a guest and returns a handle you wire to your own buttons. When the prompt cannot be shown (player already registered, invalid `Message`, SDK not initialized, platform without a prompt) it returns null and calls `onError` right away.
+
+```csharp
+void OfferRegistration()
+{
+    // Save first: the platform may reload the game after registration.
+    Yes2SDK.Data.SetString("save", SerializeProgress());
+    Yes2SDK.Data.FlushAsync(onSuccess: _ => ShowSignUpPanel());
+}
+
+void ShowSignUpPanel()
+{
+    if (Yes2SDK.Auth.IsAuthenticated()) return;
+
+    RegistrationPrompt prompt = Yes2SDK.Auth.ShowRegistrationPrompt(
+        new RegistrationPromptOptions
+        {
+            Theme = RegistrationPromptTheme.Dark,
+            Data  = new Dictionary<string, object> { { "from", "save-slot" } }
+        },
+        onClose: () => HideSignUpPanel(),
+        onError: err => HideSignUpPanel());
+    if (prompt == null) return;   // onError already ran
+
+    signUpButton.onClick.AddListener(prompt.Login);
+    notNowButton.onClick.AddListener(() => { prompt.Close(); HideSignUpPanel(); });
+}
+```
+
+- `Login()` hands off to the platform's registration flow, which may reload the game, so save before you prompt. Registration can finish outside the game: check `IsAuthenticated()` the next time the game opens. `Data` comes back through `Session.GetEntryPointData()` after registration.
+- `onClose` fires at most once per prompt, when the platform reports it closed. Hide your own UI yourself after `Close()` rather than waiting for it. `Login()` and `Close()` on a closed prompt (`IsOpen == false`) log a warning and do nothing.
+- `Message` is optional. When set it must be at most 140 characters and contain `{{registrationCode}}` exactly once.
+- When you show your own prompt, turn off automatic login reminders in the Yes2Games Dashboard so the player is not asked twice.
 
 ### Friends
 
@@ -337,6 +397,40 @@ if (Yes2SDK.Friends.IsSupported())
     );
 }
 ```
+
+### Referrals
+
+Share a referral link and list the players who joined through it.
+
+```csharp
+if (Yes2SDK.Referrals.IsSupported())
+{
+    Yes2SDK.Referrals.ShareAsync(
+        new ReferralShareOptions("party_mode_v1")
+        {
+            Title = "Play with me",
+            Text  = "Join my party",
+            Data  = new Dictionary<string, object> { { "inviter", playerId } }
+        },
+        onSuccess: result => { if (!result.Canceled) ShowThanks(); },
+        onError:   err    => Debug.LogWarning(err));
+
+    Yes2SDK.Referrals.ListAsync(
+        onSuccess: list =>
+        {
+            // Send list.SignedRequest to your server and grant rewards from what it verifies.
+            if (list.Referrals.TryGetValue("party_mode_v1", out var joined))
+                Debug.Log($"{joined.Count} players joined");
+        },
+        onError: err => Debug.LogWarning(err));
+}
+```
+
+- `Reference` is required: a stable campaign key that groups the conversions. Null options or an empty reference fail with `InvalidParams` right away.
+- `Data` reaches the invited player through `Session.GetEntryPointData()`.
+- `ImageDataUrl` takes a PNG, JPEG or WebP base64 data URL of at most 2 MB (see `Yes2SDKImage.ToPngDataUrl` under [Notifications](#notifications)).
+- A closed share dialog is a success with `Canceled == true`, not an error.
+- `ListAsync` groups `ReferralConversion`s (`PlayerId`, `JoinedAt`) by reference. A reference nobody joined through is absent. Verify `SignedRequest` on your server before granting a reward.
 
 ### Banners
 
@@ -468,6 +562,9 @@ Yes2SDK.IAP.PurchaseAsync("gems_100",
     {
         // Yandex reports a closed payment dialog the same way as a failed
         // payment, so keep this message neutral ("Purchase not completed").
+        // Platforms that report a closed checkout separately send it as
+        // err.ErrorCode == ErrorCode.UserCancelled.
+        if (err.ErrorCode == ErrorCode.UserCancelled) return;
         ShowPurchaseNotCompleted();
     });
 ```
@@ -478,6 +575,81 @@ Yes2SDK.IAP.PurchaseAsync("gems_100",
 - Recover incomplete purchases on startup with `GetPurchasesAsync` (see the launch example above), then grant and consume them.
 - Grant the item before consuming it, and save progress (see `Data.FlushAsync`) so a closed tab can't lose a paid item. Any purchase that was paid but not consumed comes back from `GetPurchasesAsync` on the next launch.
 - In the Editor, IAP is mocked in Play Mode (see [Editor Testing](#editor-testing)), so you can test your shop and your `IsSupported()` gating without a platform build.
+
+#### Subscriptions
+
+Subscriptions have their own check, `IAP.IsSubscriptionSupported()`, and typed results.
+
+```csharp
+if (Yes2SDK.IAP.IsSubscriptionSupported())
+{
+    // On every launch: the list is the source of truth for entitlements.
+    Yes2SDK.IAP.GetSubscriptionsAsync(
+        onSuccess: subscriptions =>
+        {
+            foreach (Subscription sub in subscriptions)
+            {
+                if (sub.IsActive) GrantVip(sub);                    // never re-offer it
+                else ShowOffer(sub, showTrial: sub.TrialEligible);
+            }
+        },
+        onError: err => HideSubscriptions());
+}
+
+// When the player taps "subscribe":
+Yes2SDK.IAP.SubscribeAsync("vip_monthly",
+    onSuccess: result => { if (result.IsSubscribed) GrantVip(result.Subscription); },
+    onError:   err    => ShowPurchaseNotCompleted());
+```
+
+- Grant access when `IsActive` is true. Show trial copy only when `TrialEligible` is true. `IntroOffer` and `RetentionOffer` are null when there is none. `IsSandbox` and `SignedRequest` work as on `Purchase`.
+- A closed checkout is a success with `result.Status == SubscribeStatus.Cancelled`, not an error.
+- Never offer a subscription the player already holds: `SubscribeAsync` fails with `err.Code == "IAP_ALREADY_PURCHASED"`.
+- Guests may get an empty list, and `SubscribeAsync` fails with `err.Code == "PLAYER_NOT_AUTHENTICATED"`. Offer a [registration prompt](#registration-prompt) instead.
+- `CancelSubscriptionAsync(productId)` reports `true` when the player confirmed and `false` when they dismissed the dialog. The player keeps access until the end of the billing period, so do not revoke it at once.
+- `ClaimRetentionOfferAsync(productId)` applies `RetentionOffer` to a subscription the player holds and returns the refreshed `Subscription`. Repeating a claim is safe. A player who does not hold it gets `err.Code == "INVALID_OPERATION"`.
+
+### Notifications
+
+```csharp
+if (Yes2SDK.Notifications.IsSupported())
+{
+    Yes2SDK.Notifications.ScheduleAsync(
+        new NotificationOptions
+        {
+            Id              = "daily-reward",   // scheduling the same id again replaces it
+            Title           = "Your reward is ready",
+            Body            = "Come back and claim today's chest.",
+            ScheduledInDays = 1,                // or DelaySeconds: exactly one of the two
+            CtaText         = "Claim",
+            Priority        = NotificationPriority.High,
+            ImageDataUrl    = Yes2SDKImage.ToPngDataUrl(chestTexture),
+            Data            = new Dictionary<string, object> { { "reward", "chest" } }
+        },
+        onSuccess: scheduled => Debug.Log($"Scheduled {scheduled.Id} at {scheduled.ScheduledAt}"),
+        onError:   err       => Debug.LogWarning(err));
+
+    Yes2SDK.Notifications.CancelAsync("daily-reward");
+}
+```
+
+| Option | Rule |
+|---|---|
+| `Title` | Required, at most 200 characters. |
+| `Body` | 1 to 2000 characters. |
+| `DelaySeconds` | Positive, at most 7 days. Set this or `ScheduledInDays`, exactly one. |
+| `ScheduledInDays` | Whole days from now, 0 to 7. The platform picks the best time inside that day. |
+| `Id` | Optional. Generated when null; reusing an id replaces that notification. An empty string is rejected. |
+| `CtaText` | Optional button label, 1 to 50 characters. |
+| `Priority` | `Low`, `Medium` (default), `High` or `Critical`. |
+| `ImageAssetId` / `ImageDataUrl` | At most one. `ImageDataUrl` is a PNG, JPEG or WebP base64 data URL with a lowercase prefix, at most 2 MiB. |
+| `IconUrl` | Optional icon URL, on platforms that use one. |
+| `Data` | Optional data handed back to the game when the player opens the notification. |
+
+- `Yes2SDKImage.ToPngDataUrl(texture)` builds an `ImageDataUrl` from a readable texture. It returns null and logs a warning when the texture is not readable (enable Read/Write) or encodes to more than 2 MiB; a null image is simply not sent.
+- Options that break these rules fail with `InvalidParams`. On platforms that only notify registered players, a guest gets `err.Code == "PLAYER_NOT_AUTHENTICATED"`.
+- Keep `ScheduledNotification.Id` to cancel later. `CancelAllAsync()` cancels every notification the game scheduled (some platforms only reach the ones scheduled this session).
+- The older `ScheduleAsync(title, body, delaySec, dataJson, ...)` overload still works and passes the new id to `onSuccess`. Prefer `NotificationOptions`.
 
 ---
 
@@ -550,10 +722,15 @@ In the Unity Editor, SDK calls run against mock implementations:
 - **Ads show a fullscreen mock ad in Play Mode**: a countdown (3s interstitial, 5s rewarded), then **Close Ad** (fires `afterAd`), or **Claim Reward** (fires `adViewed`) / **Skip** (fires `adDismissed`) for rewarded ads. This lets you verify pause-resume wiring and both reward outcomes by clicking. The ad fills the game view and scales with its resolution, landscape or portrait. While the popup is up, input to the game behind it is blocked (uGUI clicks, legacy `Input` axis/button polling), matching how a real ad overlay behaves. Direct new Input System device polling (e.g. `Keyboard.current`) is not suppressed.
 - **IAP is mocked in Play Mode**: `IsSupported()` returns true, `GetCatalogAsync` returns a sample catalog, and `PurchaseAsync` opens a Buy / Cancel dialog. Any product id is accepted, so you can test with your real ids. Purchases last for the current play session.
 - **Failures can be simulated**: the Ad result dropdown (No fill / Ad blocked / Error) makes ad calls fire `onError` with platform-shaped error codes, and Fail purchases makes `PurchaseAsync` fail, so error handling is testable without a platform build.
+- **Subscriptions follow the IAP mock**: `SubscribeAsync` opens a Subscribe / Close dialog and `CancelSubscriptionAsync` a confirm dialog. The mock applies the platform rules (guest, already held, not held) so those error paths are testable.
+- **Player is registered** sets whether the mock player is signed in (off, a guest, by default). It drives `IsAuthenticated()`, the subscription list and the guest errors. The registration prompt is mocked without UI: `Login()` registers the player for the current play session and `Close()` closes the prompt.
+- **Entry point data (JSON)** is what `Session.GetEntryPointData()` returns in Play Mode. Only a valid JSON object is saved.
+- **Mock referrals and notifications** turns on those mocks. **Referral share result** picks Shared / Cancelled / Error, and **Referral conversions** sets how many players joined through each shared reference; with 0, references are left out of `ListAsync` results, as on a real platform.
+- **Simulate exit request** (Play Mode only) raises `OnExitRequested`, then saves game data the way the platform flush does.
 - `Data` uses `PlayerPrefs`
 - Other optional APIs return `FeatureNotSupported`
 
-Both mocks can be turned off under **Yes2SDK > Build Window > Play Mode Testing**. With the ad popup off, ad callbacks fire instantly with no UI (pass `"dismiss"` as the rewarded description to trigger `adDismissed`). Batch-mode runs (CI) always use the instant flow.
+The mocks can be turned off under **Yes2SDK > Build Window > Play Mode Testing**. With the ad popup off, ad callbacks fire instantly with no UI (pass `"dismiss"` as the rewarded description to trigger `adDismissed`). Batch-mode runs (CI) always use the instant flow.
 
 For richer simulation (specific locales, network conditions, event log capture), use the **QA Inspector** in the Yes2Games Dashboard.
 
@@ -629,7 +806,7 @@ onError: err => {
 | `PlatformError` | The underlying platform SDK rejected the call. | Log `err.Message` and `err.Context` for support; treat the call as failed. |
 | `NetworkError` | A platform call failed network-side (timeout, offline, server error). | Retry with backoff. Don't retry indefinitely. |
 | `RateLimited` | Too many calls in a short window (e.g. ad spam protection). | Back off and try again later — don't retry immediately. |
-| `UserCancelled` | The player closed/dismissed a flow (e.g. login dialog, rewarded ad, the player closed a purchase checkout). | Not an error in the usual sense - silently respect the player's choice, no toast. |
+| `UserCancelled` | The player closed/dismissed a flow (e.g. login dialog, rewarded ad, purchase checkout). | Not an error in the usual sense - silently respect the player's choice, no toast. |
 | `Unknown` | The error didn't match any of the above. | Log everything (`err.Code`, `err.Message`, `err.Context`) and treat as a hard failure. |
 | `Timeout` | Raised by the SDK's ad watchdog: an interstitial or rewarded ad never started, or started and never finished. | Treat the ad as failed and resume the game. The next `Show*` works normally. |
 
