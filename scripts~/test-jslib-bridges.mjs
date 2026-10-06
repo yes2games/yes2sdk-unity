@@ -509,6 +509,139 @@ test('referrals wrapper stubs reject FEATURE_NOT_SUPPORTED through the bridge', 
 });
 // ---- end Referrals --------------------------------------------------------------------------
 
+// ---- Auth: registration prompt handle and isAuthenticated (task: registration prompt) ------
+const regAuth = (overrides) => ({ auth: Object.assign({ isSupported: () => true }, overrides) });
+const regOpts = (sb, obj) => sb.str(obj === undefined ? '' : JSON.stringify(obj));
+
+test('auth ShowRegistrationPrompt success returns "" and stores the handle', async () => {
+  let received = null;
+  const handle = { login() {}, close() {} };
+  const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({
+    showRegistrationPrompt: (o) => { received = o; return handle; },
+  }) });
+  const res = sb.readStr(sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 4,
+    regOpts(sb, { theme: 'light', data: { level: 3 }, message: 'Hi {{registrationCode}}' })));
+  assert.equal(res, '');
+  assert.equal(received.theme, 'light');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(received.data)), { level: 3 });
+  assert.equal(received.message, 'Hi {{registrationCode}}');
+  assert.equal(typeof received.onClose, 'function');
+  assert.deepStrictEqual(sb.sent, []);
+});
+
+test('auth ShowRegistrationPrompt passes only the options that are set', async () => {
+  let received = null;
+  const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({
+    showRegistrationPrompt: (o) => { received = o; return { login() {}, close() {} }; },
+  }) });
+  assert.equal(sb.readStr(sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 1, regOpts(sb, {}))), '');
+  assert.deepStrictEqual(Object.keys(received), ['onClose']);
+  assert.equal(sb.readStr(sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 2, regOpts(sb))), '');
+  assert.deepStrictEqual(Object.keys(received), ['onClose']);
+});
+
+test('auth ShowRegistrationPrompt returns error JSON when Core throws', async () => {
+  const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({
+    showRegistrationPrompt: () => { throw { code: 'INVALID_OPERATION', message: 'already registered', context: 'core' }; },
+  }) });
+  const res = sb.readStr(sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 3, regOpts(sb, {})));
+  assert.deepStrictEqual(JSON.parse(res), {
+    code: 'INVALID_OPERATION', message: 'already registered', context: 'Yes2SDK.Auth.ShowRegistrationPrompt',
+  });
+  assert.deepStrictEqual(sb.sent, []);
+});
+
+test('auth ShowRegistrationPrompt returns error JSON for a plain Error, bad options JSON, no SDK, no method', async () => {
+  const boom = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({ showRegistrationPrompt: () => { throw new Error('boom'); } }) });
+  assert.deepStrictEqual(JSON.parse(boom.readStr(boom.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 1, regOpts(boom, {})))),
+    { code: 'Unknown', message: 'boom', context: 'Yes2SDK.Auth.ShowRegistrationPrompt' });
+
+  const badJson = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({ showRegistrationPrompt: () => ({}) }) });
+  assert.equal(JSON.parse(badJson.readStr(badJson.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 1, badJson.str('{bad')))).code, 'Unknown');
+
+  const noSdk = createSandbox(['Yes2SDKAuth.jslib']);
+  assert.equal(JSON.parse(noSdk.readStr(noSdk.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 1, regOpts(noSdk, {})))).code, 'NotInitialized');
+
+  const noMethod = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({}) });
+  assert.equal(JSON.parse(noMethod.readStr(noMethod.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 1, regOpts(noMethod, {})))).code, 'FeatureNotSupported');
+});
+
+test('auth platform onClose sends OnRegistrationPromptClose with the prompt id, once', async () => {
+  let onClose = null;
+  const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({
+    showRegistrationPrompt: (o) => { onClose = o.onClose; return { login() {}, close() {} }; },
+  }) });
+  sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 12, regOpts(sb, {}));
+  onClose();
+  onClose();
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnRegistrationPromptClose', '12']]);
+});
+
+test('auth prompt login and close reach the stored handle for that id only', async () => {
+  const calls = [];
+  let n = 0;
+  const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({
+    showRegistrationPrompt: () => {
+      const id = ++n;
+      return { login: () => calls.push('login' + id), close: () => calls.push('close' + id) };
+    },
+  }) });
+  sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 7, regOpts(sb, {}));
+  sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 8, regOpts(sb, {}));
+  sb.call('Yes2SDK_Auth_RegistrationPromptLoginJS', 8);
+  sb.call('Yes2SDK_Auth_RegistrationPromptCloseJS', 7);
+  assert.deepStrictEqual(calls, ['login2', 'close1']);
+});
+
+test('auth prompt login and close on an unknown id or a throwing handle never throw', async () => {
+  const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({
+    showRegistrationPrompt: () => ({ login: throwing, close: throwing }),
+  }) });
+  sb.call('Yes2SDK_Auth_RegistrationPromptLoginJS', 99);
+  sb.call('Yes2SDK_Auth_RegistrationPromptCloseJS', 99);
+  sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 1, regOpts(sb, {}));
+  sb.call('Yes2SDK_Auth_RegistrationPromptLoginJS', 1);
+  sb.call('Yes2SDK_Auth_RegistrationPromptCloseJS', 1);
+  const noSdk = createSandbox(['Yes2SDKAuth.jslib']);
+  noSdk.call('Yes2SDK_Auth_RegistrationPromptLoginJS', 1);
+  noSdk.call('Yes2SDK_Auth_RegistrationPromptCloseJS', 1);
+});
+
+test('auth prompt close drops the stored handle', async () => {
+  const calls = [];
+  const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({
+    showRegistrationPrompt: () => ({ login: () => calls.push('login'), close: () => calls.push('close') }),
+  }) });
+  sb.call('Yes2SDK_Auth_ShowRegistrationPromptJS', 5, regOpts(sb, {}));
+  sb.call('Yes2SDK_Auth_RegistrationPromptCloseJS', 5);
+  sb.call('Yes2SDK_Auth_RegistrationPromptLoginJS', 5);
+  assert.deepStrictEqual(calls, ['close']);
+});
+
+test('auth IsAuthenticated returns 1/0 and 0 on throw, missing method or no SDK', async () => {
+  const yes = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({ isAuthenticated: () => true }) });
+  assert.equal(yes.call('Yes2SDK_Auth_IsAuthenticatedJS'), 1);
+  const no = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({ isAuthenticated: () => false }) });
+  assert.equal(no.call('Yes2SDK_Auth_IsAuthenticatedJS'), 0);
+  const boom = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({ isAuthenticated: throwing }) });
+  assert.equal(boom.call('Yes2SDK_Auth_IsAuthenticatedJS'), 0);
+  const missing = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({}) });
+  assert.equal(missing.call('Yes2SDK_Auth_IsAuthenticatedJS'), 0);
+  const noSdk = createSandbox(['Yes2SDKAuth.jslib']);
+  assert.equal(noSdk.call('Yes2SDK_Auth_IsAuthenticatedJS'), 0);
+});
+
+test('auth wrapper isAuthenticated is false and showRegistrationPrompt throws FEATURE_NOT_SUPPORTED', async () => {
+  const sb = createSandbox(['Yes2SDKPlatformInit.jslib']);
+  sb.window.CrazyGames = { SDK: {} };
+  sb.window.__y2 = { log() {}, warn() {}, error() {} };
+  sb.window.__yes2PlatformInit();
+  const auth = sb.window.Yes2SDK.auth;
+  assert.equal(auth.isAuthenticated(), false);
+  assert.throws(() => auth.showRegistrationPrompt({}), (e) => e.code === 'FEATURE_NOT_SUPPORTED');
+});
+// ---- end Auth: registration prompt ---------------------------------------------------------
+
 // ---- runner --------------------------------------------------------------------------------
 let failed = 0;
 for (const { name, fn } of tests) {

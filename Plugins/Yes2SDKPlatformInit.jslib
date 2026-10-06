@@ -647,7 +647,13 @@ mergeInto(LibraryManager.library, {
                         return Promise.reject({ code: 'FeatureNotSupported', message: 'Account link not available', context: 'auth.showAccountLinkPromptAsync' });
                     }
                     return sdk.user.showAccountLinkPrompt();
-                }
+                },
+
+                // ---- registration prompt and isAuthenticated ----
+                // The wrapper has no synchronous user, so it reports a guest.
+                isAuthenticated: function() { return false; },
+                showRegistrationPrompt: function(options) { throw __y2fns('Auth.showRegistrationPrompt'); }
+                // ---- end registration prompt and isAuthenticated ----
             },
 
             // Game module - gameplay lifecycle, invite, settings, clipboard

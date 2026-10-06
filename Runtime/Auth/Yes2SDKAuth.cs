@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,6 +45,20 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_Auth_ShowAccountLinkPromptAsyncJS();
+
+        // ---- registration prompt and IsAuthenticated ----
+        [DllImport("__Internal")]
+        private static extern bool Yes2SDK_Auth_IsAuthenticatedJS();
+
+        [DllImport("__Internal")]
+        private static extern string Yes2SDK_Auth_ShowRegistrationPromptJS(int promptId, string optionsJson);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Auth_RegistrationPromptLoginJS(int promptId);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Auth_RegistrationPromptCloseJS(int promptId);
+        // ---- end registration prompt and IsAuthenticated ----
 #endif
 
         #endregion
@@ -147,6 +163,313 @@ namespace Yes2SDK
             => TaskCallbackHelper.ToTask<bool>(
                 (success, error) => ShowAccountLinkPromptAsync(success, error),
                 cancellationToken);
+
+        #endregion
+
+        #region Registration Prompt and IsAuthenticated
+
+        private const string RegistrationContext = "Yes2SDK.Auth.ShowRegistrationPrompt";
+        private const string RegistrationCode = "{{registrationCode}}";
+        private const int MaxRegistrationMessageLength = 140;
+
+        // Open prompts by id. A prompt is removed before its onClose runs, so a
+        // duplicate or late close message finds nothing and is dropped.
+        private static readonly Dictionary<int, RegistrationPrompt> _openPrompts = new Dictionary<int, RegistrationPrompt>();
+        private static int _nextPromptId;
+
+        /// <summary>
+        /// Whether the player is signed in (registered) on the platform.
+        /// False before the SDK is initialized, on platforms without player
+        /// accounts, and on any error.
+        /// </summary>
+        public bool IsAuthenticated()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_Auth_IsAuthenticatedJS();
+#elif UNITY_EDITOR
+            return Yes2SDKEditorMock.IsRegisteredNow;
+#else
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// Show the platform's registration prompt for a guest player and get a
+        /// handle whose <see cref="RegistrationPrompt.Login"/> and
+        /// <see cref="RegistrationPrompt.Close"/> the game wires to its own
+        /// buttons. Returns null and calls onError right away when the prompt
+        /// cannot be shown: the player is already registered (INVALID_OPERATION),
+        /// the message breaks the platform rules (INVALID_PARAM), the SDK is not
+        /// initialized, or the platform has no registration prompt.
+        /// </summary>
+        /// <param name="options">Optional theme, data and message.</param>
+        /// <param name="onClose">Called once when the prompt closes.</param>
+        /// <param name="onError">Called synchronously when the prompt cannot be shown.</param>
+        /// <returns>The open prompt, or null on failure.</returns>
+        public RegistrationPrompt ShowRegistrationPrompt(
+            RegistrationPromptOptions options = null,
+            Action onClose = null,
+            Action<Error> onError = null)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            string optionsJson;
+            try
+            {
+                optionsJson = options != null ? options.ToJson() : "{}";
+            }
+            catch (Exception e)
+            {
+                onError?.Invoke(new Error { Code = "INVALID_PARAM", Message = $"Registration prompt options could not be serialized: {e.Message}", Context = RegistrationContext });
+                return null;
+            }
+
+            // Registered before the call so a close reported during the call
+            // still finds its prompt.
+            var prompt = RegisterPrompt(onClose);
+            string result = Yes2SDK_Auth_ShowRegistrationPromptJS(prompt.Id, optionsJson);
+            return CompleteShow(prompt, result, onError);
+#elif UNITY_EDITOR
+            // Same order as the device path: options are serialized first.
+            try
+            {
+                if (options != null) options.ToJson();
+            }
+            catch (Exception e)
+            {
+                string serializeMessage = $"Registration prompt options could not be serialized: {e.Message}";
+                Yes2Log.Log($"Mock: Auth.ShowRegistrationPrompt() - INVALID_PARAM: {serializeMessage}");
+                onError?.Invoke(new Error { Code = "INVALID_PARAM", Message = serializeMessage, Context = RegistrationContext });
+                return null;
+            }
+            if (Yes2SDKEditorMock.IsRegisteredNow)
+            {
+                Yes2Log.Log("Mock: Auth.ShowRegistrationPrompt() - player is registered, INVALID_OPERATION");
+                onError?.Invoke(new Error
+                {
+                    Code = "INVALID_OPERATION",
+                    Message = "The player is already registered; the registration prompt is for guests only",
+                    Context = RegistrationContext
+                });
+                return null;
+            }
+            if (options != null && options.Message != null
+                && !TryValidateRegistrationMessage(options.Message, out var messageError))
+            {
+                Yes2Log.Log($"Mock: Auth.ShowRegistrationPrompt() - INVALID_PARAM: {messageError}");
+                onError?.Invoke(new Error { Code = "INVALID_PARAM", Message = messageError, Context = RegistrationContext });
+                return null;
+            }
+            var mockPrompt = RegisterPrompt(onClose);
+            Yes2Log.Log($"Mock: Auth.ShowRegistrationPrompt() - prompt {mockPrompt.Id} open; Login() completes a mock registration, Close() closes it");
+            return mockPrompt;
+#else
+            onError?.Invoke(FeatureNotSupportedError(RegistrationContext));
+            return null;
+#endif
+        }
+
+        internal static void LoginRegistrationPrompt(RegistrationPrompt prompt)
+        {
+            if (!prompt.IsOpen)
+            {
+                Yes2Log.Warning($"Auth: registration prompt {prompt.Id} is already closed; Login() ignored");
+                return;
+            }
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Auth_RegistrationPromptLoginJS(prompt.Id);
+#elif UNITY_EDITOR
+            Yes2SDKEditorMock.SessionRegisteredOverride = true;
+            Yes2Log.Log($"Mock: registration prompt {prompt.Id} - mock registration complete");
+            prompt.IsOpen = false;
+            DeliverMockClose(prompt.Id);
+#endif
+        }
+
+        internal static void CloseRegistrationPrompt(RegistrationPrompt prompt)
+        {
+            if (!prompt.IsOpen)
+            {
+                Yes2Log.Warning($"Auth: registration prompt {prompt.Id} is already closed; Close() ignored");
+                return;
+            }
+            prompt.IsOpen = false;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Auth_RegistrationPromptCloseJS(prompt.Id);
+#elif UNITY_EDITOR
+            Yes2Log.Log($"Mock: registration prompt {prompt.Id} closed");
+            DeliverMockClose(prompt.Id);
+#endif
+        }
+
+        /// <summary>
+        /// Bridge entry for "OnRegistrationPromptClose" (payload: the prompt id).
+        /// Removes the prompt before running its onClose; unknown or duplicate
+        /// ids are dropped with a warning.
+        /// </summary>
+        internal static void HandleRegistrationPromptClose(string idText)
+        {
+            if (!int.TryParse(idText, NumberStyles.None, CultureInfo.InvariantCulture, out int id)
+                || !_openPrompts.TryGetValue(id, out var prompt))
+            {
+                Yes2Log.Warning($"Auth: dropped registration prompt close for '{idText}': no such prompt open (already closed or unknown)");
+                return;
+            }
+
+            _openPrompts.Remove(id);
+            prompt.IsOpen = false;
+            prompt.OnClose?.Invoke();
+        }
+
+        /// <summary>
+        /// Platform rules for a custom registration message, checked by the
+        /// Editor mock with the same messages the platform reports.
+        /// </summary>
+        // Whitespace set of JavaScript String.prototype.trim (includes U+FEFF,
+        // excludes U+0085 and U+180E), which string.Trim() does not match.
+        private static bool IsJsWhitespace(char c)
+        {
+            return c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r' || c == ' '
+                || c == '\u00A0' || c == '\u1680' || (c >= '\u2000' && c <= '\u200A')
+                || c == '\u2028' || c == '\u2029' || c == '\u202F' || c == '\u205F'
+                || c == '\u3000' || c == '\uFEFF';
+        }
+
+        private static bool IsBlankLikeJs(string text)
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (!IsJsWhitespace(text[i])) return false;
+            }
+            return true;
+        }
+
+        internal static bool TryValidateRegistrationMessage(string message, out string error)
+        {
+            error = null;
+            if (message == null || IsBlankLikeJs(message))
+            {
+                error = "Registration message must not be empty or whitespace only";
+                return false;
+            }
+            if (message.Length > MaxRegistrationMessageLength)
+            {
+                error = $"Registration message must be at most {MaxRegistrationMessageLength} characters";
+                return false;
+            }
+            string[] parts = message.Split(new[] { RegistrationCode }, StringSplitOptions.None);
+            if (parts.Length != 2)
+            {
+                error = $"Registration message must contain {RegistrationCode} exactly once";
+                return false;
+            }
+            if (System.Text.RegularExpressions.Regex.IsMatch(parts[0] + parts[1], @"\{\{[^}]*\}\}"))
+            {
+                error = $"Registration message must not contain placeholders other than {RegistrationCode}";
+                return false;
+            }
+            string before = parts[0];
+            string after = parts[1];
+            int prevIndex = before.Length - 1;
+            if (prevIndex > 0 && char.IsSurrogatePair(before[prevIndex - 1], before[prevIndex]))
+            {
+                prevIndex--;
+            }
+            bool prevJoins = prevIndex >= 0 && IsWordLike(before, prevIndex);
+            bool nextJoins = after.Length > 0 && IsWordLike(after, 0);
+            if (prevJoins || nextJoins)
+            {
+                error = $"{RegistrationCode} must not run into a neighbouring letter, digit, combining mark or underscore; separate it with a space or punctuation";
+                return false;
+            }
+            return true;
+        }
+
+        // Letter, digit, combining mark or underscore at index (surrogate pairs read as one character).
+        private static bool IsWordLike(string text, int index)
+        {
+            if (text[index] == '_') return true;
+            switch (CharUnicodeInfo.GetUnicodeCategory(text, index))
+            {
+                case UnicodeCategory.UppercaseLetter:
+                case UnicodeCategory.LowercaseLetter:
+                case UnicodeCategory.TitlecaseLetter:
+                case UnicodeCategory.ModifierLetter:
+                case UnicodeCategory.OtherLetter:
+                case UnicodeCategory.DecimalDigitNumber:
+                case UnicodeCategory.LetterNumber:
+                case UnicodeCategory.OtherNumber:
+                case UnicodeCategory.NonSpacingMark:
+                case UnicodeCategory.SpacingCombiningMark:
+                case UnicodeCategory.EnclosingMark:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static RegistrationPrompt RegisterPrompt(Action onClose)
+        {
+            // Ids only need to be unique among open prompts, so wrap back to 1
+            // rather than go negative after int.MaxValue prompts.
+            _nextPromptId = _nextPromptId == int.MaxValue ? 1 : _nextPromptId + 1;
+            var prompt = new RegistrationPrompt(_nextPromptId, onClose);
+            _openPrompts[prompt.Id] = prompt;
+            return prompt;
+        }
+
+        // jsResult is "" on success, else error JSON {code, message, context}.
+        private static RegistrationPrompt CompleteShow(RegistrationPrompt prompt, string jsResult, Action<Error> onError)
+        {
+            if (string.IsNullOrEmpty(jsResult))
+            {
+                return prompt;
+            }
+
+            _openPrompts.Remove(prompt.Id);
+            prompt.IsOpen = false;
+            onError?.Invoke(Bridge.ParseError(jsResult));
+            return null;
+        }
+
+#if UNITY_EDITOR
+        // The device path reports the close through Bridge, which logs a
+        // throwing onClose instead of letting it escape; the mock does the same.
+        private static void DeliverMockClose(int id)
+        {
+            try
+            {
+                HandleRegistrationPromptClose(id.ToString(CultureInfo.InvariantCulture));
+            }
+            catch (Exception e)
+            {
+                Yes2Log.Error($"Bridge: callback 'OnRegistrationPromptClose' threw: {e}");
+            }
+        }
+
+        // Domain reload may be disabled, so open prompts from the last play are
+        // cleared on each play.
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistrationPromptEditorState()
+        {
+            _openPrompts.Clear();
+        }
+#endif
+
+        internal static RegistrationPrompt CompleteShowForTests(string jsResult, Action onClose, Action<Error> onError)
+        {
+            return CompleteShow(RegisterPrompt(onClose), jsResult, onError);
+        }
+
+        internal static int OpenPromptCountForTests()
+        {
+            return _openPrompts.Count;
+        }
+
+        internal static void ResetRegistrationPromptStateForTests()
+        {
+            _openPrompts.Clear();
+            _nextPromptId = 0;
+        }
 
         #endregion
 
