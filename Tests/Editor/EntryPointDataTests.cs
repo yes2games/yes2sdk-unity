@@ -38,6 +38,18 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Parse_IsoDateStrings_StayStrings()
+        {
+            Dictionary<string, object> d = Yes2SDKSession.ParseEntryPointData(
+                "{\"when\":\"2024-01-02T03:04:05Z\",\"n\":{\"at\":\"2024-01-02T03:04:05Z\"}}");
+
+            Assert.IsInstanceOf<string>(d["when"]);
+            Assert.AreEqual("2024-01-02T03:04:05Z", d["when"]);
+            Assert.AreEqual(JTokenType.String, ((JObject)d["n"])["at"].Type);
+            Assert.AreEqual("2024-01-02T03:04:05Z", (string)((JObject)d["n"])["at"]);
+        }
+
+        [Test]
         public void Parse_EmptyString_ReturnsEmpty()
         {
             Assert.AreEqual(0, Yes2SDKSession.ParseEntryPointData("").Count);

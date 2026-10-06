@@ -154,6 +154,7 @@ namespace Yes2SDK
         /// Get the entry point data as a dictionary. Data from the link that opened the game,
         /// including data attached to a referral share or a registration prompt.
         /// Nested objects are returned as <c>JObject</c> and arrays as <c>JArray</c>.
+        /// Numbers come back as <c>long</c> or <c>double</c>; date-like strings stay strings.
         /// Returns an empty dictionary when there is no data or it is not a JSON object.
         /// </summary>
         public Dictionary<string, object> GetEntryPointDataDictionary()
@@ -161,12 +162,21 @@ namespace Yes2SDK
             return ParseEntryPointData(GetEntryPointData());
         }
 
+        private static JToken ParseToken(string json)
+        {
+            // DateParseHandling.None keeps ISO date strings as strings.
+            return JsonConvert.DeserializeObject<JToken>(json, new JsonSerializerSettings
+            {
+                DateParseHandling = DateParseHandling.None
+            });
+        }
+
         internal static bool IsJsonObject(string json)
         {
             if (string.IsNullOrWhiteSpace(json)) return false;
             try
             {
-                return JToken.Parse(json) is JObject;
+                return ParseToken(json) is JObject;
             }
             catch (Exception)
             {
@@ -180,7 +190,7 @@ namespace Yes2SDK
             if (string.IsNullOrWhiteSpace(json)) return result;
             try
             {
-                JObject obj = JToken.Parse(json) as JObject;
+                JObject obj = ParseToken(json) as JObject;
                 if (obj == null) return result;
                 foreach (KeyValuePair<string, JToken> pair in obj)
                 {
