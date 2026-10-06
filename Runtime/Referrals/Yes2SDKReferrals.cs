@@ -165,11 +165,13 @@ namespace Yes2SDK
 
         // Task-returning overloads.
 
+        /// <summary>Task overload of <see cref="ShareAsync(ReferralShareOptions, Action{ReferralShareResult}, Action{Error})"/>.</summary>
         public Task<ReferralShareResult> ShareAsync(ReferralShareOptions options, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<ReferralShareResult>(
                 (success, error) => ShareAsync(options, success, error),
                 cancellationToken);
 
+        /// <summary>Task overload of <see cref="ListAsync(Action{ReferralList}, Action{Error})"/>.</summary>
         public Task<ReferralList> ListAsync(CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<ReferralList>(
                 (success, error) => ListAsync(success, error),

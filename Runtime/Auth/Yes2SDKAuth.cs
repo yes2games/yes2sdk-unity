@@ -320,10 +320,6 @@ namespace Yes2SDK
             prompt.OnClose?.Invoke();
         }
 
-        /// <summary>
-        /// Platform rules for a custom registration message, checked by the
-        /// Editor mock with the same messages the platform reports.
-        /// </summary>
         // Whitespace set of JavaScript String.prototype.trim (includes U+FEFF,
         // excludes U+0085 and U+180E), which string.Trim() does not match.
         private static bool IsJsWhitespace(char c)
@@ -343,6 +339,10 @@ namespace Yes2SDK
             return true;
         }
 
+        /// <summary>
+        /// Platform rules for a custom registration message, checked by the
+        /// Editor mock with the same messages the platform reports.
+        /// </summary>
         internal static bool TryValidateRegistrationMessage(string message, out string error)
         {
             error = null;

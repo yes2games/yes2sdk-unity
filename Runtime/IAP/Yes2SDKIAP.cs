@@ -443,21 +443,25 @@ namespace Yes2SDK
 
         // Task-returning overloads.
 
+        /// <summary>Task overload of <see cref="GetSubscriptionsAsync(Action{List{Subscription}}, Action{Error})"/>.</summary>
         public Task<List<Subscription>> GetSubscriptionsAsync(CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<List<Subscription>>(
                 (success, error) => GetSubscriptionsAsync(success, error),
                 cancellationToken);
 
+        /// <summary>Task overload of <see cref="SubscribeAsync(string, Action{SubscribeResult}, Action{Error})"/>.</summary>
         public Task<SubscribeResult> SubscribeAsync(string productId, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<SubscribeResult>(
                 (success, error) => SubscribeAsync(productId, success, error),
                 cancellationToken);
 
+        /// <summary>Task overload of <see cref="CancelSubscriptionAsync(string, Action{bool}, Action{Error})"/>.</summary>
         public Task<bool> CancelSubscriptionAsync(string productId, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<bool>(
                 (success, error) => CancelSubscriptionAsync(productId, success, error),
                 cancellationToken);
 
+        /// <summary>Task overload of <see cref="ClaimRetentionOfferAsync(string, Action{Subscription}, Action{Error})"/>.</summary>
         public Task<Subscription> ClaimRetentionOfferAsync(string productId, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<Subscription>(
                 (success, error) => ClaimRetentionOfferAsync(productId, success, error),
@@ -484,7 +488,7 @@ namespace Yes2SDK
                     onError?.Invoke(new Error
                     {
                         Code = "Unknown",
-                        Message = $"Could not parse the platform result: {ex.Message}",
+                        Message = "Could not read the platform response",
                         Context = context
                     });
                     return;

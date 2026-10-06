@@ -444,6 +444,16 @@ test('referrals entry points never throw into wasm, even when reporting the erro
   assert.doesNotThrow(() => sb.call('Yes2SDK_Referrals_ListAsyncJS', 14));
 });
 
+test('iap subscription and notification entry points never throw into wasm, even when reporting the error throws', () => {
+  const boom = () => { throw new Error('sync boom'); };
+  const sb = createSandbox(['Yes2SDKIAP.jslib', 'Yes2SDKNotifications.jslib'], {
+    Yes2SDK: { iap: { getSubscriptionsAsync: boom }, notifications: { scheduleAsync: boom } },
+  });
+  sb.sent.push = () => { throw new Error('SendMessage failed'); };
+  assert.doesNotThrow(() => sb.call('Yes2SDK_IAP_GetSubscriptionsAsyncJS', 21));
+  assert.doesNotThrow(() => sb.call('Yes2SDK_Notifications_ScheduleAsyncJS', 22, sb.str('{"title":"t"}')));
+});
+
 test('referrals ListAsync success sends the whole list', async () => {
   const list = { referrals: { party_v1: [{ playerId: 'p1', joinedAt: '2026-10-06T08:00:00.000Z' }] }, signedRequest: 'sig' };
   const sb = createSandbox(['Yes2SDKReferrals.jslib'], { Yes2SDK: { referrals: { listAsync: () => Promise.resolve(list) } } });

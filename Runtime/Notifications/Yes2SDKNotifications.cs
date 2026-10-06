@@ -189,16 +189,19 @@ namespace Yes2SDK
 
         // Task-returning overloads.
 
+        /// <summary>Task overload of <see cref="ScheduleAsync(NotificationOptions, Action{ScheduledNotification}, Action{Error})"/>.</summary>
         public Task<ScheduledNotification> ScheduleAsync(NotificationOptions options, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<ScheduledNotification>(
                 (success, error) => ScheduleAsync(options, success, error),
                 cancellationToken);
 
+        /// <summary>Task overload of <see cref="CancelAsync(string, Action, Action{Error})"/>.</summary>
         public Task CancelAsync(string notificationId, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask(
                 (success, error) => CancelAsync(notificationId, success, error),
                 cancellationToken);
 
+        /// <summary>Task overload of <see cref="CancelAllAsync(Action, Action{Error})"/>.</summary>
         public Task CancelAllAsync(CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask(
                 (success, error) => CancelAllAsync(success, error),
