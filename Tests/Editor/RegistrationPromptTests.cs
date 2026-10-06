@@ -259,6 +259,23 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void EditorMock_UnserializableData_GetsInvalidParamBeforeRegisteredCheck()
+        {
+            Yes2SDKEditorMock.SessionRegisteredOverride = true;
+            var cyclic = new Dictionary<string, object>();
+            cyclic["self"] = cyclic;
+            Error received = default;
+            var options = new RegistrationPromptOptions { Data = cyclic };
+
+            var prompt = new Yes2SDKAuth().ShowRegistrationPrompt(options, null, error => received = error);
+
+            Assert.IsNull(prompt);
+            Assert.AreEqual("INVALID_PARAM", received.Code);
+            StringAssert.Contains("could not be serialized", received.Message);
+            Assert.AreEqual(0, Yes2SDKAuth.OpenPromptCountForTests());
+        }
+
+        [Test]
         public void EditorMock_ThrowingOnClose_IsLoggedAndDoesNotEscapeClose()
         {
             var prompt = new Yes2SDKAuth().ShowRegistrationPrompt(null,
@@ -283,6 +300,8 @@ namespace Yes2SDK.Tests
 
         [TestCase("", "must not be empty")]
         [TestCase("   ", "must not be empty")]
+        [TestCase("\uFEFF", "must not be empty")]
+        [TestCase("\u00A0\u2003\u3000\uFEFF", "must not be empty")]
         [TestCase("no code here", "exactly once")]
         [TestCase("{{registrationCode}} and {{registrationCode}}", "exactly once")]
         [TestCase("Hi {{name}}, {{registrationCode}} is my code", "placeholders other than")]

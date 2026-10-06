@@ -229,6 +229,18 @@ namespace Yes2SDK
             string result = Yes2SDK_Auth_ShowRegistrationPromptJS(prompt.Id, optionsJson);
             return CompleteShow(prompt, result, onError);
 #elif UNITY_EDITOR
+            // Same order as the device path: options are serialized first.
+            try
+            {
+                if (options != null) options.ToJson();
+            }
+            catch (Exception e)
+            {
+                string serializeMessage = $"Registration prompt options could not be serialized: {e.Message}";
+                Yes2Log.Log($"Mock: Auth.ShowRegistrationPrompt() - INVALID_PARAM: {serializeMessage}");
+                onError?.Invoke(new Error { Code = "INVALID_PARAM", Message = serializeMessage, Context = RegistrationContext });
+                return null;
+            }
             if (Yes2SDKEditorMock.IsRegisteredNow)
             {
                 Yes2Log.Log("Mock: Auth.ShowRegistrationPrompt() - player is registered, INVALID_OPERATION");
@@ -312,10 +324,29 @@ namespace Yes2SDK
         /// Platform rules for a custom registration message, checked by the
         /// Editor mock with the same messages the platform reports.
         /// </summary>
+        // Whitespace set of JavaScript String.prototype.trim (includes U+FEFF,
+        // excludes U+0085 and U+180E), which string.Trim() does not match.
+        private static bool IsJsWhitespace(char c)
+        {
+            return c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r' || c == ' '
+                || c == '\u00A0' || c == '\u1680' || (c >= '\u2000' && c <= '\u200A')
+                || c == '\u2028' || c == '\u2029' || c == '\u202F' || c == '\u205F'
+                || c == '\u3000' || c == '\uFEFF';
+        }
+
+        private static bool IsBlankLikeJs(string text)
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (!IsJsWhitespace(text[i])) return false;
+            }
+            return true;
+        }
+
         internal static bool TryValidateRegistrationMessage(string message, out string error)
         {
             error = null;
-            if (message == null || message.Trim().Length == 0)
+            if (message == null || IsBlankLikeJs(message))
             {
                 error = "Registration message must not be empty or whitespace only";
                 return false;
