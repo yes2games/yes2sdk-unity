@@ -345,6 +345,8 @@ mergeInto(LibraryManager.library, {
                     }
                 },
 
+                setSessionDataFromJson: function(json) { return this.setSessionData(json); },
+
                 getEntryPointAsync: function() {
                     var sdk = window.Yes2SDK._sdk;
                     var source = 'crazygames';

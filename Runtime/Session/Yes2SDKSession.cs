@@ -110,7 +110,9 @@ namespace Yes2SDK
         }
 
         /// <summary>
-        /// Get the traffic source as a JSON string containing referrer and URL parameters.
+        /// Get the traffic source as a JSON string. The shape is platform-defined: some platforms
+        /// report a referrer plus a params object, others report referrer and campaign fields.
+        /// Returns a JSON object with an empty referrer when nothing is available.
         /// </summary>
         public string GetTrafficSource()
         {
@@ -123,7 +125,8 @@ namespace Yes2SDK
         }
 
         /// <summary>
-        /// Get the entry point data (URL search params) as a JSON string.
+        /// Get the entry point data as a JSON string (the payload the game was launched with).
+        /// Returns "{}" when there is none.
         /// </summary>
         public string GetEntryPointData()
         {
