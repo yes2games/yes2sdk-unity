@@ -580,9 +580,8 @@ Yes2SDK.IAP.PurchaseAsync("gems_100",
 
 #### Subscriptions
 
-Subscriptions are not available on every platform that supports IAP: gate them with `IsSubscriptionSupported()`, not `IsSupported()`.
+Subscriptions are not available on every platform that supports IAP: gate them with `IsSubscriptionSupported()`, not `IsSupported()`, and read the typed results.
 
-Subscriptions have their own check, `IAP.IsSubscriptionSupported()`, and typed results.
 
 ```csharp
 if (Yes2SDK.IAP.IsSubscriptionSupported())
