@@ -234,6 +234,145 @@ test('lifecycle exitRequested sends OnExitRequested to Bridge after init', async
   assert.deepStrictEqual(sb.sent, [['Bridge', 'OnExitRequested', '']]);
 });
 // ---- end Lifecycle: exitRequested ----------------------------------------------------------
+// ---- Referrals: request-id envelope ("<id>|<payload>" to Bridge) --------------------------
+const refPayload = (sb, i = 0) => {
+  const p = sb.sent[i][2];
+  return [p.slice(0, p.indexOf('|')), p.slice(p.indexOf('|') + 1)];
+};
+
+test('referrals ShareAsync passes the parsed options and sends the result envelope', async () => {
+  const seen = [];
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], {
+    Yes2SDK: { referrals: { shareAsync: (o) => { seen.push(o); return Promise.resolve({ canceled: false }); } } },
+  });
+  sb.call('Yes2SDK_Referrals_ShareAsyncJS', 4, sb.str('{"reference":"party_v1","data":{"room":"abc"},"image":"data:image/png;base64,AAAA"}'));
+  await flush();
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(seen)), [{ reference: 'party_v1', data: { room: 'abc' }, image: 'data:image/png;base64,AAAA' }]);
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnReferralShareSuccess', '4|{"canceled":false}']]);
+});
+
+test('referrals ShareAsync reports a cancelled share', async () => {
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], {
+    Yes2SDK: { referrals: { shareAsync: () => Promise.resolve({ canceled: true }) } },
+  });
+  sb.call('Yes2SDK_Referrals_ShareAsyncJS', 6, sb.str('{"reference":"r"}'));
+  await flush();
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnReferralShareSuccess', '6|{"canceled":true}']]);
+});
+
+test('referrals ShareAsync rejection sends the error envelope with the platform code', async () => {
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], {
+    Yes2SDK: { referrals: { shareAsync: () => Promise.reject({ code: 'INVALID_PARAM', message: 'bad ref' }) } },
+  });
+  sb.call('Yes2SDK_Referrals_ShareAsyncJS', 8, sb.str('{"reference":" "}'));
+  await flush();
+  assert.equal(sb.sent.length, 1);
+  assert.equal(sb.sent[0][1], 'OnReferralShareError');
+  const [id, body] = refPayload(sb);
+  assert.equal(id, '8');
+  assert.deepStrictEqual(JSON.parse(body), { code: 'INVALID_PARAM', message: 'bad ref', context: 'Yes2SDK.Referrals.ShareAsync' });
+});
+
+test('referrals ShareAsync with bad options JSON sends INVALID_PARAM and never calls the platform', async () => {
+  let called = 0;
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], {
+    Yes2SDK: { referrals: { shareAsync: () => { called++; return Promise.resolve({ canceled: false }); } } },
+  });
+  sb.call('Yes2SDK_Referrals_ShareAsyncJS', 2, sb.str('{not json'));
+  await flush();
+  assert.equal(called, 0);
+  assert.equal(sb.sent.length, 1);
+  assert.equal(sb.sent[0][1], 'OnReferralShareError');
+  const [id, body] = refPayload(sb);
+  assert.equal(id, '2');
+  assert.equal(JSON.parse(body).code, 'INVALID_PARAM');
+});
+
+test('referrals ShareAsync turns a synchronous platform throw into an error envelope', async () => {
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], {
+    Yes2SDK: { referrals: { shareAsync: () => { throw new Error('sync boom'); } } },
+  });
+  sb.call('Yes2SDK_Referrals_ShareAsyncJS', 3, sb.str('{"reference":"r"}'));
+  await flush();
+  assert.equal(sb.sent[0][1], 'OnReferralShareError');
+  assert.deepStrictEqual(JSON.parse(refPayload(sb)[1]), { code: 'Unknown', message: 'sync boom', context: 'Yes2SDK.Referrals.ShareAsync' });
+});
+
+test('referrals entry points never throw into wasm, even when reporting the error throws', () => {
+  const boom = () => { throw new Error('sync boom'); };
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], {
+    Yes2SDK: { referrals: { shareAsync: boom, listAsync: boom } },
+  });
+  // Make SendMessage itself throw while the catch block reports the error.
+  sb.sent.push = () => { throw new Error('SendMessage failed'); };
+  assert.doesNotThrow(() => sb.call('Yes2SDK_Referrals_ShareAsyncJS', 4, sb.str('{"reference":"r"}')));
+  assert.doesNotThrow(() => sb.call('Yes2SDK_Referrals_ListAsyncJS', 14));
+});
+
+test('referrals ListAsync success sends the whole list', async () => {
+  const list = { referrals: { party_v1: [{ playerId: 'p1', joinedAt: '2026-10-06T08:00:00.000Z' }] }, signedRequest: 'sig' };
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], { Yes2SDK: { referrals: { listAsync: () => Promise.resolve(list) } } });
+  sb.call('Yes2SDK_Referrals_ListAsyncJS', 12);
+  await flush();
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnReferralListSuccess', '12|' + JSON.stringify(list)]]);
+});
+
+test('referrals ListAsync rejection sends the error envelope', async () => {
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], {
+    Yes2SDK: { referrals: { listAsync: () => Promise.reject(new Error('down')) } },
+  });
+  sb.call('Yes2SDK_Referrals_ListAsyncJS', 13);
+  await flush();
+  assert.equal(sb.sent[0][1], 'OnReferralListError');
+  const [id, body] = refPayload(sb);
+  assert.equal(id, '13');
+  assert.deepStrictEqual(JSON.parse(body), { code: 'Unknown', message: 'down', context: 'Yes2SDK.Referrals.ListAsync' });
+});
+
+test('referrals module missing after init reports FEATURE_NOT_SUPPORTED', async () => {
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], { Yes2SDK: {} });
+  sb.call('Yes2SDK_Referrals_ShareAsyncJS', 1, sb.str('{"reference":"r"}'));
+  sb.call('Yes2SDK_Referrals_ListAsyncJS', 2);
+  assert.deepStrictEqual(sb.sent.map((s) => s[1]), ['OnReferralShareError', 'OnReferralListError']);
+  assert.equal(JSON.parse(refPayload(sb, 0)[1]).code, 'FEATURE_NOT_SUPPORTED');
+  assert.equal(JSON.parse(refPayload(sb, 1)[1]).code, 'FEATURE_NOT_SUPPORTED');
+});
+
+test('referrals without the SDK reports NotInitialized', async () => {
+  const sb = createSandbox(['Yes2SDKReferrals.jslib']);
+  sb.call('Yes2SDK_Referrals_ShareAsyncJS', 1, sb.str('{"reference":"r"}'));
+  sb.call('Yes2SDK_Referrals_ListAsyncJS', 2);
+  assert.equal(JSON.parse(refPayload(sb, 0)[1]).code, 'NotInitialized');
+  assert.equal(JSON.parse(refPayload(sb, 1)[1]).code, 'NotInitialized');
+});
+
+test('referrals IsSupported reflects the platform and never throws', async () => {
+  const make = (referrals) => createSandbox(['Yes2SDKReferrals.jslib'], referrals === undefined ? {} : { Yes2SDK: { referrals } });
+  assert.equal(make({ isSupported: () => true }).call('Yes2SDK_Referrals_IsSupportedJS'), 1);
+  assert.equal(make({ isSupported: () => false }).call('Yes2SDK_Referrals_IsSupportedJS'), 0);
+  assert.equal(make({ isSupported: throwing }).call('Yes2SDK_Referrals_IsSupportedJS'), 0);
+  assert.equal(make(undefined).call('Yes2SDK_Referrals_IsSupportedJS'), 0);
+});
+
+test('referrals wrapper stubs reject FEATURE_NOT_SUPPORTED through the bridge', async () => {
+  const sb = createSandbox(['Yes2SDKPlatformInit.jslib', 'Yes2SDKReferrals.jslib']);
+  sb.window.CrazyGames = { SDK: {} };
+  sb.window.__y2 = { log() {}, warn() {}, error() {} };
+  sb.window.__yes2PlatformInit();
+  assert.equal(sb.call('Yes2SDK_Referrals_IsSupportedJS'), 0);
+  sb.call('Yes2SDK_Referrals_ShareAsyncJS', 21, sb.str('{"reference":"r"}'));
+  sb.call('Yes2SDK_Referrals_ListAsyncJS', 22);
+  await flush();
+  assert.deepStrictEqual(sb.sent.map((s) => s[1]), ['OnReferralShareError', 'OnReferralListError']);
+  // the wrapper's own stubs answer (not the bridge's module-missing path)
+  assert.deepStrictEqual(JSON.parse(refPayload(sb, 0)[1]), {
+    code: 'FEATURE_NOT_SUPPORTED', message: 'Referrals.shareAsync is not supported on the current platform.', context: 'Yes2SDK.Referrals.ShareAsync',
+  });
+  assert.deepStrictEqual(JSON.parse(refPayload(sb, 1)[1]), {
+    code: 'FEATURE_NOT_SUPPORTED', message: 'Referrals.listAsync is not supported on the current platform.', context: 'Yes2SDK.Referrals.ListAsync',
+  });
+});
+// ---- end Referrals --------------------------------------------------------------------------
 
 // ---- runner --------------------------------------------------------------------------------
 let failed = 0;

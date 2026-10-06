@@ -136,6 +136,14 @@ namespace Yes2SDK
             ["OnGetPurchasesError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.GetPurchases, data, ParseError),
             ["OnConsumePurchaseError"] = data => Yes2SDKIAP.HandleErrorMessage(Yes2SDKIAP.Operation.ConsumePurchase, data, ParseError),
 
+            // Referrals. Messages carry a request id, so errors are unwrapped
+            // here too rather than in _errorHandlers.
+            ["OnReferralShareSuccess"] = data => Yes2SDKReferrals.HandleSuccessMessage(Yes2SDKReferrals.Operation.Share, data),
+            ["OnReferralShareError"] = data => Yes2SDKReferrals.HandleErrorMessage(Yes2SDKReferrals.Operation.Share, data, ParseError),
+            ["OnReferralListSuccess"] = data => Yes2SDKReferrals.HandleSuccessMessage(Yes2SDKReferrals.Operation.List, data),
+            ["OnReferralListError"] = data => Yes2SDKReferrals.HandleErrorMessage(Yes2SDKReferrals.Operation.List, data, ParseError),
+            // End referrals
+
             // Data (async durable saves)
             // Data confirmed writes carry a request id, so their errors are
             // unwrapped here too rather than in _errorHandlers.
@@ -352,6 +360,13 @@ namespace Yes2SDK
         public void OnGetPurchasesError(string msg) => Handle(msg);
         public void OnConsumePurchaseSuccess(string msg) => Handle(msg);
         public void OnConsumePurchaseError(string msg) => Handle(msg);
+
+        // Referrals
+        public void OnReferralShareSuccess(string msg) => Handle(msg);
+        public void OnReferralShareError(string msg) => Handle(msg);
+        public void OnReferralListSuccess(string msg) => Handle(msg);
+        public void OnReferralListError(string msg) => Handle(msg);
+        // End referrals
 
         // Data (async durable saves)
         public void OnDataSetStringSuccess(string msg) => Handle(msg);

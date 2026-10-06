@@ -874,6 +874,13 @@ mergeInto(LibraryManager.library, {
                 getPurchasesAsync: function() { return Promise.reject(__y2fns('IAP.getPurchasesAsync')); },
                 consumePurchaseAsync: function(purchaseToken) { return Promise.reject(__y2fns('IAP.consumePurchaseAsync')); },
                 isSupported: function() { return false; }
+            },
+
+            // Referrals module - unsupported on CrazyGames
+            referrals: {
+                shareAsync: function(options) { return Promise.reject(__y2fns('Referrals.shareAsync')); },
+                listAsync: function() { return Promise.reject(__y2fns('Referrals.listAsync')); },
+                isSupported: function() { return false; }
             }
         };
 
