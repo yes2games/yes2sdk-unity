@@ -112,6 +112,9 @@ namespace Yes2SDK
             ["OnSignInSuccess"] = Yes2SDKAuth.InvokeSignInSuccess,
             ["OnGetTokenSuccess"] = Yes2SDKAuth.InvokeGetTokenSuccess,
             ["OnAccountLinkSuccess"] = Yes2SDKAuth.InvokeAccountLinkSuccess,
+            // --- registration prompt close (payload: prompt id) ---
+            ["OnRegistrationPromptClose"] = Yes2SDKAuth.HandleRegistrationPromptClose,
+            // --- end registration prompt ---
 
             // Game
             ["OnInviteLinkSuccess"] = Yes2SDKGame.InvokeInviteLinkSuccess,
@@ -325,6 +328,9 @@ namespace Yes2SDK
         public void OnGetTokenError(string msg) => Handle(msg);
         public void OnAccountLinkSuccess(string msg) => Handle(msg);
         public void OnAccountLinkError(string msg) => Handle(msg);
+        // --- registration prompt close ---
+        public void OnRegistrationPromptClose(string msg) => Handle(msg);
+        // --- end registration prompt ---
 
         // Game
         public void OnInviteLinkSuccess(string msg) => Handle(msg);
