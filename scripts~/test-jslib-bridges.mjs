@@ -10,6 +10,9 @@
 // and sb.readStr(handle) to read strings returned through __y2h.returnStr.
 // Not wired into CI (local and reviewer tool).
 import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createSandbox, flush } from './jslib-harness.mjs';
 
 const tests = [];
@@ -105,6 +108,40 @@ test('harness fails a bridge that uses a $helper missing from its __deps', async
 
 test('harness accepts a bridge that lists its $helper in __deps', async () => {
   createSandbox([fakeLib("Fake_PingJS__deps: ['$__y2h'],")]);
+});
+
+const fakeObjectHelper = (deps) => ({
+  name: 'FakeObj.jslib',
+  source: `mergeInto(LibraryManager.library, {
+    $__y2foo: { a: function() { return __y2h.has('data'); } },
+    ${deps}
+  });`,
+});
+
+test('harness fails an object-valued $helper whose method uses a $helper missing from its __deps', async () => {
+  assert.throws(() => createSandbox([fakeObjectHelper('')]), /\$__y2foo uses \$__y2h/);
+});
+
+test('harness accepts an object-valued $helper that lists its $helper in __deps', async () => {
+  createSandbox([fakeObjectHelper("$__y2foo__deps: ['$__y2h'],")]);
+});
+
+test('harness ignores helper names inside string literals and comments', async () => {
+  createSandbox([{ name: 'Fake.jslib', source: `mergeInto(LibraryManager.library, {
+    Fake_OkJS: function() { var u = 'http://x/__y2h'; /* __y2h */ return u; } // __y2h
+  });` }]);
+});
+
+test('harness rejects a use hidden after a string holding comment markers', async () => {
+  assert.throws(() => createSandbox([{ name: 'Fake.jslib', source: `mergeInto(LibraryManager.library, {
+    Fake_PingJS: function() { var a = '/*'; __y2h.has('a'); var b = '*/'; }
+  });` }]), /Fake_PingJS uses \$__y2h/);
+});
+
+test('every Plugins/*.jslib loads under the strict __deps check', async () => {
+  const all = readdirSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'Plugins')).filter((f) => f.endsWith('.jslib'));
+  assert.ok(all.length > 1);
+  createSandbox(all);
 });
 
 test('harness exposes timers and drops closures over file-level vars', async () => {

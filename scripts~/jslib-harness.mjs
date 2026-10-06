@@ -87,8 +87,11 @@ export function createSandbox(files, opts = {}) {
   };
   const checkDeps = (key, fn) => {
     const allowed = closure(key);
-    // comments are not uses (URLs inside strings keep their //)
-    const src = fn.toString().replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/.*$/gm, '$1');
+    // string literals and comments are not uses: blank strings first so a // or /* inside one is inert
+    const src = fn.toString()
+      .replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g, '""')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
     for (const h of helperNames) {
       const used = new RegExp('(?<![.\\w$])' + h.replace(/\$/g, '\\$') + '(?![\\w$])').test(src);
       if (used && !allowed.has(h) && key !== '$' + h) {
@@ -97,13 +100,27 @@ export function createSandbox(files, opts = {}) {
     }
   };
 
+  // A function helper is checked and re-created; an object helper has each function-valued member
+  // checked against the helper's own __deps closure and re-created (recursively for nested objects).
+  const prepareHelper = (key, value) => {
+    if (typeof value === 'function') {
+      checkDeps(key, value);
+      return recreate(value);
+    }
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const out = {};
+      for (const [member, v] of Object.entries(value)) out[member] = prepareHelper(key, v);
+      return out;
+    }
+    return value;
+  };
+
   const exported = {};
   for (const [key, value] of Object.entries(library)) {
     if (key.startsWith('$')) {
       if (key.endsWith('__postset')) postsets.push(value);
       else if (!isMeta(key)) {
-        if (typeof value === 'function') checkDeps(key, value);
-        sandbox[key.slice(1)] = recreate(value);
+        sandbox[key.slice(1)] = prepareHelper(key, value);
       }
     } else if (!isMeta(key) && typeof value === 'function') {
       checkDeps(key, value);
