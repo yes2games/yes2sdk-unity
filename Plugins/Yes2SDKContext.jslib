@@ -19,7 +19,6 @@ mergeInto(LibraryManager.library, {
             };
         }
     },
-    $__y2ctx__deps: ['$__y2h'],
 
     Yes2SDK_Context_ShareAsyncJS__deps: ['$__y2ctx', '$__y2h'],
     Yes2SDK_Context_ShareAsyncJS: function(requestId, payloadJsonPtr) {

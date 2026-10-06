@@ -439,20 +439,26 @@ if (Yes2SDK.Referrals.IsSupported())
 Open the platform share sheet with an image, for example a score card or a coupon.
 
 ```csharp
-Yes2SDK.Context.ShareAsync(
-    scoreCardTexture,                // a readable Texture2D, encoded as a PNG data URL
-    text: "Beat my score",
-    data: new Dictionary<string, object> { { "coupon", "SPRING25" } },
+Yes2SDK.Context.ShareImageAsync(
+    new ContextShareOptions
+    {
+        ImageDataUrl = Yes2SDKImage.ToPngDataUrl(scoreCardTexture), // a readable Texture2D
+        Text = "Beat my score",
+        Data = new Dictionary<string, object> { { "coupon", "SPRING25" } }
+    },
     onSuccess: () => Debug.Log("Share sheet closed"),
     onError:   err => Debug.LogWarning(err));
+
+// Image and text only:
+Yes2SDK.Context.ShareAsync("Beat my score", Yes2SDKImage.ToPngDataUrl(scoreCardTexture));
 ```
 
-- The image must be a PNG data URL. Build one with `Yes2SDKImage.ToPngDataUrl(texture)`, or pass the texture as above. The string overload `ShareAsync(text, imageBase64, ...)` also accepts raw base64 PNG data and adds the prefix; pass null to let the platform capture the game screen where it can.
-- A texture that is null, not readable or larger than 2 MiB once encoded fails with `InvalidParams` right away, as does `data` that cannot be serialized.
-- `data` reaches the player who opens the share through `Session.GetEntryPointData()`.
-- `text` may be ignored by some platforms.
+- Pass an explicit image, built from a texture with `Yes2SDKImage.ToPngDataUrl(texture)`. Raw base64 PNG data is also accepted and gets the PNG data URL prefix. With no image some platforms capture the game screen instead, and a WebGL canvas capture can come out blank, so verify it on the device before relying on it.
+- Null options, or `Data` that cannot be serialized, fail with `InvalidParams` right away.
+- `Data` reaches the player who opens the share through `Session.GetEntryPointData()`.
+- `Text` may be ignored by some platforms.
 - Success means the share sheet completed or was dismissed: there is no cancel signal.
-- Do not gate this on `Context.IsSupported()`. It reports context switching and can be `false` on a platform where sharing works. Call `ShareAsync` and handle `onError` (`FeatureNotSupported` where sharing is unavailable).
+- Do not gate this on `Context.IsSupported()`. It reports context switching and can be `false` on a platform where sharing works. Call the share method and handle `onError` (`FeatureNotSupported` where sharing is unavailable).
 
 ### Banners
 

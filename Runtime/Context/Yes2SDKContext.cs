@@ -11,12 +11,13 @@ namespace Yes2SDK
 {
     /// <summary>
     /// Context API for Yes2SDK.
-    /// <see cref="ShareAsync(string, string, Action, Action{Error})"/> opens the platform share
-    /// sheet with an image where the platform supports it. Context switching
+    /// <see cref="ShareAsync(string, string, Action, Action{Error})"/> and
+    /// <see cref="ShareImageAsync(ContextShareOptions, Action, Action{Error})"/> open the platform
+    /// share sheet with an image where the platform supports it. Context switching
     /// (<see cref="SwitchAsync"/>, <see cref="ChooseAsync"/>, <see cref="CreateAsync"/>,
     /// <see cref="GetContext"/>) is not supported and reports FeatureNotSupported.
     /// Do not gate sharing on <c>IsSupported()</c>: it reports context switching and can be
-    /// false on a platform where sharing works. Call ShareAsync and handle onError instead.
+    /// false on a platform where sharing works. Call the share method and handle onError instead.
     /// </summary>
     public class Yes2SDKContext : Yes2SDKStubModule
     {
@@ -48,6 +49,7 @@ namespace Yes2SDK
         private const char EnvelopeSeparator = '|';
 
         private const string ShareContext = "Yes2SDK.Context.ShareAsync";
+        private const string ShareImageContext = "Yes2SDK.Context.ShareImageAsync";
         private const string ShareIntent = "SHARE";
         private const string PngDataUrlPrefix = "data:image/png;base64,";
 
@@ -87,113 +89,50 @@ namespace Yes2SDK
         /// Open the platform share sheet with an image.
         /// <paramref name="imageBase64"/> is a PNG data URL ("data:image/png;base64,...", build one
         /// from a texture with <see cref="Yes2SDKImage.ToPngDataUrl(Texture2D)"/>) or raw base64 PNG
-        /// data, which gets the PNG data URL prefix. Pass null to let the platform capture the
-        /// game screen where it can. <paramref name="text"/> may be ignored by some platforms.
-        /// onSuccess means the share sheet completed or was dismissed: a player closing it
-        /// without sharing is not reported. Platforms without sharing call onError with
-        /// FeatureNotSupported. Do not gate on <c>IsSupported()</c>, which can be false where
-        /// sharing works.
+        /// data, which gets the PNG data URL prefix. Prefer passing an image: when it is null some
+        /// platforms capture the game screen instead, which can come out blank for a WebGL canvas,
+        /// so verify that on the device before relying on it. <paramref name="text"/> may be
+        /// ignored by some platforms. onSuccess means the share sheet completed or was dismissed:
+        /// a player closing it without sharing is not reported. Platforms without sharing call
+        /// onError with FeatureNotSupported. Do not gate on <c>IsSupported()</c>, which can be
+        /// false where sharing works. To send entry data with the share, use
+        /// <see cref="ShareImageAsync(ContextShareOptions, Action, Action{Error})"/>.
         /// </summary>
         public void ShareAsync(string text, string imageBase64, Action onSuccess = null, Action<Error> onError = null)
-            => ShareAsync(text, imageBase64, null, onSuccess, onError);
+            => Share(text, imageBase64, null, onSuccess, onError);
 
         /// <summary>
-        /// Open the platform share sheet with an image and an entry payload.
-        /// <paramref name="data"/> is handed to the player who opens the share, through
-        /// <c>Yes2SDK.Session.GetEntryPointData()</c>. Data that cannot be serialized to JSON
-        /// (a cyclic graph, or a Unity type such as Vector3) calls onError synchronously with
-        /// InvalidParams. Everything else is as in
-        /// <see cref="ShareAsync(string, string, Action, Action{Error})"/>.
+        /// Open the platform share sheet with the image, text and entry data in
+        /// <paramref name="options"/>. <see cref="ContextShareOptions.Data"/> is handed to the player
+        /// who opens the share, through <c>Yes2SDK.Session.GetEntryPointData()</c>. Null options, or
+        /// Data that cannot be serialized to JSON (a cyclic graph, or a Unity type such as Vector3),
+        /// call onError synchronously with InvalidParams. Everything else is as in
+        /// <see cref="ShareAsync(string, string, Action, Action{Error})"/>, including the advice to
+        /// pass an explicit image.
         /// </summary>
-        public void ShareAsync(
-            string text,
-            string imageBase64,
-            Dictionary<string, object> data,
-            Action onSuccess = null,
-            Action<Error> onError = null)
+        public void ShareImageAsync(ContextShareOptions options, Action onSuccess = null, Action<Error> onError = null)
         {
-            string image = NormalizeImage(imageBase64);
-
-            // Serialize before registering: data the serializer cannot handle
-            // fails here, synchronously, and never leaves a pending request.
-            if (!TrySerializeSharePayload(text, image, data, out string payloadJson, out Error serializeError))
+            if (options == null)
             {
-                onError?.Invoke(serializeError);
-                return;
-            }
-
-            int requestId = Register(Operation.Share, TypedShare(onSuccess), onError);
-
-#if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_Context_ShareAsyncJS(requestId, payloadJson);
-#else
-#if UNITY_EDITOR
-            if (MockActive)
-            {
-                MockShare(requestId, image != null);
-                return;
-            }
-#endif
-            Yes2Log.Log("Mock: Context.ShareAsync() - FeatureNotSupported");
-            CompleteError(Operation.Share, requestId, new Error
-            {
-                Code = "FeatureNotSupported",
-                Message = "Sharing is not supported on the current platform",
-                Context = ShareContext
-            });
-#endif
-        }
-
-        /// <summary>
-        /// Open the platform share sheet with a texture, encoded with
-        /// <see cref="Yes2SDKImage.ToPngDataUrl(Texture2D)"/>. A texture that is null, not
-        /// readable (enable Read/Write), or larger than 2 MiB once encoded calls onError
-        /// synchronously with InvalidParams. Everything else is as in
-        /// <see cref="ShareAsync(string, string, Dictionary{string, object}, Action, Action{Error})"/>.
-        /// </summary>
-        public void ShareAsync(
-            Texture2D image,
-            string text = null,
-            Dictionary<string, object> data = null,
-            Action onSuccess = null,
-            Action<Error> onError = null)
-        {
-            string dataUrl = Yes2SDKImage.ToPngDataUrl(image);
-            if (dataUrl == null)
-            {
-                Yes2Log.Warning("Context.ShareAsync: the image could not be encoded as a PNG data URL");
+                Yes2Log.Warning("Context.ShareImageAsync: options must not be null");
                 onError?.Invoke(new Error
                 {
                     Code = "InvalidParams",
-                    Message = "image must be a readable texture that encodes to at most 2 MiB",
-                    Context = ShareContext
+                    Message = "options must not be null",
+                    Context = ShareImageContext
                 });
                 return;
             }
 
-            ShareAsync(text, dataUrl, data, onSuccess, onError);
+            Share(options.Text, options.ImageDataUrl, options.Data, onSuccess, onError);
         }
 
         // Task-returning overloads.
 
-        /// <summary>Task overload of <see cref="ShareAsync(string, string, Dictionary{string, object}, Action, Action{Error})"/>.</summary>
-        public Task ShareAsync(
-            string text,
-            string imageBase64,
-            Dictionary<string, object> data,
-            CancellationToken cancellationToken)
+        /// <summary>Task overload of <see cref="ShareImageAsync(ContextShareOptions, Action, Action{Error})"/>.</summary>
+        public Task ShareImageAsync(ContextShareOptions options, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask(
-                (success, error) => ShareAsync(text, imageBase64, data, success, error),
-                cancellationToken);
-
-        /// <summary>Task overload of <see cref="ShareAsync(Texture2D, string, Dictionary{string, object}, Action, Action{Error})"/>.</summary>
-        public Task ShareAsync(
-            Texture2D image,
-            string text,
-            Dictionary<string, object> data,
-            CancellationToken cancellationToken)
-            => TaskCallbackHelper.ToTask(
-                (success, error) => ShareAsync(image, text, data, success, error),
+                (success, error) => ShareImageAsync(options, success, error),
                 cancellationToken);
 
         #endregion
@@ -311,6 +250,45 @@ namespace Yes2SDK
         #endregion
 
         #region Private Helpers
+
+        private static void Share(
+            string text,
+            string imageBase64,
+            Dictionary<string, object> data,
+            Action onSuccess,
+            Action<Error> onError)
+        {
+            string image = NormalizeImage(imageBase64);
+
+            // Serialize before registering: data the serializer cannot handle
+            // fails here, synchronously, and never leaves a pending request.
+            if (!TrySerializeSharePayload(text, image, data, out string payloadJson, out Error serializeError))
+            {
+                onError?.Invoke(serializeError);
+                return;
+            }
+
+            int requestId = Register(Operation.Share, TypedShare(onSuccess), onError);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Context_ShareAsyncJS(requestId, payloadJson);
+#else
+#if UNITY_EDITOR
+            if (MockActive)
+            {
+                MockShare(requestId, image != null);
+                return;
+            }
+#endif
+            Yes2Log.Log("Mock: Context.ShareAsync() - FeatureNotSupported");
+            CompleteError(Operation.Share, requestId, new Error
+            {
+                Code = "FeatureNotSupported",
+                Message = "Sharing is not supported on the current platform",
+                Context = ShareContext
+            });
+#endif
+        }
 
         private static Action<string> TypedShare(Action onSuccess)
         {

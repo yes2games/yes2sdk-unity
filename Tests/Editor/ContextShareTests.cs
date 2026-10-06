@@ -8,10 +8,11 @@ using UnityEngine;
 namespace Yes2SDK.Tests
 {
     /// <summary>
-    /// Covers Context.ShareAsync: each response reaches only the call that made
+    /// Covers Context.ShareAsync and ShareImageAsync: each response reaches only the call that made
     /// it, the share payload serializes to the platform shape, a raw base64
     /// image gets the PNG data URL prefix, invalid input fails synchronously
-    /// without leaving a pending request, the Editor mock, and the other
+    /// without leaving a pending request, the 2.9.0 call shapes still
+    /// compiling, the Editor mock, and the other
     /// Context methods staying unsupported.
     ///
     /// Requests are registered without being sent and the bridge messages are
@@ -248,14 +249,16 @@ namespace Yes2SDK.Tests
         // --- Synchronous InvalidParams, no pending request left behind ---
 
         [Test]
-        public void ShareAsync_WithUnserializableData_FailsSynchronouslyWithInvalidParams()
+        public void ShareImageAsync_WithUnserializableData_FailsSynchronouslyWithInvalidParams()
         {
             var cyclic = new Dictionary<string, object>();
             cyclic["self"] = cyclic;
             Error received = default;
             int errors = 0;
 
-            Yes2SDK.Context.ShareAsync("t", "iVBORw0KGgo=", cyclic, () => Assert.Fail("success"), e => { errors++; received = e; });
+            Yes2SDK.Context.ShareImageAsync(
+                new ContextShareOptions { Text = "t", ImageDataUrl = "iVBORw0KGgo=", Data = cyclic },
+                () => Assert.Fail("success"), e => { errors++; received = e; });
 
             Assert.AreEqual(1, errors);
             Assert.AreEqual(ErrorCode.InvalidParams, received.ErrorCode);
@@ -263,12 +266,12 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
-        public void ShareAsync_WithANullTexture_FailsSynchronouslyWithInvalidParams()
+        public void ShareImageAsync_WithNullOptions_FailsSynchronouslyWithInvalidParams()
         {
             Error received = default;
             int errors = 0;
 
-            Yes2SDK.Context.ShareAsync((Texture2D)null, "t", null, () => Assert.Fail("success"), e => { errors++; received = e; });
+            Yes2SDK.Context.ShareImageAsync(null, () => Assert.Fail("success"), e => { errors++; received = e; });
 
             Assert.AreEqual(1, errors);
             Assert.AreEqual(ErrorCode.InvalidParams, received.ErrorCode);
@@ -286,10 +289,16 @@ namespace Yes2SDK.Tests
             try
             {
                 Yes2SDK.Context.ShareAsync("t", "iVBORw0KGgo=", () => successes++, e => codes.Add(e.ErrorCode));
-                Yes2SDK.Context.ShareAsync("t", (string)null, () => successes++, e => codes.Add(e.ErrorCode));
-                Yes2SDK.Context.ShareAsync("t", "iVBORw0KGgo=", new Dictionary<string, object> { ["k"] = 1 },
+                Yes2SDK.Context.ShareAsync("t", null, () => successes++, e => codes.Add(e.ErrorCode));
+                Yes2SDK.Context.ShareImageAsync(
+                    new ContextShareOptions
+                    {
+                        ImageDataUrl = Yes2SDKImage.ToPngDataUrl(texture),
+                        Text = "t",
+                        Data = new Dictionary<string, object> { ["k"] = 1 }
+                    },
                     () => successes++, e => codes.Add(e.ErrorCode));
-                Yes2SDK.Context.ShareAsync(texture, "t", null, () => successes++, e => codes.Add(e.ErrorCode));
+                Yes2SDK.Context.ShareImageAsync(new ContextShareOptions(), () => successes++, e => codes.Add(e.ErrorCode));
             }
             finally
             {
@@ -305,11 +314,32 @@ namespace Yes2SDK.Tests
             Assert.AreEqual(0, Yes2SDKContext.PendingCountForTests);
         }
 
+        /// <summary>
+        /// The call shapes 2.9.0 accepted must keep compiling (a literal null in
+        /// any position included), so this test is also a compile-time guard
+        /// against adding an overload that makes them ambiguous.
+        /// </summary>
+        [Test]
+        public void ShareAsync_CallShapesFrom290_StillCompileAndRun()
+        {
+            var codes = new List<ErrorCode>();
+
+            Yes2SDK.Context.ShareAsync("t", "img", null);
+            Yes2SDK.Context.ShareAsync(null, "img");
+            Yes2SDK.Context.ShareAsync(null, null);
+            Yes2SDK.Context.ShareAsync("t", "img", () => { }, e => codes.Add(e.ErrorCode));
+            Yes2SDK.Context.ShareAsync(null, null, null, e => codes.Add(e.ErrorCode));
+
+            Assert.AreEqual(new[] { ErrorCode.FeatureNotSupported, ErrorCode.FeatureNotSupported }, codes);
+            Assert.AreEqual(0, Yes2SDKContext.PendingCountForTests);
+        }
+
         [Test]
         public void TaskOverloads_FaultWithTheError()
         {
-            var share = Yes2SDK.Context.ShareAsync("t", "iVBORw0KGgo=", null, CancellationToken.None);
-            var invalid = Yes2SDK.Context.ShareAsync((Texture2D)null, "t", null, CancellationToken.None);
+            var share = Yes2SDK.Context.ShareImageAsync(
+                new ContextShareOptions { ImageDataUrl = "iVBORw0KGgo=" }, CancellationToken.None);
+            var invalid = Yes2SDK.Context.ShareImageAsync(null, CancellationToken.None);
 
             Assert.IsTrue(share.IsFaulted);
             Assert.AreEqual(ErrorCode.FeatureNotSupported, ((Yes2SDKException)share.Exception.InnerException).ErrorCode);
