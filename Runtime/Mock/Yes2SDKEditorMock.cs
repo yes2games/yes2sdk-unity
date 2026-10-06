@@ -122,8 +122,8 @@ namespace Yes2SDK
             string.IsNullOrWhiteSpace(json) || Yes2SDKSession.IsJsonObject(json);
 
         /// <summary>
-        /// When enabled, the referral and notification mocks are active in
-        /// Play Mode. When disabled they report unsupported. Default on.
+        /// When enabled, the referral, image share and notification mocks are
+        /// active in Play Mode. When disabled they report unsupported. Default on.
         /// </summary>
         public static bool PlatformServicesEnabled
         {

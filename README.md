@@ -434,6 +434,32 @@ if (Yes2SDK.Referrals.IsSupported())
 - A closed share dialog is a success with `Canceled == true`, not an error.
 - `ListAsync` groups `ReferralConversion`s (`PlayerId`, `JoinedAt`) by reference. A reference nobody joined through is absent. Verify `SignedRequest` on your server before granting a reward.
 
+### Share an image
+
+Open the platform share sheet with an image, for example a score card or a coupon.
+
+```csharp
+Yes2SDK.Context.ShareImageAsync(
+    new ContextShareOptions
+    {
+        ImageDataUrl = Yes2SDKImage.ToPngDataUrl(scoreCardTexture), // a readable Texture2D
+        Text = "Beat my score",
+        Data = new Dictionary<string, object> { { "coupon", "SPRING25" } }
+    },
+    onSuccess: () => Debug.Log("Share sheet closed"),
+    onError:   err => Debug.LogWarning(err));
+
+// Image and text only:
+Yes2SDK.Context.ShareAsync("Beat my score", Yes2SDKImage.ToPngDataUrl(scoreCardTexture));
+```
+
+- Pass an explicit image, built from a texture with `Yes2SDKImage.ToPngDataUrl(texture)`. Raw base64 PNG data is also accepted and gets the PNG data URL prefix. With no image some platforms capture the game screen instead, and a WebGL canvas capture can come out blank, so verify it on the device before relying on it.
+- Null options, or `Data` that cannot be serialized, fail with `InvalidParams` right away.
+- `Data` reaches the player who opens the share through `Session.GetEntryPointData()`.
+- `Text` may be ignored by some platforms.
+- Success means the share sheet completed or was dismissed: there is no cancel signal.
+- Do not gate this on `Context.IsSupported()`. It reports context switching and can be `false` on a platform where sharing works. Call the share method and handle `onError` (`FeatureNotSupported` where sharing is unavailable).
+
 ### Banners
 
 There are two banner surfaces and they are not interchangeable. Pick by the
@@ -746,7 +772,7 @@ In the Unity Editor, SDK calls run against mock implementations:
 - **Subscriptions follow the IAP mock**: `SubscribeAsync` opens a Subscribe / Close dialog and `CancelSubscriptionAsync` a confirm dialog. The mock applies the platform rules (guest, already held, not held) so those error paths are testable.
 - **Player is registered** sets whether the mock player is signed in (off, a guest, by default). It drives `IsAuthenticated()`, the subscription list and the guest errors. The registration prompt is mocked without UI: `Login()` registers the player for the current play session and `Close()` closes the prompt.
 - **Entry point data (JSON)** is what `Session.GetEntryPointData()` returns in Play Mode. Only a valid JSON object is saved.
-- **Mock referrals and notifications** turns on those mocks. **Referral share result** picks Shared / Cancelled / Error, and **Referral conversions** sets how many players joined through each shared reference; with 0, references are left out of `ListAsync` results, as on a real platform.
+- **Mock referrals, notifications and signed player** turns on those mocks, including the image share mock and the signed player mock, which always succeeds. **Referral share result** picks Shared / Cancelled / Error, and **Referral conversions** sets how many players joined through each shared reference; with 0, references are left out of `ListAsync` results, as on a real platform.
 - **Simulate exit request** (Play Mode only) raises `OnExitRequested`, then saves game data the way the platform flush does.
 - `Data` uses `PlayerPrefs`
 - Other optional APIs return `FeatureNotSupported`
