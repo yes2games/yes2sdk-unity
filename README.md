@@ -439,7 +439,7 @@ if (Yes2SDK.IAP.IsSupported())
     // On launch: restore what the player already owns, and finish any
     // consumable purchase that was paid for but not yet granted.
     Yes2SDK.IAP.GetPurchasesAsync(
-        onSuccess: purchasesJson => RestorePurchases(purchasesJson),  // JSON array
+        onSuccess: purchasesJson => RestorePurchases(Purchase.ListFromJson(purchasesJson)),
         onError:   err => Debug.LogWarning(err));
 
     // Build the shop from the platform catalog (prices are localized).
@@ -456,10 +456,13 @@ else
 Yes2SDK.IAP.PurchaseAsync("gems_100",
     onSuccess: purchaseJson =>
     {
-        var purchase = JsonUtility.FromJson<Purchase>(purchaseJson);
-        GrantItem(purchase.productId);
+        var purchase = Purchase.FromJson(purchaseJson);
+        GrantItem(purchase.ProductId);
+        // Sandbox purchases move no real money: grant the item, but keep it
+        // out of your revenue reporting.
+        if (purchase.IsSandbox) MarkAsTestPurchase(purchase);
         // Consumables must be consumed so they can be bought again.
-        Yes2SDK.IAP.ConsumePurchaseAsync(purchase.purchaseToken);
+        Yes2SDK.IAP.ConsumePurchaseAsync(purchase.PurchaseToken);
     },
     onError: err =>
     {
@@ -467,12 +470,12 @@ Yes2SDK.IAP.PurchaseAsync("gems_100",
         // payment, so keep this message neutral ("Purchase not completed").
         ShowPurchaseNotCompleted();
     });
-
-[Serializable]
-class Purchase { public string productId; public string purchaseToken; }
 ```
 
-- Results arrive as JSON strings. `GetCatalogAsync` and `GetPurchasesAsync` return a top-level JSON array, which `JsonUtility` cannot parse on its own: wrap it (`JsonUtility.FromJson<Wrapper>("{\"items\":" + json + "}")`) or use Newtonsoft. Each purchase carries `productId` and `purchaseToken`. Each catalog product carries `productId`, `title`, `description`, `price` (formatted) and `priceCurrencyCode`.
+- Results arrive as JSON strings. Parse a purchase with `Purchase.FromJson(json)` and a `GetPurchasesAsync` array with `Purchase.ListFromJson(json)`; both return null or an empty list and log a warning on bad input. A `Purchase` carries `ProductId`, `PurchaseToken`, `PaymentId`, `PurchaseTime` (ISO 8601), `DeveloperPayload`, `SignedRequest` and `IsSandbox`. `GetCatalogAsync` returns a top-level JSON array, which `JsonUtility` cannot parse on its own: wrap it (`JsonUtility.FromJson<Wrapper>("{\"items\":" + json + "}")`) or use Newtonsoft. Each catalog product carries `productId`, `title`, `description`, `price` (formatted) and `priceCurrencyCode`.
+- `IsSandbox` is true when no real money changed hands (a sandbox tester or the platform simulator, and always in the Editor mock). Grant the item, but keep it out of revenue reporting.
+- `SignedRequest` is the platform's signed proof of the purchase, or null when the platform provides none. Verify it on your server before granting value for anything that matters.
+- Recover incomplete purchases on startup with `GetPurchasesAsync` (see the launch example above), then grant and consume them.
 - Grant the item before consuming it, and save progress (see `Data.FlushAsync`) so a closed tab can't lose a paid item. Any purchase that was paid but not consumed comes back from `GetPurchasesAsync` on the next launch.
 - In the Editor, IAP is mocked in Play Mode (see [Editor Testing](#editor-testing)), so you can test your shop and your `IsSupported()` gating without a platform build.
 

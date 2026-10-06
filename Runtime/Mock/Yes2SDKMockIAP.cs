@@ -33,6 +33,8 @@ namespace Yes2SDK
             [JsonProperty("purchaseTime")] public string PurchaseTime;
             [JsonProperty("developerPayload", NullValueHandling = NullValueHandling.Ignore)]
             public string DeveloperPayload;
+            [JsonProperty("signedRequest")] public string SignedRequest = "mock-signed-request";
+            [JsonProperty("isSandbox")] public bool IsSandbox = true;
         }
 
         // Sample catalog returned by GetCatalogAsync. PurchaseAsync accepts
