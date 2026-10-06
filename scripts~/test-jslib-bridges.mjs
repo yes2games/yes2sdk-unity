@@ -283,6 +283,17 @@ test('referrals ShareAsync turns a synchronous platform throw into an error enve
   assert.deepStrictEqual(JSON.parse(refPayload(sb)[1]), { code: 'Unknown', message: 'sync boom', context: 'Yes2SDK.Referrals.ShareAsync' });
 });
 
+test('referrals entry points never throw into wasm, even when reporting the error throws', () => {
+  const boom = () => { throw new Error('sync boom'); };
+  const sb = createSandbox(['Yes2SDKReferrals.jslib'], {
+    Yes2SDK: { referrals: { shareAsync: boom, listAsync: boom } },
+  });
+  // Make SendMessage itself throw while the catch block reports the error.
+  sb.sent.push = () => { throw new Error('SendMessage failed'); };
+  assert.doesNotThrow(() => sb.call('Yes2SDK_Referrals_ShareAsyncJS', 4, sb.str('{"reference":"r"}')));
+  assert.doesNotThrow(() => sb.call('Yes2SDK_Referrals_ListAsyncJS', 14));
+});
+
 test('referrals ListAsync success sends the whole list', async () => {
   const list = { referrals: { party_v1: [{ playerId: 'p1', joinedAt: '2026-10-06T08:00:00.000Z' }] }, signedRequest: 'sig' };
   const sb = createSandbox(['Yes2SDKReferrals.jslib'], { Yes2SDK: { referrals: { listAsync: () => Promise.resolve(list) } } });

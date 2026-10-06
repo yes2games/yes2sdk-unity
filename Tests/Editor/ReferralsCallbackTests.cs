@@ -306,9 +306,26 @@ namespace Yes2SDK.Tests
             DeliverSuccess(Yes2SDKReferrals.Operation.Share, share, payload);
             DeliverSuccess(Yes2SDKReferrals.Operation.List, list, payload);
 
-            Assert.AreEqual(ErrorCode.PlatformError, shareError.ErrorCode);
-            Assert.AreEqual(ErrorCode.PlatformError, listError.ErrorCode);
+            Assert.AreEqual(ErrorCode.Unknown, shareError.ErrorCode);
+            Assert.AreEqual(ErrorCode.Unknown, listError.ErrorCode);
             Assert.AreEqual(0, Yes2SDKReferrals.PendingCountForTests);
+        }
+
+        [Test]
+        public void UnparseablePayload_KeepsTheRawPayloadOutOfTheMessage()
+        {
+            const string payload = "{\"referrals\":\"secret-signed-request-xyz\"";
+            Error shareError = default, listError = default;
+            int share = Yes2SDKReferrals.RegisterShareForTests(_ => Assert.Fail("share success"), e => shareError = e);
+            int list = Yes2SDKReferrals.RegisterListForTests(_ => Assert.Fail("list success"), e => listError = e);
+
+            DeliverSuccess(Yes2SDKReferrals.Operation.Share, share, payload);
+            DeliverSuccess(Yes2SDKReferrals.Operation.List, list, payload);
+
+            Assert.AreEqual(ErrorCode.Unknown, shareError.ErrorCode);
+            Assert.AreEqual(ErrorCode.Unknown, listError.ErrorCode);
+            StringAssert.DoesNotContain("secret-signed-request-xyz", shareError.Message);
+            StringAssert.DoesNotContain("secret-signed-request-xyz", listError.Message);
         }
 
         // --- Share options serialization ---
@@ -344,6 +361,84 @@ namespace Yes2SDK.Tests
             Assert.IsNull(json["imageDataUrl"], "the image goes under the platform key 'image'");
             Assert.IsNull(json["ImageDataUrl"]);
             Assert.AreEqual(5, json.Count, json.ToString());
+        }
+
+        [Test]
+        public void ShareOptions_WithNestedData_KeepTheNestedShape()
+        {
+            var options = new ReferralShareOptions("party_v1")
+            {
+                Data = new Dictionary<string, object>
+                {
+                    ["room"] = new Dictionary<string, object> { ["id"] = "r1" },
+                    ["tags"] = new List<object> { "a", 1 }
+                }
+            };
+
+            var json = JObject.Parse(options.ToJson());
+
+            Assert.AreEqual(JTokenType.Object, json["data"]["room"].Type);
+            Assert.AreEqual("r1", (string)json["data"]["room"]["id"]);
+            var tags = (JArray)json["data"]["tags"];
+            Assert.AreEqual(2, tags.Count);
+            Assert.AreEqual("a", (string)tags[0]);
+            Assert.AreEqual(1, (int)tags[1]);
+        }
+
+        [Test]
+        public void ShareAsync_WithUnserializableData_FailsSynchronouslyWithInvalidParams()
+        {
+            var cyclic = new Dictionary<string, object>();
+            cyclic["self"] = cyclic;
+            var options = new ReferralShareOptions("party_v1") { Data = cyclic };
+            Error received = default;
+            int errors = 0;
+
+            Yes2SDK.Referrals.ShareAsync(options, _ => Assert.Fail("success"), e => { errors++; received = e; });
+
+            Assert.AreEqual(1, errors);
+            Assert.AreEqual(ErrorCode.InvalidParams, received.ErrorCode);
+            Assert.AreEqual(0, Yes2SDKReferrals.PendingCountForTests);
+        }
+
+        private static IEnumerable<object> UnserializableDataValues()
+        {
+            var cyclic = new Dictionary<string, object>();
+            cyclic["self"] = cyclic;
+            yield return cyclic;
+            // A unit vector: its "normalized" property equals itself, so the serializer reports a loop.
+            yield return UnityEngine.Vector3.right;
+        }
+
+        [Test]
+        public void SerializeShareOptions_WithUnserializableData_ReturnsInvalidParams(
+            [ValueSource(nameof(UnserializableDataValues))] object value)
+        {
+            var options = new ReferralShareOptions("party_v1")
+            {
+                Data = new Dictionary<string, object> { ["value"] = value }
+            };
+
+            bool ok = Yes2SDKReferrals.TrySerializeShareOptions(options, out string json, out Error error);
+
+            Assert.IsFalse(ok);
+            Assert.IsNull(json);
+            Assert.AreEqual(ErrorCode.InvalidParams, error.ErrorCode);
+            Assert.AreEqual(0, Yes2SDKReferrals.PendingCountForTests);
+        }
+
+        [Test]
+        public void SerializeShareOptions_WithPlainData_ReturnsTheJson()
+        {
+            var options = new ReferralShareOptions("party_v1")
+            {
+                Data = new Dictionary<string, object> { ["room"] = "abc" }
+            };
+
+            bool ok = Yes2SDKReferrals.TrySerializeShareOptions(options, out string json, out Error error);
+
+            Assert.IsTrue(ok);
+            Assert.AreEqual("abc", (string)JObject.Parse(json)["data"]["room"]);
         }
 
         // --- Synchronous InvalidParams ---

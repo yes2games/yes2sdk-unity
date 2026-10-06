@@ -67,7 +67,8 @@ mergeInto(LibraryManager.library, {
                 })
                 .catch(onError);
         } catch (e) {
-            onError(e);
+            // Reporting must not throw either: a throw here would reach wasm.
+            try { onError(e); } catch (_) {}
         }
     },
 
@@ -84,7 +85,8 @@ mergeInto(LibraryManager.library, {
                 })
                 .catch(onError);
         } catch (e) {
-            onError(e);
+            // Reporting must not throw either: a throw here would reach wasm.
+            try { onError(e); } catch (_) {}
         }
     }
 

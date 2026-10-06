@@ -93,7 +93,8 @@ namespace Yes2SDK
         /// Open the platform share dialog with a referral link.
         /// onSuccess receives <see cref="ReferralShareResult.Canceled"/> = true when the player closed
         /// the dialog without sharing. Null options or an empty <see cref="ReferralShareOptions.Reference"/>
-        /// call onError synchronously with InvalidParams.
+        /// call onError synchronously with InvalidParams, as does Data that cannot be serialized
+        /// to JSON (a cyclic graph, or a Unity type such as Vector3).
         /// </summary>
         public void ShareAsync(
             ReferralShareOptions options,
@@ -114,10 +115,18 @@ namespace Yes2SDK
                 return;
             }
 
+            // Serialize before registering: Data the serializer cannot handle
+            // fails here, synchronously, and never leaves a pending request.
+            if (!TrySerializeShareOptions(options, out string optionsJson, out Error serializeError))
+            {
+                onError?.Invoke(serializeError);
+                return;
+            }
+
             int requestId = Register(Operation.Share, TypedShare(onSuccess, onError), onError);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Yes2SDK_Referrals_ShareAsyncJS(requestId, options.ToJson());
+            Yes2SDK_Referrals_ShareAsyncJS(requestId, optionsJson);
 #else
 #if UNITY_EDITOR
             if (MockActive)
@@ -390,12 +399,42 @@ namespace Yes2SDK
 
         private static Error UnreadableResultError(string context, string payload)
         {
+            // The raw payload stays out of the error: a list response carries the
+            // signed request and can be large. Log its length only.
+            Yes2Log.Warning($"Referrals: unreadable {context} response ({payload?.Length ?? 0} chars)");
             return new Error
             {
-                Code = "PlatformError",
-                Message = "Could not read the platform response: '" + payload + "'",
+                Code = "Unknown",
+                Message = "Could not read the platform response",
                 Context = context
             };
+        }
+
+        /// <summary>
+        /// Serializes share options for the platform. Returns false with an
+        /// InvalidParams error when Data cannot be serialized (a cyclic graph,
+        /// or a value such as a Unity vector that the serializer rejects).
+        /// </summary>
+        internal static bool TrySerializeShareOptions(ReferralShareOptions options, out string json, out Error error)
+        {
+            try
+            {
+                json = options.ToJson();
+                error = default;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Yes2Log.Warning($"Referrals.ShareAsync: options.Data could not be serialized ({ex.Message})");
+                json = null;
+                error = new Error
+                {
+                    Code = "InvalidParams",
+                    Message = "options.Data could not be serialized",
+                    Context = ShareContext
+                };
+                return false;
+            }
         }
 
         private static int Register(Operation operation, Action<string> onSuccess, Action<Error> onError)
