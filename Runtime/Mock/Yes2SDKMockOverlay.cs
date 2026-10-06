@@ -17,6 +17,8 @@ namespace Yes2SDK
     ///
     /// IAP: a Buy / Cancel confirmation dialog; Buy resolves PurchaseAsync
     /// with a realistic purchase payload, Cancel with a UserCancelled error.
+    /// Subscriptions: a Subscribe / Close dialog; both resolve SubscribeAsync
+    /// successfully, with status "subscribed" or "cancelled".
     ///
     /// Drawn with IMGUI so the Runtime assembly needs no uGUI reference.
     /// The countdown uses realtime, not scaled time, because games typically
@@ -35,7 +37,7 @@ namespace Yes2SDK
     [DefaultExecutionOrder(-32000)]
     internal class Yes2SDKMockOverlay : MonoBehaviour
     {
-        private enum Kind { None, Interstitial, Rewarded, Purchase }
+        private enum Kind { None, Interstitial, Rewarded, Purchase, Subscribe }
 
         private const float InterstitialSeconds = 3f;
         private const float RewardedSeconds = 5f;
@@ -127,6 +129,23 @@ namespace Yes2SDK
             return true;
         }
 
+        /// <summary>Show the subscription dialog. Returns false if another popup is open.</summary>
+        internal static bool ShowSubscribe(int requestId, string productId)
+        {
+            var overlay = GetOrCreate();
+            if (overlay._kind != Kind.None) return false;
+
+            var subscription = Yes2SDKMockIAP.CurrentSubscription();
+            overlay._kind = Kind.Subscribe;
+            overlay._purchaseRequestId = requestId;
+            overlay._productId = productId;
+            overlay._productTitle = subscription.Title;
+            overlay._productPrice = $"{subscription.Price} / {subscription.BillingPeriod}";
+            overlay._developerPayload = null;
+            overlay.AcquireInputShield();
+            return true;
+        }
+
         private static Yes2SDKMockOverlay GetOrCreate()
         {
             // Destroyed-on-play-exit instances compare equal to null, so this
@@ -209,6 +228,17 @@ namespace Yes2SDK
                     Context = "Yes2SDK.IAP.PurchaseAsync"
                 });
             }
+        }
+
+        private void CompleteSubscribe(bool confirmed)
+        {
+            int requestId = _purchaseRequestId;
+            Hide();
+
+            // A closed checkout is a success with status "cancelled", as on
+            // the platform, not an error.
+            Yes2SDKIAP.CompleteSuccess(Yes2SDKIAP.Operation.Subscribe, requestId,
+                confirmed ? Yes2SDKMockIAP.Subscribe() : Yes2SDKMockIAP.CancelledResultJson);
         }
 
         #endregion
@@ -309,7 +339,7 @@ namespace Yes2SDK
             GUI.color = previousColor;
 
             Rect cardRect;
-            if (_kind == Kind.Purchase)
+            if (_kind == Kind.Purchase || _kind == Kind.Subscribe)
             {
                 // Purchase prompts are dialogs on real platforms; keep a
                 // centered modal.
@@ -345,6 +375,10 @@ namespace Yes2SDK
             if (_kind == Kind.Purchase)
             {
                 DrawPurchase();
+            }
+            else if (_kind == Kind.Subscribe)
+            {
+                DrawSubscribe();
             }
             else
             {
@@ -457,6 +491,36 @@ namespace Yes2SDK
 
             GUILayout.Space(6f * _uiScale);
             GUILayout.Label("Mock purchases last for this play session only.", _hintStyle);
+        }
+
+        private void DrawSubscribe()
+        {
+            GUILayout.Label("MOCK SUBSCRIPTION", _badgeStyle);
+            GUILayout.Space(10f * _uiScale);
+
+            GUILayout.Label(_productTitle, _titleStyle);
+            GUILayout.Label($"Product id: {_productId}", _bodyStyle);
+            GUILayout.Label($"Price: {_productPrice}", _bodyStyle);
+            if (Yes2SDKMockIAP.SubscriptionActive)
+            {
+                GUILayout.Label("The player already holds this subscription.", _bodyStyle);
+            }
+
+            GUILayout.FlexibleSpace();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Subscribe", _buttonStyle, GUILayout.Height(34f * _uiScale)))
+            {
+                CompleteSubscribe(confirmed: true);
+            }
+            if (GUILayout.Button("Close (cancelled)", _buttonStyle, GUILayout.Height(34f * _uiScale)))
+            {
+                CompleteSubscribe(confirmed: false);
+            }
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(6f * _uiScale);
+            GUILayout.Label("Mock subscriptions last for this play session only.", _hintStyle);
         }
 
         private void EnsureStyles(float scale)

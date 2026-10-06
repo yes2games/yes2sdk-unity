@@ -37,6 +37,38 @@ namespace Yes2SDK
             [JsonProperty("isSandbox")] public bool IsSandbox = true;
         }
 
+        internal class MockOffer
+        {
+            [JsonProperty("priceAmount")] public double PriceAmount;
+            [JsonProperty("durationPeriods")] public int DurationPeriods;
+        }
+
+        // Same JSON shape as the platform Subscription, so games parse the
+        // fields they will see on a real platform build.
+        internal class MockSubscription
+        {
+            [JsonProperty("productId")] public string ProductId;
+            [JsonProperty("title")] public string Title;
+            [JsonProperty("description")] public string Description;
+            [JsonProperty("price")] public string Price;
+            [JsonProperty("priceAmount")] public double PriceAmount;
+            [JsonProperty("priceCurrencyCode")] public string PriceCurrencyCode = "USD";
+            [JsonProperty("billingPeriod")] public string BillingPeriod;
+            [JsonProperty("isActive")] public bool IsActive;
+            [JsonProperty("trialEligible")] public bool TrialEligible;
+            [JsonProperty("introOffer")] public MockOffer IntroOffer;
+            [JsonProperty("retentionOffer")] public MockOffer RetentionOffer;
+            [JsonProperty("isSandbox")] public bool IsSandbox = true;
+            [JsonProperty("signedRequest")] public string SignedRequest = "mock-signed-request";
+        }
+
+        /// <summary>The one mock subscription product id.</summary>
+        internal const string MockSubscriptionId = "yes2.mock.vip.monthly";
+
+        // Session-only subscription state, reset on each play.
+        internal static bool SubscriptionActive;
+        internal static bool RetentionClaimed;
+
         // Sample catalog returned by GetCatalogAsync. PurchaseAsync accepts
         // ANY product id (not just these) so games can test with their real
         // ids before the platform catalog exists.
@@ -82,6 +114,47 @@ namespace Yes2SDK
             return JsonConvert.SerializeObject(purchase);
         }
 
+        internal static bool IsKnownSubscription(string productId) => productId == MockSubscriptionId;
+
+        /// <summary>The mock subscription with the current session state.</summary>
+        internal static MockSubscription CurrentSubscription()
+        {
+            return new MockSubscription
+            {
+                ProductId = MockSubscriptionId,
+                Title = "VIP Monthly",
+                Description = "Mock monthly subscription.",
+                Price = "4.99 USD",
+                PriceAmount = 4.99,
+                BillingPeriod = "monthly",
+                IsActive = SubscriptionActive,
+                // Trial and intro pricing only apply before the first subscription.
+                TrialEligible = !SubscriptionActive,
+                IntroOffer = SubscriptionActive ? null : new MockOffer { PriceAmount = 0.99, DurationPeriods = 1 },
+                RetentionOffer = RetentionClaimed ? null : new MockOffer { PriceAmount = 1.99, DurationPeriods = 3 }
+            };
+        }
+
+        /// <summary>JSON array returned by GetSubscriptionsAsync for a registered player.</summary>
+        internal static string SubscriptionsJson => JsonConvert.SerializeObject(new[] { CurrentSubscription() });
+
+        /// <summary>Mark the subscription active and return the subscribed result JSON.</summary>
+        internal static string Subscribe()
+        {
+            SubscriptionActive = true;
+            return JsonConvert.SerializeObject(new { status = "subscribed", subscription = CurrentSubscription() });
+        }
+
+        /// <summary>Result JSON for a closed checkout.</summary>
+        internal const string CancelledResultJson = "{\"status\":\"cancelled\"}";
+
+        /// <summary>Use up the retention offer and return the refreshed subscription JSON.</summary>
+        internal static string ClaimRetentionOffer()
+        {
+            RetentionClaimed = true;
+            return JsonConvert.SerializeObject(CurrentSubscription());
+        }
+
         internal static void Consume(string purchaseToken)
         {
             Purchases.RemoveAll(p => p.PurchaseToken == purchaseToken);
@@ -94,6 +167,8 @@ namespace Yes2SDK
         {
             Purchases.Clear();
             _paymentCounter = 0;
+            SubscriptionActive = false;
+            RetentionClaimed = false;
         }
     }
 }
