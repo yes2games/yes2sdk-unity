@@ -8,13 +8,31 @@ namespace Yes2SDK
 {
     internal sealed class UnityWebRequestControlPlaneTransport : IControlPlaneTransport
     {
+        private readonly Func<TimeSpan> _clock;
+
+        public UnityWebRequestControlPlaneTransport(Func<TimeSpan> clock)
+        {
+            _clock = clock;
+        }
+
+        public static Func<TimeSpan> MonotonicClock()
+        {
+            var elapsed = Stopwatch.StartNew();
+            return () => elapsed.Elapsed;
+        }
+
         public async Task<ControlPlaneTransportResponse> GetAsync(ControlPlaneTransportRequest request, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            var url = request.BypassCache ? CacheBypassUrl(request.Url, Guid.NewGuid().ToString("N")) : request.Url;
-            using (var web = UnityWebRequest.Get(url))
+            using (var web = UnityWebRequest.Get(request.Url))
             {
-                var elapsed = Stopwatch.StartNew();
+#if !UNITY_WEBGL || UNITY_EDITOR
+                if (request.BypassCache)
+                {
+                    web.SetRequestHeader("Cache-Control", "no-cache");
+                }
+#endif
+                var deadline = _clock() + request.Timeout;
                 var operation = web.SendWebRequest();
                 while (!operation.isDone)
                 {
@@ -23,7 +41,7 @@ namespace Yes2SDK
                         web.Abort();
                         token.ThrowIfCancellationRequested();
                     }
-                    if (elapsed.Elapsed >= request.Timeout)
+                    if (_clock() >= deadline)
                     {
                         web.Abort();
                         return ControlPlaneTransportResponse.TimedOut();
@@ -36,6 +54,7 @@ namespace Yes2SDK
                     }
                     await Task.Yield();
                 }
+                token.ThrowIfCancellationRequested();
 
                 switch (web.result)
                 {
@@ -47,7 +66,7 @@ namespace Yes2SDK
                     case UnityWebRequest.Result.ProtocolError:
                         return ControlPlaneTransportResponse.Completed(web.responseCode, null);
                     default:
-                        return elapsed.Elapsed >= request.Timeout
+                        return _clock() >= deadline
                             ? ControlPlaneTransportResponse.TimedOut()
                             : ControlPlaneTransportResponse.NetworkUnavailable(web.error);
                 }
@@ -63,11 +82,6 @@ namespace Yes2SDK
                 await Task.Yield();
             }
             token.ThrowIfCancellationRequested();
-        }
-
-        public static string CacheBypassUrl(string url, string nonce)
-        {
-            return url + (url.IndexOf('?') < 0 ? "?" : "&") + "cb=" + nonce;
         }
     }
 }

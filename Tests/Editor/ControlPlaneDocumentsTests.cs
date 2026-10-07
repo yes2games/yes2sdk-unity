@@ -227,6 +227,18 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void ReadSnapshot_ReportsDigestBeforeDuplicateKey()
+        {
+            var bootstrap = ControlPlaneFixture.BootstrapFor(SnapshotBytes);
+            var duplicate = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(SnapshotBytes).Replace("\"speed\":2", "\"speed\":2,\"speed\":3"));
+
+            var result = ControlPlaneDocuments.ReadSnapshot(duplicate, bootstrap);
+
+            Assert.AreEqual("snapshot_invalid", ControlPlaneFixture.Code(result.Error));
+            StringAssert.Contains("digest", result.Detail);
+        }
+
+        [Test]
         public void ReadSnapshot_RejectsSingleByteChange()
         {
             var bootstrap = ControlPlaneFixture.BootstrapFor(SnapshotBytes);
@@ -263,7 +275,10 @@ namespace Yes2SDK.Tests
         {
             var json = Encoding.UTF8.GetString(SnapshotBytes).Replace("\"speed\":2", "\"speed\":2,\"speed\":3");
 
-            Assert.AreEqual("snapshot_invalid", ControlPlaneFixture.Code(ReadSnapshotText(json).Error));
+            var result = ReadSnapshotText(json);
+
+            Assert.AreEqual("snapshot_invalid", ControlPlaneFixture.Code(result.Error));
+            StringAssert.DoesNotContain("digest", result.Detail);
         }
 
         [Test]

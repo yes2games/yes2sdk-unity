@@ -1,14 +1,73 @@
+using System;
+using System.Collections;
+using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
+using UnityEngine.TestTools;
 
 namespace Yes2SDK.Tests
 {
     public class UnityWebRequestControlPlaneTransportTests
     {
-        [TestCase("https://runtime.yes2games.com/environments/nsr/production/bootstrap-v1.json", "https://runtime.yes2games.com/environments/nsr/production/bootstrap-v1.json?cb=n1")]
-        [TestCase("https://runtime.yes2games.com/bootstrap-v1.json?a=1", "https://runtime.yes2games.com/bootstrap-v1.json?a=1&cb=n1")]
-        public void CacheBypassUrl_AppendsNonce(string url, string expected)
+        private const string RefusedUrl = "http://127.0.0.1:1/bootstrap-v1.json";
+
+        private static ControlPlaneTransportRequest Request()
         {
-            Assert.AreEqual(expected, UnityWebRequestControlPlaneTransport.CacheBypassUrl(url, "n1"));
+            return new ControlPlaneTransportRequest(RefusedUrl, TimeSpan.FromSeconds(5), ControlPlaneDocuments.MaxDocumentBytes, true);
+        }
+
+        private static IEnumerator Wait(Task task)
+        {
+            while (!task.IsCompleted)
+            {
+                yield return null;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator GetAsync_ReportsItsOwnDeadlineAsTimeout()
+        {
+            var calls = 0;
+            var transport = new UnityWebRequestControlPlaneTransport(() => calls++ == 0 ? TimeSpan.Zero : TimeSpan.FromSeconds(5));
+
+            var task = transport.GetAsync(Request(), CancellationToken.None);
+            yield return Wait(task);
+
+            Assert.AreEqual(ControlPlaneTransportStatus.TimedOut, task.Result.Status);
+        }
+
+        [UnityTest]
+        public IEnumerator GetAsync_ReportsCancelAbortAsCancellation()
+        {
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var calls = 0;
+                var transport = new UnityWebRequestControlPlaneTransport(() =>
+                {
+                    if (calls++ == 1)
+                    {
+                        cancellation.Cancel();
+                    }
+                    return TimeSpan.Zero;
+                });
+
+                var task = transport.GetAsync(Request(), cancellation.Token);
+                yield return Wait(task);
+
+                Assert.IsTrue(task.IsCanceled);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator GetAsync_ReportsRefusedConnectionAsNoResponse()
+        {
+            var transport = new UnityWebRequestControlPlaneTransport(() => TimeSpan.Zero);
+
+            var task = transport.GetAsync(Request(), CancellationToken.None);
+            yield return Wait(task);
+
+            Assert.AreEqual(ControlPlaneTransportStatus.NetworkUnavailable, task.Result.Status);
+            Assert.AreEqual(0, task.Result.HttpStatus);
         }
     }
 }

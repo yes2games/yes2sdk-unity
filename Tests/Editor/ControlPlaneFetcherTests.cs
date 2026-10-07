@@ -152,6 +152,30 @@ namespace Yes2SDK.Tests
             Assert.AreEqual(1, _delays.Count);
         }
 
+        [TestCase("timeout", "503", "bootstrap_http_failed")]
+        [TestCase("503", "timeout", "timeout")]
+        [TestCase("network", "429", "bootstrap_http_failed")]
+        [TestCase("500", "network", "network_unavailable")]
+        public void FetchBootstrap_ReportsLastAttemptAfterMixedFailures(string first, string second, string code)
+        {
+            _transport.Enqueue(() => Respond(first));
+            _transport.Enqueue(() => Respond(second));
+
+            Assert.AreEqual(code, ControlPlaneFixture.Code(FetchBootstrap().Error));
+            Assert.AreEqual(2, _transport.Requests.Count);
+        }
+
+        [Test]
+        public void FetchBootstrap_DoesNotRetryOtherStatusAfterRetryableFailure()
+        {
+            _transport.Enqueue(ControlPlaneTransportResponse.TimedOut());
+            _transport.Enqueue(ControlPlaneTransportResponse.Completed(404, null));
+            _transport.Enqueue(ControlPlaneTransportResponse.Completed(200, BootstrapBytes));
+
+            Assert.AreEqual("bootstrap_http_failed", ControlPlaneFixture.Code(FetchBootstrap().Error));
+            Assert.AreEqual(2, _transport.Requests.Count);
+        }
+
         [TestCase("400")]
         [TestCase("401")]
         [TestCase("403")]
