@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<linker>
+    <assembly fullname="Yes2SDK.ControlPlane">
+        <type fullname="Yes2SDK.ControlPlaneFetcher" preserve="all"/>
+        <type fullname="Yes2SDK.UnityWebRequestControlPlaneTransport" preserve="all"/>
+    </assembly>
+</linker>
