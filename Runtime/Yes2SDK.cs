@@ -17,7 +17,8 @@ namespace Yes2SDK
         Yandex,
         GameDistribution,
         YouTube,
-        Debug
+        Debug,
+        Jest
     }
 
     /// <summary>
@@ -629,6 +630,7 @@ namespace Yes2SDK
                 "gamedistribution" => Platform.GameDistribution,
                 "youtube" => Platform.YouTube,
                 "debug" => Platform.Debug,
+                "jest" => Platform.Jest,
                 _ => Platform.Unknown
             };
         }
