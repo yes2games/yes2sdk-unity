@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -9,11 +11,29 @@ namespace Yes2SDK.Tests
 {
     public class UnityWebRequestControlPlaneTransportTests
     {
-        private const string RefusedUrl = "http://127.0.0.1:1/bootstrap-v1.json";
+        private TcpListener _silent;
 
-        private static ControlPlaneTransportRequest Request()
+        [SetUp]
+        public void SetUp()
         {
-            return new ControlPlaneTransportRequest(RefusedUrl, TimeSpan.FromSeconds(5), ControlPlaneDocuments.MaxDocumentBytes, true);
+            _silent = new TcpListener(IPAddress.Loopback, 0);
+            _silent.Start();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            _silent.Stop();
+        }
+
+        private ControlPlaneTransportRequest SilentRequest()
+        {
+            return Request("http://127.0.0.1:" + ((IPEndPoint)_silent.LocalEndpoint).Port + "/bootstrap-v1.json");
+        }
+
+        private static ControlPlaneTransportRequest Request(string url)
+        {
+            return new ControlPlaneTransportRequest(url, TimeSpan.FromSeconds(5), ControlPlaneDocuments.MaxDocumentBytes, true);
         }
 
         private static IEnumerator Wait(Task task)
@@ -25,19 +45,19 @@ namespace Yes2SDK.Tests
         }
 
         [UnityTest]
-        public IEnumerator GetAsync_ReportsItsOwnDeadlineAsTimeout()
+        public IEnumerator GetAsync_AbortsAtItsOwnDeadlineAsTimeout()
         {
             var calls = 0;
             var transport = new UnityWebRequestControlPlaneTransport(() => calls++ == 0 ? TimeSpan.Zero : TimeSpan.FromSeconds(5));
 
-            var task = transport.GetAsync(Request(), CancellationToken.None);
+            var task = transport.GetAsync(SilentRequest(), CancellationToken.None);
             yield return Wait(task);
 
             Assert.AreEqual(ControlPlaneTransportStatus.TimedOut, task.Result.Status);
         }
 
         [UnityTest]
-        public IEnumerator GetAsync_ReportsCancelAbortAsCancellation()
+        public IEnumerator GetAsync_AbortsOnCancelAsCancellation()
         {
             using (var cancellation = new CancellationTokenSource())
             {
@@ -47,7 +67,7 @@ namespace Yes2SDK.Tests
                     return TimeSpan.Zero;
                 });
 
-                var task = transport.GetAsync(Request(), cancellation.Token);
+                var task = transport.GetAsync(SilentRequest(), cancellation.Token);
                 yield return Wait(task);
 
                 Assert.IsTrue(task.IsCanceled);
@@ -59,7 +79,7 @@ namespace Yes2SDK.Tests
         {
             var transport = new UnityWebRequestControlPlaneTransport(() => TimeSpan.Zero);
 
-            var task = transport.GetAsync(Request(), CancellationToken.None);
+            var task = transport.GetAsync(Request("http://127.0.0.1:1/bootstrap-v1.json"), CancellationToken.None);
             yield return Wait(task);
 
             Assert.AreEqual(ControlPlaneTransportStatus.NetworkUnavailable, task.Result.Status);
