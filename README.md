@@ -716,7 +716,7 @@ Launch checklist:
 - [ ] A held subscription (check `GetSubscriptionsAsync`) is never offered again
 - [ ] Guests get a registration prompt (with a custom prompt, turn off Automatic login reminders in the game's Overview settings on the Yes2Games Dashboard)
 - [ ] Progress is saved synchronously in `OnExitRequested`
-- [ ] Set Jest's loading screen to Automatic mode in its developer console (recommended for now), and still call `SetLoadingProgress` as assets load and `StartGameAsync` when playable. In Manual mode Jest closes the game after 15 seconds without a progress update, and Yes2SDK only keeps it alive once it has initialized, so a long engine download can hit that timeout
+- [ ] Set Jest's loading screen to Auto mode in its developer console (recommended for now), and still call `SetLoadingProgress` as assets load and `StartGameAsync` when playable. In Manual mode Jest closes the game after 15 seconds without a progress update, and Yes2SDK only keeps it alive once it has initialized, so a long engine download can hit that timeout
 - [ ] Asset paths are relative
 - [ ] Entry data comes from `Session.GetEntryPointData()`, not URL parameters
 
