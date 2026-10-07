@@ -59,11 +59,40 @@ namespace Yes2SDK.Tests
         [TestCase("9007199254740992")]
         [TestCase("-9007199254740992")]
         [TestCase("9223372036854775807")]
-        [TestCase("99999999999999999999999")]
+        [TestCase("100000000000000000000")]
+        [TestCase("1e20")]
+        [TestCase("9007199254740992.0")]
         [TestCase("{\"a\":[9007199254740992]}")]
-        public void Parse_RejectsUnsafeIntegers(string json)
+        public void Parse_AcceptsFiniteNumbersOutsideTheSafeIntegerRange(string json)
         {
-            Assert.Throws<FormatException>(() => ControlPlaneStrictJson.Parse(json));
+            Assert.DoesNotThrow(() => ControlPlaneStrictJson.Parse(json));
+        }
+
+        [TestCase("9007199254740991", true, 9007199254740991L)]
+        [TestCase("-9007199254740991", true, -9007199254740991L)]
+        [TestCase("9007199254740992", false, 0L)]
+        [TestCase("-9007199254740992", false, 0L)]
+        [TestCase("9007199254740991.0", true, 9007199254740991L)]
+        [TestCase("9007199254740992.0", false, 0L)]
+        [TestCase("1.0", true, 1L)]
+        [TestCase("1e3", true, 1000L)]
+        [TestCase("-0.0", true, 0L)]
+        [TestCase("1.5", false, 0L)]
+        [TestCase("1e20", false, 0L)]
+        [TestCase("100000000000000000000", false, 0L)]
+        [TestCase("\"1\"", false, 0L)]
+        [TestCase("true", false, 0L)]
+        [TestCase("null", false, 0L)]
+        public void TryGetSafeInteger_AcceptsOnlyIntegralSafeValues(string json, bool expected, long expectedValue)
+        {
+            Assert.AreEqual(expected, ControlPlaneStrictJson.TryGetSafeInteger(ControlPlaneStrictJson.Parse(json), out var value));
+            Assert.AreEqual(expectedValue, value);
+        }
+
+        [Test]
+        public void TryGetSafeInteger_RejectsNull()
+        {
+            Assert.IsFalse(ControlPlaneStrictJson.TryGetSafeInteger(null, out _));
         }
 
         [TestCase("NaN")]
@@ -131,12 +160,33 @@ namespace Yes2SDK.Tests
             Assert.AreEqual("\u00e9", token["e"].Value<string>());
         }
 
-        [Test]
-        public void Parse_RejectsInvalidUtf8()
+        [TestCase(new byte[] { 0x5b, 0x22, 0xff, 0x22, 0x5d })]
+        [TestCase(new byte[] { 0x5b, 0x22, 0xc0, 0xaf, 0x22, 0x5d })]
+        [TestCase(new byte[] { 0x5b, 0x22, 0xed, 0xa0, 0x80, 0x22, 0x5d })]
+        [TestCase(new byte[] { 0x5b, 0x22, 0xe2, 0x82 })]
+        [TestCase(new byte[] { 0xef, 0xbb, 0xbf, 0x7b, 0x7d })]
+        public void Parse_RejectsInvalidUtf8AndBom(byte[] bytes)
         {
-            var bytes = new byte[] { (byte)'[', (byte)'"', 0xff, (byte)'"', (byte)']' };
-
             Assert.Throws<FormatException>(() => ControlPlaneStrictJson.Parse(bytes));
+        }
+
+        [Test]
+        public void Parse_RejectsBomInText()
+        {
+            Assert.Throws<FormatException>(() => ControlPlaneStrictJson.Parse("\ufeff{}"));
+        }
+
+        [Test]
+        public void Parse_AllowsJsonWhitespace()
+        {
+            Assert.AreEqual(JTokenType.Object, ControlPlaneStrictJson.Parse(" \t\r\n{ \"a\" :\n[ 1 , 2 ]\t}\r\n ").Type);
+        }
+
+        [Test]
+        public void Parse_RejectsNullInput()
+        {
+            Assert.Throws<ArgumentNullException>(() => ControlPlaneStrictJson.Parse((byte[])null));
+            Assert.Throws<ArgumentNullException>(() => ControlPlaneStrictJson.Parse((string)null));
         }
     }
 }

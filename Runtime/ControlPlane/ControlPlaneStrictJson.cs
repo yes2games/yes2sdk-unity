@@ -16,11 +16,16 @@ namespace Yes2SDK
 
         private static readonly JsonLoadSettings LoadSettings = new JsonLoadSettings
         {
-            DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error
+            DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error,
+            LineInfoHandling = LineInfoHandling.Ignore
         };
 
         public static JToken Parse(byte[] utf8)
         {
+            if (utf8 == null)
+            {
+                throw new ArgumentNullException(nameof(utf8));
+            }
             string json;
             try
             {
@@ -50,6 +55,34 @@ namespace Yes2SDK
                     throw new FormatException(e.Message, e);
                 }
             }
+        }
+
+        public static bool TryGetSafeInteger(JToken token, out long value)
+        {
+            value = 0;
+            if (token == null)
+            {
+                return false;
+            }
+            if (token.Type == JTokenType.Integer)
+            {
+                if (((JValue)token).Value is long integer && integer >= -MaxSafeInteger && integer <= MaxSafeInteger)
+                {
+                    value = integer;
+                    return true;
+                }
+                return false;
+            }
+            if (token.Type == JTokenType.Float)
+            {
+                var number = token.Value<double>();
+                if (Math.Floor(number) == number && Math.Abs(number) <= MaxSafeInteger)
+                {
+                    value = (long)number;
+                    return true;
+                }
+            }
+            return false;
         }
 
         private sealed class Grammar
@@ -227,12 +260,10 @@ namespace Yes2SDK
                 {
                     Digits();
                 }
-                var integral = true;
                 if (_i < _s.Length && _s[_i] == '.')
                 {
                     _i++;
                     Digits();
-                    integral = false;
                 }
                 if (_i < _s.Length && (_s[_i] == 'e' || _s[_i] == 'E'))
                 {
@@ -242,20 +273,10 @@ namespace Yes2SDK
                         _i++;
                     }
                     Digits();
-                    integral = false;
                 }
 
                 var literal = _s.Substring(start, _i - start);
-                if (integral)
-                {
-                    if (!long.TryParse(literal, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
-                        || value > MaxSafeInteger || value < -MaxSafeInteger)
-                    {
-                        _i = start;
-                        throw Fail("integer outside the safe range");
-                    }
-                }
-                else if (!double.TryParse(literal, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+                if (!double.TryParse(literal, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
                     || double.IsInfinity(value) || double.IsNaN(value))
                 {
                     _i = start;
