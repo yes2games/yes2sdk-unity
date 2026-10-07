@@ -5,6 +5,8 @@
 
 A single SDK for your Unity WebGL game. Integrate once against Yes2SDK, submit through the Yes2Games Dashboard, and the Yes2Games team handles the rest.
 
+Supported platforms: Poki, CrazyGames, Yandex Games, GameDistribution, YouTube Playables and [Jest](#jest).
+
 The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string), so you can log it for support tickets.
 
 ## Requirements
@@ -704,7 +706,7 @@ Yes2SDK runs on Jest (jest.com) too. `Yes2SDK.GetPlatform()` returns `Platform.J
 
 - **Supported:** player and [signed player](#server-verification), [Auth with the registration prompt](#registration-prompt) (guests only), [Data](#data-required) (1 MB), [lifecycle and `OnExitRequested`](#lifecycle-required), [IAP and subscriptions](#in-app-purchases), [Notifications](#notifications) (`ScheduledInDays` 0 to 7, with images), [the entry payload](#session-recommended) (`Session.GetEntryPointData()`), [Referrals](#referrals), [sharing an image](#share-an-image), and analytics (logged only).
 - **Not supported:** banners, leaderboards, achievements, tournaments, stats, review, config, friends and score. Check `IsSupported()` and handle `FeatureNotSupported`.
-- **Ads:** there are none. `Ads.IsInterstitialSupported()` and `Ads.IsRewardedSupported()` return `false`. If you call them anyway, `onError` fires with `NoFill`, so resume in `onError` and never gate progress on an ad.
+- **Ads:** there are none. `Ads.IsInterstitialSupported()` and `Ads.IsRewardedSupported()` return `false`. If you call `Ads.ShowInterstitial` or `Ads.ShowRewarded` anyway, `onError` fires with `NoFill`, so resume in `onError` and never gate progress on an ad.
 
 Launch checklist:
 
@@ -883,7 +885,7 @@ onError: err => {
 
 ## Running alongside other SDKs
 
-Real games often ship with multiple platform SDKs in the same build (Yes2SDK + Poki + Yandex + Jest + Playgama, etc.). A few ground rules to keep them from stepping on each other:
+Real games often ship with multiple platform SDKs in the same build (Yes2SDK + Poki + Yandex + Playgama, etc.). A few ground rules to keep them from stepping on each other:
 
 - **Init order.** Initialize Yes2SDK first. Yes2SDK figures out which actual platform is hosting the game and routes through it, so initializing your own platform SDK directly first can race with Yes2SDK's detection.
 - **One owner for pause / resume.** Pick one SDK to drive `Time.timeScale` and `AudioListener.pause`. If both Yes2SDK and another SDK call resume/pause, you'll get oscillation. Recommended: subscribe to `Yes2SDK.OnPause` / `OnResume` and ignore the other SDK's equivalent.
