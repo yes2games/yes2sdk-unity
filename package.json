@@ -10,6 +10,7 @@
     "licensesUrl": "https://github.com/yes2games/yes2sdk-unity/blob/main/LICENSE",
     "dependencies": {
         "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.modules.unitywebrequest": "1.0.0",
         "com.unity.nuget.newtonsoft-json": "3.2.1",
         "com.unity.ugui": "1.0.0"
     },
