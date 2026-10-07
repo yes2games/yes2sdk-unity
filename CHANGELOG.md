@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.10.0...v2.11.0) (2026-10-07)
+
+
+### Features
+
+* add Jest platform value and README section ([#126](https://github.com/yes2games/yes2sdk-unity/issues/126)) ([a9ca5bf](https://github.com/yes2games/yes2sdk-unity/commit/a9ca5bfb931b4b690723fdb3ddf9a27c03815990))
+* **control-plane:** add CP-6.1 all-platform ControlPlane assembly foundations ([#124](https://github.com/yes2games/yes2sdk-unity/issues/124)) ([058ebde](https://github.com/yes2games/yes2sdk-unity/commit/058ebde68f1ac668aa76be762b8c85a86c7eda45))
+* **control-plane:** add the transport and bootstrap/snapshot fetch pipeline ([#127](https://github.com/yes2games/yes2sdk-unity/issues/127)) ([d8d69be](https://github.com/yes2games/yes2sdk-unity/commit/d8d69bec77290f368e875034797af343aff681fb))
+
 ## [2.10.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.9.0...v2.10.0) (2026-10-06)
 
 
