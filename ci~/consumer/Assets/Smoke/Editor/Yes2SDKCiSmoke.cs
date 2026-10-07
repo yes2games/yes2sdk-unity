@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.Build.Player;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -29,20 +31,55 @@ namespace Yes2Games.CI
         private const string TemplateName = "Yes2SDK-SuperSDK";
         private const string TemplateSetting = "PROJECT:" + TemplateName;
         private const string ScenePath = "Assets/Smoke/Smoke.unity";
+        private const string ControlPlaneAssembly = "Yes2SDK.ControlPlane";
 
         public static void BuildWebGL()
         {
+            RunAndExit("WebGL package smoke", Run);
+        }
+
+        public static void CompileWithoutControlPlane()
+        {
+            RunAndExit("WebGL compile without the control plane", () =>
+            {
+                if (AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == ControlPlaneAssembly))
+                {
+                    throw new Exception(ControlPlaneAssembly + " is loaded in the editor without YES2SDK_CONTROL_PLANE");
+                }
+                if (CompileWebGLPlayerScripts().Contains(ControlPlaneAssembly))
+                {
+                    throw new Exception(ControlPlaneAssembly + " compiled into the WebGL player without YES2SDK_CONTROL_PLANE");
+                }
+            });
+        }
+
+        private static void RunAndExit(string name, Action body)
+        {
             try
             {
-                Run();
-                Debug.Log("[smoke] WebGL package smoke passed.");
+                body();
+                Debug.Log("[smoke] " + name + " passed.");
                 EditorApplication.Exit(0);
             }
             catch (Exception e)
             {
-                Debug.LogError("[smoke] WebGL package smoke failed: " + e);
+                Debug.LogError("[smoke] " + name + " failed: " + e);
                 EditorApplication.Exit(1);
             }
+        }
+
+        private static string[] CompileWebGLPlayerScripts()
+        {
+            ScriptCompilationResult result = PlayerBuildInterface.CompilePlayerScripts(
+                new ScriptCompilationSettings { target = BuildTarget.WebGL, group = BuildTargetGroup.WebGL },
+                Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Temp", "SmokePlayerScripts")));
+            string[] assemblies = result.assemblies.Select(Path.GetFileNameWithoutExtension).ToArray();
+            if (assemblies.Length == 0)
+            {
+                throw new Exception("WebGL player scripts did not compile");
+            }
+            Debug.Log("[smoke] WebGL player assemblies: " + string.Join(", ", assemblies));
+            return assemblies;
         }
 
         private static void Run()
@@ -86,6 +123,7 @@ namespace Yes2Games.CI
             }
 
             PlayerSettings.WebGL.template = TemplateSetting;
+            PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL, ManagedStrippingLevel.High);
             AssetDatabase.Refresh();
 
             // Build the scene here rather than committing a .unity file: its
@@ -123,7 +161,12 @@ namespace Yes2Games.CI
             {
                 throw new Exception("WebGL build reported success but produced no *.loader.js under " + outputPath);
             }
-            Debug.Log("[smoke] built WebGL player: " + loaders.First());
+            Debug.Log("[smoke] built WebGL player at High stripping: " + loaders.First());
+
+            if (!CompileWebGLPlayerScripts().Contains(ControlPlaneAssembly))
+            {
+                throw new Exception(ControlPlaneAssembly + " did not compile for WebGL with YES2SDK_CONTROL_PLANE defined");
+            }
         }
 
         /// <summary>

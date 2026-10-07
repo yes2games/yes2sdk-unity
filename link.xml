@@ -2,7 +2,6 @@
 <linker>
     <!-- Preserve Yes2SDK types for IL2CPP -->
     <assembly fullname="Yes2SDK.Runtime" preserve="all"/>
-    <assembly fullname="Yes2SDK.ControlPlane" preserve="all"/>
 
     <!-- Preserve KTX for IL2CPP (com.unity.cloud.ktx) -->
     <assembly fullname="Ktx" preserve="all"/>

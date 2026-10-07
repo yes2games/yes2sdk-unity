@@ -277,6 +277,25 @@ jobs:
           versioning: None
           allowDirtyBuild: true
 
+      - name: Drop the control plane opt-in
+        run: rm 'ci~/consumer/Assets/csc.rsp'
+
+      - name: WebGL compile without the control plane
+        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ci~/consumer
+          unityVersion: 6000.3.16f1
+          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          targetPlatform: WebGL
+          buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.CompileWithoutControlPlane
+          buildName: Yes2SDKNoControlPlane
+          versioning: None
+          allowDirtyBuild: true
+
       # game-ci bundles licence activation and the test run into one action, so a
       # failure here cannot be told apart from outside: this annotation says which
       # strings to look for rather than claiming to know. Unity refusing to start

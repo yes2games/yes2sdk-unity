@@ -1,8 +1,8 @@
 {
-    "name": "Yes2SDK.Tests",
+    "name": "Yes2SDK.ControlPlane.Tests",
     "rootNamespace": "Yes2SDK.Tests",
     "references": [
-        "Yes2SDK.Runtime",
+        "Yes2SDK.ControlPlane",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
@@ -18,7 +18,8 @@
     ],
     "autoReferenced": false,
     "defineConstraints": [
-        "UNITY_INCLUDE_TESTS"
+        "UNITY_INCLUDE_TESTS",
+        "YES2SDK_CONTROL_PLANE"
     ],
     "versionDefines": [],
     "noEngineReferences": false

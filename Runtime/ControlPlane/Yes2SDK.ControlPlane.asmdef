@@ -10,7 +10,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "YES2SDK_CONTROL_PLANE"
+    ],
     "versionDefines": [],
     "noEngineReferences": false
 }

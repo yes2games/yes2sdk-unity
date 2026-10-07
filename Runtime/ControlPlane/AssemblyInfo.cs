@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Yes2SDK.Tests")]
+[assembly: InternalsVisibleTo("Yes2SDK.ControlPlane.Tests")]

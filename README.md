@@ -722,6 +722,17 @@ Launch checklist:
 
 Do **not** install Jest's own Unity package or Jest's SDK script next to Yes2SDK: Yes2SDK loads the platform SDK itself, and two copies conflict. The Jest platform guide is being published in the [Yes2Games docs](https://developer.yes2games.com/docs).
 
+### Control plane (opt-in)
+
+The control plane client is off by default. Without opt-in its assembly, `Yes2SDK.ControlPlane`, is not compiled, adds nothing to your build, and the package needs no networking module.
+
+To opt in:
+
+1. Add `YES2SDK_CONTROL_PLANE` to **Scripting Define Symbols** (*Project Settings > Player > Script Compilation*) for every target you build, or to your Unity 6 Build Profile's scripting defines. A `-define:YES2SDK_CONTROL_PLANE` line in `Assets/csc.rsp` sets it for every target at once.
+2. Keep the built-in **UnityWebRequest** module enabled (*Window > Package Manager > Built-in*). It is on by default; turn it back on if your project disabled it.
+
+With the define you get the `Yes2SDK.ControlPlane` assembly: the strict JSON reader, the SHA-256 digest check, and the UnityWebRequest transport that fetches the bootstrap and snapshot documents with bounded retries. It has no public API yet. The `Yes2ControlPlane` entry point is coming, and it will exist only under the same define. You need no `link.xml` entry for it: the assembly uses no reflection, so managed stripping keeps everything your calls reach.
+
 ---
 
 ## Integration Checklist
