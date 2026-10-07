@@ -5,6 +5,8 @@
 
 A single SDK for your Unity WebGL game. Integrate once against Yes2SDK, submit through the Yes2Games Dashboard, and the Yes2Games team handles the rest.
 
+Supported platforms: Poki, CrazyGames, Yandex Games, GameDistribution, YouTube Playables and [Jest](#jest).
+
 The current SDK version is also exposed at runtime via `Yes2SDK.Version` (string), so you can log it for support tickets.
 
 ## Requirements
@@ -382,7 +384,7 @@ void ShowSignUpPanel()
 - `Login()` hands off to the platform's registration flow, which may reload the game, so save before you prompt. Registration can finish outside the game: check `IsAuthenticated()` the next time the game opens. `Data` comes back through `Session.GetEntryPointData()` after registration.
 - `onClose` fires at most once per prompt, when the platform reports it closed. Hide your own UI yourself after `Close()` rather than waiting for it. `Login()` and `Close()` on a closed prompt (`IsOpen == false`) log a warning and do nothing.
 - `Message` is optional. When set it must be non-blank, at most 140 characters, and contain `{{registrationCode}}` exactly once.
-- When you show your own prompt, ask the Yes2Games team to turn off automatic login reminders for your game so the player is not asked twice.
+- When you show your own prompt on Jest, turn off Automatic login reminders in your game's Overview settings on the Yes2Games Dashboard (available once Jest is enabled for your studio), so the player is not asked twice.
 
 ### Friends
 
@@ -698,6 +700,28 @@ for (int d = 1; d <= 7; d++)
 - Keep `ScheduledNotification.Id` to cancel later. `CancelAllAsync()` cancels every notification the game scheduled (some platforms only reach the ones scheduled this session).
 - The older `ScheduleAsync(title, body, delaySec, dataJson, ...)` overload still works and passes the new id to `onSuccess`. Prefer `NotificationOptions`.
 
+### Jest
+
+Yes2SDK runs on Jest (jest.com) too. `Yes2SDK.GetPlatform()` returns `Platform.Jest` there.
+
+- **Supported:** player and [signed player](#server-verification), [Auth with the registration prompt](#registration-prompt) (guests only), [Data](#data-required) (1 MB), [lifecycle and `OnExitRequested`](#lifecycle-required), [IAP and subscriptions](#in-app-purchases), [Notifications](#notifications) (`ScheduledInDays` 0 to 7, with images), [the entry payload](#session-recommended) (`Session.GetEntryPointData()`), [Referrals](#referrals), [sharing an image](#share-an-image), and analytics (logged only).
+- **Not supported:** banners, leaderboards, achievements, tournaments, stats, review, config, friends and score. Check `IsSupported()` and handle `FeatureNotSupported`.
+- **Ads:** there are none. `Ads.IsInterstitialSupported()` and `Ads.IsRewardedSupported()` return `false`. If you call `Ads.ShowInterstitial` or `Ads.ShowRewarded` anyway, `onError` fires with `NoFill`, so resume in `onError` and never gate progress on an ad.
+
+Launch checklist:
+
+- [ ] Progress is saved as a guest before any login prompt
+- [ ] Notifications are scheduled for registered players on days 1 to 7, with images
+- [ ] Incomplete purchases are recovered and completed at startup with `GetPurchasesAsync`
+- [ ] A held subscription (check `GetSubscriptionsAsync`) is never offered again
+- [ ] Guests get a registration prompt (with a custom prompt, turn off Automatic login reminders in the game's Overview settings on the Yes2Games Dashboard)
+- [ ] Progress is saved synchronously in `OnExitRequested`
+- [ ] Set Jest's loading screen to Auto mode in its developer console (recommended for now), and still call `SetLoadingProgress` as assets load and `StartGameAsync` when playable. In Manual mode Jest closes the game after 15 seconds without a progress update, and Yes2SDK only keeps it alive once it has initialized, so a long engine download can hit that timeout
+- [ ] Asset paths are relative
+- [ ] Entry data comes from `Session.GetEntryPointData()`, not URL parameters
+
+Do **not** install Jest's own Unity package or Jest's SDK script next to Yes2SDK: Yes2SDK loads the platform SDK itself, and two copies conflict. The Jest platform guide is being published in the [Yes2Games docs](https://developer.yes2games.com/docs).
+
 ---
 
 ## Integration Checklist
@@ -863,7 +887,7 @@ onError: err => {
 
 Real games often ship with multiple platform SDKs in the same build (Yes2SDK + Poki + Yandex + Playgama, etc.). A few ground rules to keep them from stepping on each other:
 
-- **Init order.** Initialize Yes2SDK first. Yes2SDK figures out which actual platform is hosting the game and routes through it — initializing your own platform SDK directly first can race with Yes2SDK's detection.
+- **Init order.** Initialize Yes2SDK first. Yes2SDK figures out which actual platform is hosting the game and routes through it, so initializing your own platform SDK directly first can race with Yes2SDK's detection.
 - **One owner for pause / resume.** Pick one SDK to drive `Time.timeScale` and `AudioListener.pause`. If both Yes2SDK and another SDK call resume/pause, you'll get oscillation. Recommended: subscribe to `Yes2SDK.OnPause` / `OnResume` and ignore the other SDK's equivalent.
 - **One owner for ads.** Don't call ads via two SDKs in the same session — the platform almost always rejects the second call. Pick the SDK that targets the platform you're actually hosted on.
 - **Namespace collisions.** If you have your own `Platform` type, qualify the Yes2SDK enum (`Yes2SDK.Platform`) at the call site or use a `using` alias (`using Y2 = Yes2SDK;`). C# resolves namespace-vs-type ambiguity by full qualification.
