@@ -384,7 +384,7 @@ void ShowSignUpPanel()
 - `Login()` hands off to the platform's registration flow, which may reload the game, so save before you prompt. Registration can finish outside the game: check `IsAuthenticated()` the next time the game opens. `Data` comes back through `Session.GetEntryPointData()` after registration.
 - `onClose` fires at most once per prompt, when the platform reports it closed. Hide your own UI yourself after `Close()` rather than waiting for it. `Login()` and `Close()` on a closed prompt (`IsOpen == false`) log a warning and do nothing.
 - `Message` is optional. When set it must be non-blank, at most 140 characters, and contain `{{registrationCode}}` exactly once.
-- When you show your own prompt, ask the Yes2Games team to turn off automatic login reminders for your game so the player is not asked twice.
+- When you show your own prompt on Jest, turn off Automatic login reminders in your game's Overview settings on the Yes2Games Dashboard (available once Jest is enabled for your studio), so the player is not asked twice.
 
 ### Friends
 
@@ -714,7 +714,7 @@ Launch checklist:
 - [ ] Notifications are scheduled for registered players on days 1 to 7, with images
 - [ ] Incomplete purchases are recovered and completed at startup with `GetPurchasesAsync`
 - [ ] A held subscription (check `GetSubscriptionsAsync`) is never offered again
-- [ ] Guests get a registration prompt (with a custom prompt, ask the Yes2Games team to turn off automatic login reminders)
+- [ ] Guests get a registration prompt (with a custom prompt, turn off Automatic login reminders in the game's Overview settings on the Yes2Games Dashboard)
 - [ ] Progress is saved synchronously in `OnExitRequested`
 - [ ] Set Jest's loading screen to Automatic mode in its developer console (recommended for now), and still call `SetLoadingProgress` as assets load and `StartGameAsync` when playable. In Manual mode Jest closes the game after 15 seconds without a progress update, and Yes2SDK only keeps it alive once it has initialized, so a long engine download can hit that timeout
 - [ ] Asset paths are relative
