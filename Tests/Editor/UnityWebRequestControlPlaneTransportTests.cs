@@ -41,13 +41,9 @@ namespace Yes2SDK.Tests
         {
             using (var cancellation = new CancellationTokenSource())
             {
-                var calls = 0;
                 var transport = new UnityWebRequestControlPlaneTransport(() =>
                 {
-                    if (calls++ == 1)
-                    {
-                        cancellation.Cancel();
-                    }
+                    cancellation.Cancel();
                     return TimeSpan.Zero;
                 });
 
