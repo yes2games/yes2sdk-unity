@@ -51,6 +51,18 @@ jobs:
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
+      # If this step is red, the release is almost certainly FINE. This job runs
+      # after publication with contents: read, is not one of the six mandatory
+      # results, and is not part of the release job, so it cannot affect the tag,
+      # the GitHub Release or the package. Check the release itself before
+      # treating a red notification as a bad release.
+      #
+      # A known standing failure lives here: GCHAT_WEBHOOK_URL is rejected by
+      # Google Chat with 400 INVALID_ARGUMENT, "Missing or malformed token in the
+      # request", and has been since at least v2.7.0. Tracked in
+      # yes2games/yes2sdk-unity#107, which carries the diagnosis and the fix
+      # (re-mint the incoming webhook and re-set the secret with its full query
+      # string). Do not re-diagnose it from scratch; read that issue first.
       - name: Send Google Chat notification
         if: steps.release.outputs.skip == 'false'
         env:
