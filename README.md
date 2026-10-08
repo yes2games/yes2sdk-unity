@@ -414,7 +414,15 @@ if (Yes2SDK.Referrals.IsSupported())
         {
             Title = "Play with me",
             Text  = "Join my party",
-            Data  = new Dictionary<string, object> { { "inviter", playerId } }
+            Data  = new Dictionary<string, object> { { "inviter", playerId } },
+            NotificationTemplates = new List<ReferralNotificationTemplate>
+            {
+                new ReferralNotificationTemplate
+                {
+                    MinConversionCount = 1,
+                    Variants = { new ReferralNotificationVariant { Body = "A friend joined your party!", CtaText = "Play" } }
+                }
+            }
         },
         onSuccess: result => { if (!result.Canceled) ShowThanks(); },
         onError:   err    => Debug.LogWarning(err));
@@ -433,6 +441,8 @@ if (Yes2SDK.Referrals.IsSupported())
 - `Reference` is required: a stable campaign key that groups the conversions. Null options or an empty reference fail with `InvalidParams` right away.
 - `Data` reaches the invited player through `Session.GetEntryPointData()`.
 - `ImageDataUrl` takes a PNG, JPEG or WebP base64 data URL of at most 2 MiB (see `Yes2SDKImage.ToPngDataUrl` under [Notifications](#notifications)).
+- `OnboardingSlug` (optional) routes invited players through an onboarding game first. An empty string fails with `InvalidParams`. Jest only; ignored elsewhere.
+- `NotificationTemplates` (optional) are the notifications the referrer gets as invited players join. Each `ReferralNotificationTemplate` has a `MinConversionCount` (0 or more) and at least one `ReferralNotificationVariant` (`Body` and `CtaText` required, `Title` and `ImageReference` optional). The platform uses the template with the highest count the referrer has reached and picks one of its variants. A malformed entry fails with `InvalidParams` right away. Jest only; ignored elsewhere.
 - A closed share dialog is a success with `Canceled == true`, not an error.
 - `ListAsync` groups `ReferralConversion`s (`PlayerId`, `JoinedAt`) by reference. A reference nobody joined through is absent. Verify `SignedRequest` on your server before granting a reward.
 
@@ -548,6 +558,23 @@ if (Yes2SDK.Player.IsDataSupported())
 if (Yes2SDK.Player.IsConnectedPlayersSupported())
 {
     Yes2SDK.Player.GetConnectedPlayersAsync(onSuccess: json => {});
+}
+```
+
+#### Bot avatars
+
+`GetBotAvatarAsync(username, size)` returns a platform-generated avatar URL for a computer-controlled player. The username seeds the picture, so the same bot always looks the same. `size` is `"small"`, `"medium"` (the default) or `"large"`. An empty username or another size fails with `InvalidParams` right away. Only some platforms generate bot avatars (Jest today); elsewhere `onError` gets `FeatureNotSupported`, so check `IsBotAvatarSupported()` and fall back to your own art. In the Editor the "Mock referrals, notifications and signed player" toggle returns a placeholder URL that does not load.
+
+```csharp
+if (Yes2SDK.Player.IsBotAvatarSupported())
+{
+    Yes2SDK.Player.GetBotAvatarAsync("RoboRita", "small",
+        onSuccess: url => LoadAvatar(url),
+        onError:   err => UseDefaultBotArt());
+}
+else
+{
+    UseDefaultBotArt();
 }
 ```
 
@@ -684,7 +711,7 @@ for (int d = 1; d <= 7; d++)
 
 | Option | Rule |
 |---|---|
-| `Title` | Required, at most 200 characters. |
+| `Title` | Required, at most 200 characters. May be empty: the notification is then sent without a title. |
 | `Body` | 1 to 2000 characters. |
 | `DelaySeconds` | Positive, at most 7 days. Set this or `ScheduledInDays`, exactly one. |
 | `ScheduledInDays` | Whole days from now, 0 to 7. The platform picks the best time inside that day. |
@@ -704,7 +731,7 @@ for (int d = 1; d <= 7; d++)
 
 Yes2SDK runs on Jest (jest.com) too. `Yes2SDK.GetPlatform()` returns `Platform.Jest` there.
 
-- **Supported:** player and [signed player](#server-verification), [Auth with the registration prompt](#registration-prompt) (guests only), [Data](#data-required) (1 MB), [lifecycle and `OnExitRequested`](#lifecycle-required), [IAP and subscriptions](#in-app-purchases), [Notifications](#notifications) (`ScheduledInDays` 0 to 7, with images), [the entry payload](#session-recommended) (`Session.GetEntryPointData()`), [Referrals](#referrals), [sharing an image](#share-an-image), and analytics (logged only).
+- **Supported:** player, [signed player](#server-verification) and [bot avatars](#bot-avatars), [Auth with the registration prompt](#registration-prompt) (guests only), [Data](#data-required) (1 MB), [lifecycle and `OnExitRequested`](#lifecycle-required), [IAP and subscriptions](#in-app-purchases), [Notifications](#notifications) (`ScheduledInDays` 0 to 7, with images), [the entry payload](#session-recommended) (`Session.GetEntryPointData()`), [Referrals](#referrals), [sharing an image](#share-an-image), and analytics (logged only).
 - **Not supported:** banners, leaderboards, achievements, tournaments, stats, review, config, friends and score. Check `IsSupported()` and handle `FeatureNotSupported`.
 - **Ads:** there are none. `Ads.IsInterstitialSupported()` and `Ads.IsRewardedSupported()` return `false`. If you call `Ads.ShowInterstitial` or `Ads.ShowRewarded` anyway, `onError` fires with `NoFill`, so resume in `onError` and never gate progress on an ad.
 
@@ -807,7 +834,7 @@ In the Unity Editor, SDK calls run against mock implementations:
 - **Subscriptions follow the IAP mock**: `SubscribeAsync` opens a Subscribe / Close dialog and `CancelSubscriptionAsync` a confirm dialog. The mock applies the platform rules (guest, already held, not held) so those error paths are testable.
 - **Player is registered** sets whether the mock player is signed in (off, a guest, by default). It drives `IsAuthenticated()`, the subscription list and the guest errors. The registration prompt is mocked without UI: `Login()` registers the player for the current play session and `Close()` closes the prompt.
 - **Entry point data (JSON)** is what `Session.GetEntryPointData()` returns in Play Mode. Only a valid JSON object is saved.
-- **Mock referrals, notifications and signed player** turns on those mocks and the image share mock (Play Mode). The image share and signed player mocks always succeed. **Referral share result** picks Shared / Cancelled / Error, and **Referral conversions** sets how many players joined through each shared reference; with 0, references are left out of `ListAsync` results, as on a real platform.
+- **Mock referrals, notifications and signed player** turns on those mocks, the image share mock and the bot avatar mock (Play Mode). The image share, signed player and bot avatar mocks always succeed; the bot avatar URL is a placeholder that does not load. **Referral share result** picks Shared / Cancelled / Error, and **Referral conversions** sets how many players joined through each shared reference; with 0, references are left out of `ListAsync` results, as on a real platform.
 - **Simulate exit request** (Play Mode only) raises `OnExitRequested`, then saves game data the way the platform flush does.
 - `Data` uses `PlayerPrefs`
 - Other optional APIs return `FeatureNotSupported`
