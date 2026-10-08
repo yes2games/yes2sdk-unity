@@ -325,6 +325,15 @@ namespace Yes2SDK.Tests
             Assert.IsTrue(NotificationOptions.TryValidate(Valid(), out string message), message);
         }
 
+        [TestCase("")]
+        [TestCase("  ")]
+        public void TryValidate_AcceptsAnEmptyTitle(string title)
+        {
+            var options = new NotificationOptions { Title = title, Body = "b", DelaySeconds = 1 };
+
+            Assert.IsTrue(NotificationOptions.TryValidate(options, out string message), message);
+        }
+
         [TestCase(0)]
         [TestCase(7)]
         public void TryValidate_AcceptsScheduledInDaysInRange(int days)
@@ -337,10 +346,8 @@ namespace Yes2SDK.Tests
         private static IEnumerable<TestCaseData> InvalidOptions()
         {
             yield return new TestCaseData(null, "options must be a valid object").SetName("Null options");
-            yield return new TestCaseData(new NotificationOptions { Title = "", Body = "b", DelaySeconds = 1 },
-                "options.title must be a non-empty string").SetName("Empty title");
-            yield return new TestCaseData(new NotificationOptions { Title = "  ", Body = "b", DelaySeconds = 1 },
-                "options.title must be a non-empty string").SetName("Blank title");
+            yield return new TestCaseData(new NotificationOptions { Title = null, Body = "b", DelaySeconds = 1 },
+                "options.title must be a string").SetName("Null title");
             yield return new TestCaseData(new NotificationOptions { Title = "t", Body = "b", DelaySeconds = 1, ImageAssetId = "a", ImageDataUrl = "data:image/png;base64,AA" },
                 "Provide at most one of options.imageAssetId or options.imageDataUrl").SetName("Both images");
             yield return new TestCaseData(new NotificationOptions { Title = "t", Body = "b", DelaySeconds = 1, ImageAssetId = "" },
@@ -592,6 +599,18 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Mock_Schedule_EmptyTitle_IsAccepted()
+        {
+            ScheduledNotification result = default;
+
+            Yes2SDKNotifications.MockScheduleForTests(new NotificationOptions { Title = "", Body = "b", DelaySeconds = 5 }, true,
+                n => result = n, e => Assert.Fail(e.ToString()));
+
+            Assert.AreEqual("", result.Title);
+            Assert.AreEqual(1, Yes2SDKNotifications.MockScheduledForTests.Count);
+        }
+
+        [Test]
         public void Mock_Schedule_InDays_UsesWholeDays()
         {
             ScheduledNotification result = default;
@@ -677,7 +696,7 @@ namespace Yes2SDK.Tests
         {
             Error received = default;
 
-            Yes2SDKNotifications.MockScheduleForTests(new NotificationOptions { Title = " ", Body = "b", DelaySeconds = 5 }, false,
+            Yes2SDKNotifications.MockScheduleForTests(new NotificationOptions { Title = null, Body = "b", DelaySeconds = 5 }, false,
                 _ => Assert.Fail("no success expected"), e => received = e);
 
             Assert.AreEqual("InvalidParams", received.Code);
