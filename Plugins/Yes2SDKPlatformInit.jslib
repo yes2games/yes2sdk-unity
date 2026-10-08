@@ -499,6 +499,15 @@ mergeInto(LibraryManager.library, {
                 // Connected players are not a CrazyGames feature (Core: isConnectedPlayersSupported = false).
                 isConnectedPlayersSupported: function() {
                     return false;
+                },
+
+                // CrazyGames has no bot avatar API (Core: no getBotAvatar strategy member).
+                getBotAvatarAsync: function(username, size) {
+                    return Promise.reject(__y2fns('Player.getBotAvatarAsync'));
+                },
+
+                isBotAvatarSupported: function() {
+                    return false;
                 }
             },
 

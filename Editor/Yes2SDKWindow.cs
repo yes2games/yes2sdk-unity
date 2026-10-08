@@ -249,8 +249,8 @@ namespace Yes2SDK.Editor
             EditorGUI.BeginChangeCheck();
             bool services = EditorGUILayout.ToggleLeft(
                 new GUIContent("Mock referrals, notifications and signed player",
-                    "On: referral sharing, referral conversions, image sharing, scheduled notifications and signed " +
-                    "player info are mocked in Play Mode. Off: they report unsupported."),
+                    "On: referral sharing, referral conversions, image sharing, scheduled notifications, signed " +
+                    "player info and bot avatars are mocked in Play Mode. Off: they report unsupported."),
                 Yes2SDKEditorMock.PlatformServicesEnabled);
             if (EditorGUI.EndChangeCheck())
                 Yes2SDKEditorMock.PlatformServicesEnabled = services;

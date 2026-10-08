@@ -18,7 +18,7 @@ namespace Yes2SDK
 
     /// <summary>
     /// Options for <see cref="Yes2SDKNotifications.ScheduleAsync(NotificationOptions, Action{ScheduledNotification}, Action{Error})"/>.
-    /// <see cref="Title"/> is required, and exactly one of <see cref="DelaySeconds"/> or
+    /// <see cref="Title"/> must be set (it may be empty), and exactly one of <see cref="DelaySeconds"/> or
     /// <see cref="ScheduledInDays"/> must be set. Fields left null are not sent.
     /// </summary>
     [Serializable]
@@ -31,7 +31,10 @@ namespace Yes2SDK
         [JsonProperty("id", NullValueHandling = NullValueHandling.Ignore)]
         public string Id;
 
-        /// <summary>Required. Title of the notification (at most 200 characters).</summary>
+        /// <summary>
+        /// Required, but may be empty: the notification is then sent without a title. At most
+        /// 200 characters. Null is rejected with InvalidParams.
+        /// </summary>
         [JsonProperty("title")]
         public string Title;
 
@@ -118,9 +121,9 @@ namespace Yes2SDK
             {
                 message = "options must be a valid object";
             }
-            else if (IsBlank(options.Title))
+            else if (options.Title == null)
             {
-                message = "options.title must be a non-empty string";
+                message = "options.title must be a string";
             }
             else if (options.ImageAssetId != null && options.ImageDataUrl != null)
             {

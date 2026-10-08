@@ -187,6 +187,32 @@ mergeInto(LibraryManager.library, {
                 SendMessage('Bridge', 'OnGetPhotoSuccess', (photo === null || photo === undefined) ? 'null' : photo);
             })
             .catch(__y2h.handleCatch('OnGetPhotoError', 'GetPhoto failed', 'Yes2SDK.Player.GetPhotoAsync'));
+    },
+
+    // Get a platform-generated avatar URL for a bot
+    Yes2SDK_Player_GetBotAvatarAsyncJS__deps: ['$__y2h'],
+    Yes2SDK_Player_GetBotAvatarAsyncJS: function(usernamePtr, sizePtr) {
+        if (!__y2h.has('player')) {
+            __y2h.sendError('OnGetBotAvatarError', 'NotInitialized', 'Yes2SDK Player module not loaded', 'Yes2SDK.Player.GetBotAvatarAsync');
+            return;
+        }
+
+        var username = UTF8ToString(usernamePtr);
+        var size = UTF8ToString(sizePtr);
+
+        window.Yes2SDK.player.getBotAvatarAsync(username, size || undefined)
+            .then(function(url) {
+                SendMessage('Bridge', 'OnGetBotAvatarSuccess', url || '');
+            })
+            .catch(__y2h.handleCatch('OnGetBotAvatarError', 'GetBotAvatar failed', 'Yes2SDK.Player.GetBotAvatarAsync'));
+    },
+
+    // Whether the current platform generates bot avatars
+    Yes2SDK_Player_IsBotAvatarSupportedJS__deps: ['$__y2h'],
+    Yes2SDK_Player_IsBotAvatarSupportedJS: function() {
+        if (!__y2h.has('player')) return 0;
+        try { return window.Yes2SDK.player.isBotAvatarSupported() ? 1 : 0; }
+        catch (e) { return 0; }
     }
 
 });

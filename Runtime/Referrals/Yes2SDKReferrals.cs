@@ -93,8 +93,10 @@ namespace Yes2SDK
         /// Open the platform share dialog with a referral link.
         /// onSuccess receives <see cref="ReferralShareResult.Canceled"/> = true when the player closed
         /// the dialog without sharing. Null options or an empty <see cref="ReferralShareOptions.Reference"/>
-        /// call onError synchronously with InvalidParams, as does Data that cannot be serialized
-        /// to JSON (a cyclic graph, or a Unity type such as Vector3).
+        /// call onError synchronously with InvalidParams, as do an empty
+        /// <see cref="ReferralShareOptions.OnboardingSlug"/>, a malformed
+        /// <see cref="ReferralShareOptions.NotificationTemplates"/> entry, and Data that cannot be
+        /// serialized to JSON (a cyclic graph, or a Unity type such as Vector3).
         /// </summary>
         public void ShareAsync(
             ReferralShareOptions options,
@@ -110,6 +112,18 @@ namespace Yes2SDK
                     Message = options == null
                         ? "options must not be null"
                         : "options.Reference must be a non-empty string",
+                    Context = ShareContext
+                });
+                return;
+            }
+
+            if (!ReferralShareOptions.TryValidateOptionalFields(options, out string invalidMessage))
+            {
+                Yes2Log.Warning($"Referrals.ShareAsync: {invalidMessage}");
+                onError?.Invoke(new Error
+                {
+                    Code = "InvalidParams",
+                    Message = invalidMessage,
                     Context = ShareContext
                 });
                 return;

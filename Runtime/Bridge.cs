@@ -106,6 +106,7 @@ namespace Yes2SDK
             ["OnGetPayingStatusSuccess"] = Yes2SDKPlayer.InvokeGetPayingStatusSuccess,
             ["OnGetModeSuccess"] = Yes2SDKPlayer.InvokeGetModeSuccess,
             ["OnGetPhotoSuccess"] = Yes2SDKPlayer.InvokeGetPhotoSuccess,
+            ["OnGetBotAvatarSuccess"] = Yes2SDKPlayer.InvokeGetBotAvatarSuccess,
 
             // Auth
             ["OnGetCurrentUserSuccess"] = Yes2SDKAuth.InvokeGetCurrentUserSuccess,
@@ -226,6 +227,7 @@ namespace Yes2SDK
             ["OnGetPayingStatusError"] = Yes2SDKPlayer.InvokeGetPayingStatusError,
             ["OnGetModeError"] = Yes2SDKPlayer.InvokeGetModeError,
             ["OnGetPhotoError"] = Yes2SDKPlayer.InvokeGetPhotoError,
+            ["OnGetBotAvatarError"] = Yes2SDKPlayer.InvokeGetBotAvatarError,
 
             // Auth
             ["OnGetCurrentUserError"] = Yes2SDKAuth.InvokeGetCurrentUserError,
@@ -351,6 +353,8 @@ namespace Yes2SDK
         public void OnGetModeError(string msg) => Handle(msg);
         public void OnGetPhotoSuccess(string msg) => Handle(msg);
         public void OnGetPhotoError(string msg) => Handle(msg);
+        public void OnGetBotAvatarSuccess(string msg) => Handle(msg);
+        public void OnGetBotAvatarError(string msg) => Handle(msg);
 
         // Auth
         public void OnGetCurrentUserSuccess(string msg) => Handle(msg);

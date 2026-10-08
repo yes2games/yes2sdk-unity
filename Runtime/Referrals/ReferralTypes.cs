@@ -39,6 +39,22 @@ namespace Yes2SDK
         [JsonProperty("image", NullValueHandling = NullValueHandling.Ignore)]
         public string ImageDataUrl;
 
+        /// <summary>
+        /// Optional slug of an onboarding game that invited players are routed through first.
+        /// Ignored on platforms without onboarding games. An empty string is rejected.
+        /// </summary>
+        [JsonProperty("onboardingSlug", NullValueHandling = NullValueHandling.Ignore)]
+        public string OnboardingSlug;
+
+        /// <summary>
+        /// Optional notifications sent to the referrer as invited players join. The platform uses
+        /// the template with the highest <see cref="ReferralNotificationTemplate.MinConversionCount"/>
+        /// the referrer has reached and picks one of its variants. Ignored on platforms without
+        /// referral notifications.
+        /// </summary>
+        [JsonProperty("notificationTemplates", NullValueHandling = NullValueHandling.Ignore)]
+        public List<ReferralNotificationTemplate> NotificationTemplates;
+
         /// <summary>Creates empty options; set the fields you need.</summary>
         public ReferralShareOptions()
         {
@@ -58,6 +74,103 @@ namespace Yes2SDK
                 NullValueHandling = NullValueHandling.Ignore
             });
         }
+
+        /// <summary>
+        /// Checks <see cref="OnboardingSlug"/> and <see cref="NotificationTemplates"/> with the same
+        /// rules and messages the platform layer applies, so the Editor mock fails where a platform
+        /// build would. <see cref="Reference"/> is checked by the caller.
+        /// </summary>
+        internal static bool TryValidateOptionalFields(ReferralShareOptions options, out string message)
+        {
+            message = null;
+            if (options.OnboardingSlug != null && IsBlank(options.OnboardingSlug))
+            {
+                message = "options.onboardingSlug must be a non-empty string";
+                return false;
+            }
+            if (options.NotificationTemplates == null) return true;
+
+            for (int i = 0; i < options.NotificationTemplates.Count; i++)
+            {
+                string at = $"options.notificationTemplates[{i}]";
+                ReferralNotificationTemplate template = options.NotificationTemplates[i];
+                if (template == null)
+                {
+                    message = $"{at} must be an object";
+                    return false;
+                }
+                if (template.MinConversionCount < 0)
+                {
+                    message = $"{at}.minConversionCount must be a non-negative integer";
+                    return false;
+                }
+                if (template.Variants == null || template.Variants.Count == 0)
+                {
+                    message = $"{at}.variants must be a non-empty array";
+                    return false;
+                }
+                for (int j = 0; j < template.Variants.Count; j++)
+                {
+                    string vat = $"{at}.variants[{j}]";
+                    ReferralNotificationVariant variant = template.Variants[j];
+                    if (variant == null)
+                    {
+                        message = $"{vat} must be an object";
+                        return false;
+                    }
+                    if (IsBlank(variant.Body) || IsBlank(variant.CtaText))
+                    {
+                        message = $"{vat}.body and {vat}.ctaText must be non-empty strings";
+                        return false;
+                    }
+                    if (variant.ImageReference != null && IsBlank(variant.ImageReference))
+                    {
+                        message = $"{vat}.imageReference must be a non-empty string or null";
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        private static bool IsBlank(string value) => value == null || value.Trim().Length == 0;
+    }
+
+    /// <summary>
+    /// Referral conversion notifications that apply once the referrer reaches
+    /// <see cref="MinConversionCount"/> conversions.
+    /// </summary>
+    [Serializable]
+    public class ReferralNotificationTemplate
+    {
+        /// <summary>Conversions the referrer needs before this template applies (0 or more).</summary>
+        [JsonProperty("minConversionCount")]
+        public int MinConversionCount;
+
+        /// <summary>Wordings the platform picks from. At least one is required.</summary>
+        [JsonProperty("variants")]
+        public List<ReferralNotificationVariant> Variants = new List<ReferralNotificationVariant>();
+    }
+
+    /// <summary>One wording of a referral conversion notification.</summary>
+    [Serializable]
+    public class ReferralNotificationVariant
+    {
+        /// <summary>Optional notification title.</summary>
+        [JsonProperty("title", NullValueHandling = NullValueHandling.Ignore)]
+        public string Title;
+
+        /// <summary>Required. Notification body text.</summary>
+        [JsonProperty("body")]
+        public string Body;
+
+        /// <summary>Required. Call-to-action label.</summary>
+        [JsonProperty("ctaText")]
+        public string CtaText;
+
+        /// <summary>Optional id of a pre-approved image in the platform's image library.</summary>
+        [JsonProperty("imageReference", NullValueHandling = NullValueHandling.Ignore)]
+        public string ImageReference;
     }
 
     /// <summary>Result of a referral share.</summary>

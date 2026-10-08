@@ -518,6 +518,59 @@ test('referrals wrapper stubs reject FEATURE_NOT_SUPPORTED through the bridge', 
   });
 });
 // ---- end Referrals --------------------------------------------------------------------------
+
+// ---- Player: bot avatars -------------------------------------------------------------------
+test('player GetBotAvatarAsync passes username and size and sends the URL', async () => {
+  const calls = [];
+  const sb = createSandbox(['Yes2SDKPlayer.jslib'], {
+    Yes2SDK: { player: { getBotAvatarAsync: (u, s) => { calls.push([u, s]); return Promise.resolve('https://cdn/a.png'); } } },
+  });
+  sb.call('Yes2SDK_Player_GetBotAvatarAsyncJS', sb.str('RoboRita'), sb.str('small'));
+  await flush();
+  assert.deepStrictEqual(calls, [['RoboRita', 'small']]);
+  assert.deepStrictEqual(sb.sent, [['Bridge', 'OnGetBotAvatarSuccess', 'https://cdn/a.png']]);
+});
+
+test('player GetBotAvatarAsync rejection sends the platform error', async () => {
+  const sb = createSandbox(['Yes2SDKPlayer.jslib'], {
+    Yes2SDK: { player: { getBotAvatarAsync: () => Promise.reject({ code: 'FEATURE_NOT_SUPPORTED', message: 'no' }) } },
+  });
+  sb.call('Yes2SDK_Player_GetBotAvatarAsyncJS', sb.str('bot'), sb.str('medium'));
+  await flush();
+  assert.equal(sb.sent.length, 1);
+  assert.equal(sb.sent[0][1], 'OnGetBotAvatarError');
+  assert.equal(JSON.parse(sb.sent[0][2]).code, 'FEATURE_NOT_SUPPORTED');
+});
+
+test('player GetBotAvatarAsync without the SDK reports NotInitialized', async () => {
+  const sb = createSandbox(['Yes2SDKPlayer.jslib']);
+  sb.call('Yes2SDK_Player_GetBotAvatarAsyncJS', sb.str('bot'), sb.str('medium'));
+  assert.equal(sb.sent[0][1], 'OnGetBotAvatarError');
+  assert.equal(JSON.parse(sb.sent[0][2]).code, 'NotInitialized');
+});
+
+test('player IsBotAvatarSupported reflects the platform and never throws', async () => {
+  const make = (player) => createSandbox(['Yes2SDKPlayer.jslib'], player === undefined ? {} : { Yes2SDK: { player } });
+  assert.equal(make({ isBotAvatarSupported: () => true }).call('Yes2SDK_Player_IsBotAvatarSupportedJS'), 1);
+  assert.equal(make({ isBotAvatarSupported: () => false }).call('Yes2SDK_Player_IsBotAvatarSupportedJS'), 0);
+  assert.equal(make({ isBotAvatarSupported: throwing }).call('Yes2SDK_Player_IsBotAvatarSupportedJS'), 0);
+  assert.equal(make(undefined).call('Yes2SDK_Player_IsBotAvatarSupportedJS'), 0);
+});
+
+test('player bot avatar wrapper stubs report unsupported through the bridge', async () => {
+  const sb = createSandbox(['Yes2SDKPlatformInit.jslib', 'Yes2SDKPlayer.jslib']);
+  sb.window.CrazyGames = { SDK: {} };
+  sb.window.__y2 = { log() {}, warn() {}, error() {} };
+  sb.window.__yes2PlatformInit();
+  assert.equal(sb.call('Yes2SDK_Player_IsBotAvatarSupportedJS'), 0);
+  sb.call('Yes2SDK_Player_GetBotAvatarAsyncJS', sb.str('bot'), sb.str('medium'));
+  await flush();
+  assert.equal(sb.sent[0][1], 'OnGetBotAvatarError');
+  assert.deepStrictEqual(JSON.parse(sb.sent[0][2]), {
+    code: 'FEATURE_NOT_SUPPORTED', message: 'Player.getBotAvatarAsync is not supported on the current platform.', context: 'Yes2SDK.Player.GetBotAvatarAsync',
+  });
+});
+// ---- end Player: bot avatars ---------------------------------------------------------------
 // ---- Context: share an image (request-id envelope, empty success payload) -----------------
 const ctxError = (sb, i = 0) => {
   const p = sb.sent[i][2];
