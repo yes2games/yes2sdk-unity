@@ -441,6 +441,108 @@ namespace Yes2SDK.Tests
             Assert.AreEqual("abc", (string)JObject.Parse(json)["data"]["room"]);
         }
 
+        [Test]
+        public void ShareOptions_WithOnboardingAndTemplates_UseThePlatformShape()
+        {
+            var options = new ReferralShareOptions("party_v1")
+            {
+                OnboardingSlug = "tutorial-game",
+                NotificationTemplates = new List<ReferralNotificationTemplate>
+                {
+                    new ReferralNotificationTemplate
+                    {
+                        MinConversionCount = 1,
+                        Variants = new List<ReferralNotificationVariant>
+                        {
+                            new ReferralNotificationVariant { Body = "A friend joined!", CtaText = "Play" },
+                            new ReferralNotificationVariant { Title = "Nice", Body = "b", CtaText = "Go", ImageReference = "img_1" }
+                        }
+                    }
+                }
+            };
+
+            var json = JObject.Parse(options.ToJson());
+
+            Assert.AreEqual("tutorial-game", (string)json["onboardingSlug"]);
+            var template = json["notificationTemplates"][0];
+            Assert.AreEqual(1, (int)template["minConversionCount"]);
+            var first = (JObject)template["variants"][0];
+            Assert.AreEqual(2, first.Count, "unset title and imageReference are omitted: " + first);
+            Assert.AreEqual("A friend joined!", (string)first["body"]);
+            Assert.AreEqual("Play", (string)first["ctaText"]);
+            var second = (JObject)template["variants"][1];
+            Assert.AreEqual("Nice", (string)second["title"]);
+            Assert.AreEqual("img_1", (string)second["imageReference"]);
+        }
+
+        private static ReferralNotificationTemplate Template(int min, params ReferralNotificationVariant[] variants)
+        {
+            return new ReferralNotificationTemplate
+            {
+                MinConversionCount = min,
+                Variants = variants == null ? null : new List<ReferralNotificationVariant>(variants)
+            };
+        }
+
+        private static ReferralNotificationVariant Variant(string body = "b", string cta = "Play", string image = null)
+        {
+            return new ReferralNotificationVariant { Body = body, CtaText = cta, ImageReference = image };
+        }
+
+        private static ReferralShareOptions WithTemplates(params ReferralNotificationTemplate[] templates)
+        {
+            return new ReferralShareOptions("party_v1") { NotificationTemplates = new List<ReferralNotificationTemplate>(templates) };
+        }
+
+        private static IEnumerable<TestCaseData> InvalidOptionalFields()
+        {
+            yield return new TestCaseData(new ReferralShareOptions("party_v1") { OnboardingSlug = "" },
+                "options.onboardingSlug must be a non-empty string").SetName("Empty onboarding slug");
+            yield return new TestCaseData(new ReferralShareOptions("party_v1") { OnboardingSlug = "  " },
+                "options.onboardingSlug must be a non-empty string").SetName("Blank onboarding slug");
+            yield return new TestCaseData(WithTemplates((ReferralNotificationTemplate)null),
+                "options.notificationTemplates[0] must be an object").SetName("Null template");
+            yield return new TestCaseData(WithTemplates(Template(1, Variant()), Template(-1, Variant())),
+                "options.notificationTemplates[1].minConversionCount must be a non-negative integer").SetName("Negative count");
+            yield return new TestCaseData(WithTemplates(Template(0)),
+                "options.notificationTemplates[0].variants must be a non-empty array").SetName("No variants");
+            yield return new TestCaseData(WithTemplates(Template(0, null)),
+                "options.notificationTemplates[0].variants must be a non-empty array").SetName("Null variants");
+            yield return new TestCaseData(WithTemplates(Template(0, Variant(), (ReferralNotificationVariant)null)),
+                "options.notificationTemplates[0].variants[1] must be an object").SetName("Null variant");
+            yield return new TestCaseData(WithTemplates(Template(0, Variant(body: " "))),
+                "options.notificationTemplates[0].variants[0].body and options.notificationTemplates[0].variants[0].ctaText must be non-empty strings").SetName("Blank body");
+            yield return new TestCaseData(WithTemplates(Template(0, Variant(cta: null))),
+                "options.notificationTemplates[0].variants[0].body and options.notificationTemplates[0].variants[0].ctaText must be non-empty strings").SetName("Missing cta");
+            yield return new TestCaseData(WithTemplates(Template(0, Variant(image: ""))),
+                "options.notificationTemplates[0].variants[0].imageReference must be a non-empty string or null").SetName("Empty image reference");
+        }
+
+        [TestCaseSource(nameof(InvalidOptionalFields))]
+        public void ShareAsync_WithMalformedOptionalFields_FailsSynchronouslyWithThePlatformMessage(
+            ReferralShareOptions options, string expected)
+        {
+            var errors = new List<Error>();
+
+            Yes2SDK.Referrals.ShareAsync(options, _ => Assert.Fail("success"), errors.Add);
+
+            Assert.AreEqual(1, errors.Count);
+            Assert.AreEqual(ErrorCode.InvalidParams, errors[0].ErrorCode);
+            Assert.AreEqual(expected, errors[0].Message);
+            Assert.AreEqual(0, Yes2SDKReferrals.PendingCountForTests);
+        }
+
+        [Test]
+        public void ValidOptionalFields_PassValidation()
+        {
+            var options = WithTemplates(Template(0, Variant()), Template(5, Variant(image: "img_1"), Variant()));
+            options.OnboardingSlug = "tutorial-game";
+            options.NotificationTemplates[0].Variants[0].Title = "";
+
+            Assert.IsTrue(ReferralShareOptions.TryValidateOptionalFields(options, out string message), message);
+            Assert.IsTrue(ReferralShareOptions.TryValidateOptionalFields(WithTemplates(), out message), message);
+        }
+
         // --- Synchronous InvalidParams ---
 
         private static IEnumerable<ReferralShareOptions> InvalidOptions()
