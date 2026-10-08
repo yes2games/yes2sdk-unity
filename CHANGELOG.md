@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.11.0...v2.12.0) (2026-10-08)
+
+
+### Features
+
+* add onboarding slug and notification templates to referral share options ([801e5b9](https://github.com/yes2games/yes2sdk-unity/commit/801e5b9ff779d06f3b379af7702f28f3843d994c))
+* add Player.GetBotAvatarAsync and Player.IsBotAvatarSupported ([801e5b9](https://github.com/yes2games/yes2sdk-unity/commit/801e5b9ff779d06f3b379af7702f28f3843d994c))
+* **control-plane:** make the ControlPlane assembly opt-in behind YES2SDK_CONTROL_PLANE ([#128](https://github.com/yes2games/yes2sdk-unity/issues/128)) ([950f659](https://github.com/yes2games/yes2sdk-unity/commit/950f65931c61586c9848e1c2265f8896591ac541))
+* warn in the Editor when Jest's Unity SDK package is installed ([#130](https://github.com/yes2games/yes2sdk-unity/issues/130)) ([abeb4e1](https://github.com/yes2games/yes2sdk-unity/commit/abeb4e1a1775ed495fb9af4fec8d9b49949c7f65))
+
+
+### Bug Fixes
+
+* allow an empty notification title ([801e5b9](https://github.com/yes2games/yes2sdk-unity/commit/801e5b9ff779d06f3b379af7702f28f3843d994c))
+
 ## [2.11.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.10.0...v2.11.0) (2026-10-07)
 
 
