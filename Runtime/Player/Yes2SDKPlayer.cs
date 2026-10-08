@@ -15,6 +15,7 @@ namespace Yes2SDK
     /// save where the platform supports it, local web storage otherwise. Identity is
     /// anonymous on platforms without an auth API (e.g. Poki, YouTube). Connected
     /// players and signed info are platform-gated; check IsConnectedPlayersSupported().
+    /// Bot avatars are platform-gated too; check IsBotAvatarSupported().
     /// </summary>
     public class Yes2SDKPlayer
     {
@@ -42,6 +43,8 @@ namespace Yes2SDK
         private static Action<Error> _getModeErrorCallback;
         private static Action<string> _getPhotoSuccessCallback;
         private static Action<Error> _getPhotoErrorCallback;
+        private static Action<string> _getBotAvatarSuccessCallback;
+        private static Action<Error> _getBotAvatarErrorCallback;
 
         #endregion
 
@@ -86,6 +89,12 @@ namespace Yes2SDK
 
         [DllImport("__Internal")]
         private static extern void Yes2SDK_Player_GetPhotoAsyncJS(string size);
+
+        [DllImport("__Internal")]
+        private static extern void Yes2SDK_Player_GetBotAvatarAsyncJS(string username, string size);
+
+        [DllImport("__Internal")]
+        private static extern int Yes2SDK_Player_IsBotAvatarSupportedJS();
 #endif
 
         #endregion
@@ -327,6 +336,110 @@ namespace Yes2SDK
 #endif
         }
 
+        /// <summary>
+        /// Get a platform-generated avatar URL for a bot (a computer-controlled player), at the
+        /// "medium" size. The username seeds the picture, so the same bot always gets the same
+        /// avatar. Only some platforms generate bot avatars; elsewhere onError receives
+        /// FeatureNotSupported. Check <see cref="IsBotAvatarSupported"/> first and fall back to
+        /// your own art. An empty username calls onError synchronously with InvalidParams.
+        /// </summary>
+        /// <param name="username">The bot's display name. Must be non-empty.</param>
+        public void GetBotAvatarAsync(string username, Action<string> onSuccess = null, Action<Error> onError = null)
+        {
+            GetBotAvatarAsync(username, DefaultBotAvatarSize, onSuccess, onError);
+        }
+
+        /// <summary>
+        /// Get a platform-generated avatar URL for a bot at the requested size.
+        /// See <see cref="GetBotAvatarAsync(string, Action{string}, Action{Error})"/>.
+        /// An empty username, or a size other than "small", "medium" or "large", calls onError
+        /// synchronously with InvalidParams.
+        /// </summary>
+        /// <param name="username">The bot's display name. Must be non-empty.</param>
+        /// <param name="size">"small", "medium" or "large".</param>
+        public void GetBotAvatarAsync(string username, string size, Action<string> onSuccess = null, Action<Error> onError = null)
+        {
+            if (!TryValidateBotAvatarArgs(username, size, out string message))
+            {
+                Yes2Log.Warning($"Player.GetBotAvatarAsync: {message}");
+                onError?.Invoke(new Error
+                {
+                    Code = "InvalidParams",
+                    Message = message,
+                    Context = BotAvatarContext
+                });
+                return;
+            }
+
+            _getBotAvatarSuccessCallback = onSuccess;
+            _getBotAvatarErrorCallback = onError;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Yes2SDK_Player_GetBotAvatarAsyncJS(username, size);
+#elif UNITY_EDITOR
+            if (Yes2SDKEditorMock.PlatformServicesEnabled)
+            {
+                Yes2Log.Log($"Mock: GetBotAvatarAsync('{username}', '{size}') returning a mock avatar URL");
+                InvokeGetBotAvatarSuccess(MockBotAvatarUrl(username, size));
+            }
+            else
+            {
+                Yes2Log.Log("Mock: GetBotAvatarAsync() reporting FeatureNotSupported");
+                InvokeGetBotAvatarError(FeatureNotSupportedError(BotAvatarContext));
+            }
+#else
+            Yes2Log.Log("Mock: GetBotAvatarAsync() - FeatureNotSupported");
+            InvokeGetBotAvatarError(FeatureNotSupportedError(BotAvatarContext));
+#endif
+        }
+
+        /// <summary>
+        /// Whether the current platform generates bot avatars
+        /// (see <see cref="GetBotAvatarAsync(string, Action{string}, Action{Error})"/>).
+        /// False before initialization. In the Editor, follows the platform services mock toggle.
+        /// </summary>
+        public bool IsBotAvatarSupported()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return Yes2SDK_Player_IsBotAvatarSupportedJS() == 1;
+#elif UNITY_EDITOR
+            return Yes2SDKEditorMock.PlatformServicesEnabled;
+#else
+            return false;
+#endif
+        }
+
+        internal const string DefaultBotAvatarSize = "medium";
+        private const string BotAvatarContext = "Yes2SDK.Player.GetBotAvatarAsync";
+        private static readonly string[] BotAvatarSizes = { "small", "medium", "large" };
+
+        /// <summary>
+        /// Checks the arguments with the same rules and messages the platform layer applies, so
+        /// the Editor mock fails where a platform build would.
+        /// </summary>
+        internal static bool TryValidateBotAvatarArgs(string username, string size, out string message)
+        {
+            message = null;
+            if (username == null || username.Trim().Length == 0)
+            {
+                message = "username must be a non-empty string";
+            }
+            else if (Array.IndexOf(BotAvatarSizes, size) < 0)
+            {
+                message = "size must be \"small\", \"medium\" or \"large\"";
+            }
+            return message == null;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Placeholder URL the Editor mock returns. It is not loadable; it only lets avatar code
+        /// paths run in Play Mode.
+        /// </summary>
+        internal static string MockBotAvatarUrl(string username, string size) =>
+            $"https://mock.yes2sdk.invalid/bot-avatar/{size}/{Uri.EscapeDataString(username)}.png";
+#endif
+
         // Task-returning overloads.
 
         public Task<PlayerInfo> GetPlayerAsync(CancellationToken cancellationToken)
@@ -382,6 +495,16 @@ namespace Yes2SDK
         public Task<string> GetPhotoAsync(string size, CancellationToken cancellationToken)
             => TaskCallbackHelper.ToTask<string>(
                 (success, error) => GetPhotoAsync(size, success, error),
+                cancellationToken);
+
+        public Task<string> GetBotAvatarAsync(string username, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetBotAvatarAsync(username, success, error),
+                cancellationToken);
+
+        public Task<string> GetBotAvatarAsync(string username, string size, CancellationToken cancellationToken)
+            => TaskCallbackHelper.ToTask<string>(
+                (success, error) => GetBotAvatarAsync(username, size, success, error),
                 cancellationToken);
 
         /// <summary>
@@ -585,6 +708,22 @@ namespace Yes2SDK
             _getPhotoErrorCallback?.Invoke(error);
             _getPhotoSuccessCallback = null;
             _getPhotoErrorCallback = null;
+        }
+
+        internal static void InvokeGetBotAvatarSuccess(string avatarUrl)
+        {
+            var callback = _getBotAvatarSuccessCallback;
+            _getBotAvatarSuccessCallback = null;
+            _getBotAvatarErrorCallback = null;
+            callback?.Invoke(avatarUrl);
+        }
+
+        internal static void InvokeGetBotAvatarError(Error error)
+        {
+            var callback = _getBotAvatarErrorCallback;
+            _getBotAvatarSuccessCallback = null;
+            _getBotAvatarErrorCallback = null;
+            callback?.Invoke(error);
         }
 
         #endregion
