@@ -131,6 +131,9 @@ jobs:
       - name: Check wrapper method parity
         run: node 'scripts~/check-wrapper-parity.mjs'
 
+      - name: Run jslib bridge tests
+        run: node 'scripts~/test-jslib-bridges.mjs'
+
   optimizer-anchors:
     name: Optimizer anchors
     runs-on: ubuntu-24.04

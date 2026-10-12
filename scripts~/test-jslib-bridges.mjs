@@ -8,7 +8,7 @@
 //   sb.call('Yes2SDK_Foo_BarJS', ...args); await flush();
 //   assert.deepStrictEqual(sb.sent, [['Bridge', 'OnFoo', '<payload>']]);
 // and sb.readStr(handle) to read strings returned through __y2h.returnStr.
-// Not wired into CI (local and reviewer tool).
+// Run in CI by the Wrapper parity job (.github/workflows/required-ci.yml).
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
