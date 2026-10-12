@@ -772,11 +772,12 @@ test('auth prompt login and close on an unknown id or a throwing handle never th
 });
 
 for (const [label, token, expected] of [
-  ['Core AuthToken object', { accessToken: 'jwt.a.b', expiresAt: 1, refreshToken: 'r' }, 'jwt.a.b'],
-  ['legacy wrapper string', 'jwt.c.d', 'jwt.c.d'],
-  ['empty result', null, ''],
+  ['a Core AuthToken object', { accessToken: 'jwt.a.b', expiresAt: 1, refreshToken: 'r' }, 'jwt.a.b'],
+  ['a Core AuthToken with no access token', { accessToken: '', expiresAt: 0 }, ''],
+  ['a legacy wrapper string', 'jwt.c.d', 'jwt.c.d'],
+  ['an empty result', null, ''],
 ]) {
-  test(`auth GetTokenAsync sends the access token string for a ${label}`, async () => {
+  test(`auth GetTokenAsync sends the access token string for ${label}`, async () => {
     const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({ getTokenAsync: () => Promise.resolve(token) }) });
     sb.call('Yes2SDK_Auth_GetTokenAsyncJS');
     await flush();
