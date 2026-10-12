@@ -44,7 +44,7 @@ mergeInto(LibraryManager.library, {
 
         window.Yes2SDK.auth.getTokenAsync()
             .then(function(token) {
-                SendMessage('Bridge', 'OnGetTokenSuccess', token || '');
+                SendMessage('Bridge', 'OnGetTokenSuccess', (token && typeof token === 'object' ? token.accessToken : token) || '');
             })
             .catch(__y2h.handleCatch('OnGetTokenError', 'GetToken failed', 'Yes2SDK.Auth.GetTokenAsync'));
     },

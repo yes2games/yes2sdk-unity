@@ -8,7 +8,7 @@
 //   - library functions are re-created from their source text (as Emscripten does), so closures over
 //     file-level variables of a .jslib do not survive here either
 //   - host setTimeout/setInterval/clearTimeout/clearInterval are available to the bridges
-//   - SendMessage (recorded), UTF8ToString (pointer only, throws on non-numbers), lengthBytesUTF8, stringToUTF8, _malloc
+//   - SendMessage (recorded; throws like Unity 6's for a payload that is not a string, number or undefined), UTF8ToString (pointer only, throws on non-numbers), lengthBytesUTF8, stringToUTF8, _malloc
 // Strings returned to C# via __y2h.returnStr are readable with sb.readStr(handle).
 // Each createSandbox() call builds a fresh vm context, so tests never share state.
 import { readFileSync } from 'node:fs';
@@ -45,7 +45,12 @@ export function createSandbox(files, opts = {}) {
       warn: (...a) => logs.push(['warn', a]),
       error: (...a) => logs.push(['error', a]),
     },
-    SendMessage: (target, method, payload) => sent.push([target, method, payload]),
+    SendMessage: (target, method, payload) => {
+      if (payload !== undefined && typeof payload !== 'string' && typeof payload !== 'number') {
+        throw '' + payload + ' is does not have a type which is supported by SendMessage.';
+      }
+      sent.push([target, method, payload]);
+    },
     UTF8ToString: (v) => {
       if (typeof v !== 'number') throw new TypeError('UTF8ToString expects a pointer (number), got ' + typeof v);
       return memory.get(v) ?? '';

@@ -8,7 +8,7 @@
 //   sb.call('Yes2SDK_Foo_BarJS', ...args); await flush();
 //   assert.deepStrictEqual(sb.sent, [['Bridge', 'OnFoo', '<payload>']]);
 // and sb.readStr(handle) to read strings returned through __y2h.returnStr.
-// Not wired into CI (local and reviewer tool).
+// Run in CI by the Wrapper parity job (.github/workflows/required-ci.yml).
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -770,6 +770,20 @@ test('auth prompt login and close on an unknown id or a throwing handle never th
   noSdk.call('Yes2SDK_Auth_RegistrationPromptLoginJS', 1);
   noSdk.call('Yes2SDK_Auth_RegistrationPromptCloseJS', 1);
 });
+
+for (const [label, token, expected] of [
+  ['a Core AuthToken object', { accessToken: 'jwt.a.b', expiresAt: 1, refreshToken: 'r' }, 'jwt.a.b'],
+  ['a Core AuthToken with no access token', { accessToken: '', expiresAt: 0 }, ''],
+  ['a legacy wrapper string', 'jwt.c.d', 'jwt.c.d'],
+  ['an empty result', null, ''],
+]) {
+  test(`auth GetTokenAsync sends the access token string for ${label}`, async () => {
+    const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({ getTokenAsync: () => Promise.resolve(token) }) });
+    sb.call('Yes2SDK_Auth_GetTokenAsyncJS');
+    await flush();
+    assert.deepStrictEqual(sb.sent, [['Bridge', 'OnGetTokenSuccess', expected]]);
+  });
+}
 
 test('auth prompt close drops the stored handle', async () => {
   const calls = [];
