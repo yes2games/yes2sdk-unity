@@ -771,6 +771,19 @@ test('auth prompt login and close on an unknown id or a throwing handle never th
   noSdk.call('Yes2SDK_Auth_RegistrationPromptCloseJS', 1);
 });
 
+for (const [label, token, expected] of [
+  ['Core AuthToken object', { accessToken: 'jwt.a.b', expiresAt: 1, refreshToken: 'r' }, 'jwt.a.b'],
+  ['legacy wrapper string', 'jwt.c.d', 'jwt.c.d'],
+  ['empty result', null, ''],
+]) {
+  test(`auth GetTokenAsync sends the access token string for a ${label}`, async () => {
+    const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({ getTokenAsync: () => Promise.resolve(token) }) });
+    sb.call('Yes2SDK_Auth_GetTokenAsyncJS');
+    await flush();
+    assert.deepStrictEqual(sb.sent, [['Bridge', 'OnGetTokenSuccess', expected]]);
+  });
+}
+
 test('auth prompt close drops the stored handle', async () => {
   const calls = [];
   const sb = createSandbox(['Yes2SDKAuth.jslib'], { Yes2SDK: regAuth({
