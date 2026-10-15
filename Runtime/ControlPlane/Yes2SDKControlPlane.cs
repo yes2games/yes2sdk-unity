@@ -34,6 +34,8 @@ namespace Yes2SDK
     {
         public const string DefaultRuntimeOrigin = "https://runtime.yes2games.com";
 
+        private static readonly ControlPlaneStatus Superseded = new ControlPlaneStatus(ControlPlaneSource.None, null, null, null, null, ControlPlaneErrorCategory.Cancelled.Code());
+
         private readonly IControlPlaneTransport _transport;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
         private readonly System.Random _random;
@@ -68,7 +70,7 @@ namespace Yes2SDK
                 {
                     throw new InvalidOperationException("ControlPlane is initialized for different options; call Shutdown() first");
                 }
-                return active.Refreshing == null || active.Refreshing.IsCompleted ? Task.FromResult(active.Status) : Refresh(active, token);
+                return !active.Started || active.Refreshing?.IsCompleted == true ? Task.FromResult(active.Status) : Refresh(active, token);
             }
 
             var session = new Session(context, _openJournal(context.GameKey, context.EnvironmentKey), new ControlPlaneFetcher(_transport, _delay, _random));
@@ -143,6 +145,7 @@ namespace Yes2SDK
                 session.Persisted = true;
                 Activate(session, lkg, ControlPlaneSource.Lkg, null);
             }
+            session.Started = true;
             return await Refresh(session, token);
         }
 
@@ -177,7 +180,7 @@ namespace Yes2SDK
         {
             if (session != _session)
             {
-                return Status;
+                return Superseded;
             }
             var status = session.Status;
             return new ControlPlaneStatus(status.Source, status.GameKey, status.EnvironmentKey, status.DeploymentId, status.ReleaseId, ControlPlaneErrorCategory.Cancelled.Code());
@@ -237,7 +240,7 @@ namespace Yes2SDK
         {
             if (session != _session)
             {
-                return Status;
+                return Superseded;
             }
             session.SetStatus(session.Source, error.Code());
             return session.Status;
@@ -247,7 +250,7 @@ namespace Yes2SDK
         {
             if (session != _session)
             {
-                return Status;
+                return Superseded;
             }
             if (snapshot != session.Active)
             {
@@ -358,6 +361,7 @@ namespace Yes2SDK
             public Task<ControlPlaneStatus> Refreshing { get; set; }
             public ControlPlaneSnapshot Active { get; set; }
             public Dictionary<string, JObject> Resources { get; set; }
+            public bool Started { get; set; }
             public bool Persisted { get; set; }
             public string AnnouncedDeploymentId { get; set; }
             public ControlPlaneSource Source => Status.Source;

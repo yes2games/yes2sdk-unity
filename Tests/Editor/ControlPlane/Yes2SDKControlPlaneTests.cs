@@ -295,6 +295,18 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Initialize_AfterPreCancelledFirstCallFetchesRemote()
+        {
+            Serve(Bootstrap1, Snapshot1);
+
+            Assert.AreEqual("cancelled", Initialize(new CancellationToken(true)).LastError);
+            Assert.IsEmpty(_transport.Requests);
+
+            AssertActive(Initialize(), ControlPlaneSource.Remote, "dep-1", "rel-1", null);
+            AssertActivations("dep-1");
+        }
+
+        [Test]
         public void Initialize_ReentrantInitializeFromActivationHandlerReturnsCurrentStatus()
         {
             Journal().Write(ControlPlaneFixture.Deployment("dep-1", "rel-1"));
@@ -613,6 +625,42 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Shutdown_StaleWaiterGetsCancelledNotTheNewSessionsStatus()
+        {
+            Journal().Write(ControlPlaneFixture.Deployment("dep-1", "rel-1"));
+            var pending = _transport.Hold(ControlPlaneFixture.BootstrapUrl, false);
+            var stale = _controlPlane.InitializeAsync(Options(), CancellationToken.None);
+
+            _controlPlane.Shutdown();
+            var options = Options();
+            options.RefreshIntervalSeconds = 30;
+            var current = _controlPlane.InitializeAsync(options, CancellationToken.None);
+            pending.SetResult(ControlPlaneTransportResponse.Completed(200, Bootstrap1));
+
+            var status = stale.GetAwaiter().GetResult();
+            Assert.IsFalse(status.Available);
+            Assert.AreEqual(ControlPlaneSource.None, status.Source);
+            Assert.IsNull(status.GameKey);
+            Assert.IsNull(status.DeploymentId);
+            Assert.AreEqual("cancelled", status.LastError);
+            AssertActive(current.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", null);
+        }
+
+        [Test]
+        public void Refresh_NextWriteTargetsTheSlotOppositeTheLastCommittedOne()
+        {
+            Journal().Write(ControlPlaneFixture.Deployment("dep-1", "rel-1"));
+            Serve(Bootstrap2, Snapshot2);
+            Initialize();
+            Serve(Bootstrap1, Snapshot1);
+
+            Refresh();
+
+            Assert.AreEqual("lkg-a.dat 3", File.ReadAllText(Path.Combine(JournalDirectory(ControlPlaneFixture.Game, ControlPlaneFixture.Environment), ControlPlaneLkgJournal.Pointer)));
+            Assert.AreEqual("dep-1", Journal().Load().Bootstrap.DeploymentId);
+        }
+
+        [Test]
         public void Shutdown_ThenInitializeAnnouncesDeploymentAgain()
         {
             Serve(Bootstrap1, Snapshot1);
@@ -770,12 +818,15 @@ namespace Yes2SDK.Tests
                 _routes[url] = _ => Task.FromResult(response);
             }
 
-            public TaskCompletionSource<ControlPlaneTransportResponse> Hold(string url)
+            public TaskCompletionSource<ControlPlaneTransportResponse> Hold(string url, bool honourCancellation = true)
             {
                 var pending = new TaskCompletionSource<ControlPlaneTransportResponse>();
                 _routes[url] = token =>
                 {
-                    token.Register(() => pending.TrySetCanceled());
+                    if (honourCancellation)
+                    {
+                        token.Register(() => pending.TrySetCanceled());
+                    }
                     return pending.Task;
                 };
                 return pending;
