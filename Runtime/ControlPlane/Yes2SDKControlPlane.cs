@@ -27,6 +27,14 @@ namespace Yes2SDK
             Instance.Reset();
         }
 #endif
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void ObserveApplication()
+        {
+            var go = new GameObject("Yes2ControlPlane");
+            UnityEngine.Object.DontDestroyOnLoad(go);
+            go.AddComponent<ControlPlaneApplicationEvents>();
+        }
     }
 
     /// <summary>Native control-plane runtime (yes2games/yes2sdk-unity#98).</summary>
@@ -41,6 +49,9 @@ namespace Yes2SDK
         private readonly System.Random _random;
         private readonly Func<string, string, ControlPlaneLkgJournal> _openJournal;
         private Session _session;
+        private bool _paused;
+        private bool _unfocused;
+        private TaskCompletionSource<bool> _foreground = Foreground();
 
         internal Yes2SDKControlPlane(
             IControlPlaneTransport transport,
@@ -127,6 +138,69 @@ namespace Yes2SDK
         {
             Shutdown();
             DeploymentActivated = null;
+            SetApplicationPaused(false);
+            SetApplicationFocused(true);
+        }
+
+        internal void SetApplicationPaused(bool paused)
+        {
+            _paused = paused;
+            UpdateForeground();
+        }
+
+        internal void SetApplicationFocused(bool focused)
+        {
+            _unfocused = !focused;
+            UpdateForeground();
+        }
+
+        private static TaskCompletionSource<bool> Foreground()
+        {
+            var foreground = new TaskCompletionSource<bool>();
+            foreground.SetResult(true);
+            return foreground;
+        }
+
+        private void UpdateForeground()
+        {
+            if (!_paused && !_unfocused)
+            {
+                _foreground.TrySetResult(true);
+            }
+            else if (_foreground.Task.IsCompleted)
+            {
+                _foreground = new TaskCompletionSource<bool>();
+            }
+        }
+
+        private async Task ScheduleAsync(Session session)
+        {
+            var token = session.Cancellation.Token;
+            var interval = TimeSpan.FromSeconds(session.Context.RefreshIntervalSeconds);
+            try
+            {
+                while (true)
+                {
+                    await _delay(TimeSpan.FromTicks((long)(interval.Ticks * (0.9 + 0.2 * _random.NextDouble()))), token);
+                    while (!_foreground.Task.IsCompleted)
+                    {
+                        var cancelled = new TaskCompletionSource<bool>();
+                        using (token.Register(() => cancelled.TrySetResult(true)))
+                        {
+                            await Task.WhenAny(_foreground.Task, cancelled.Task);
+                        }
+                        token.ThrowIfCancellationRequested();
+                    }
+                    await Refresh(session, CancellationToken.None);
+                }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
 
         private async Task<ControlPlaneStatus> InitializeSessionAsync(Session session, CancellationToken token)
@@ -146,7 +220,12 @@ namespace Yes2SDK
                 Activate(session, lkg, ControlPlaneSource.Lkg, null);
             }
             session.Started = true;
-            return await Refresh(session, token);
+            var refresh = Refresh(session, token);
+            if (session.Context.RefreshIntervalSeconds > 0)
+            {
+                _ = ScheduleAsync(session);
+            }
+            return await refresh;
         }
 
         private async Task<ControlPlaneStatus> Refresh(Session session, CancellationToken token)
