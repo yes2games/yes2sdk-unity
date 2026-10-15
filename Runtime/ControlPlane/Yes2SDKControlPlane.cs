@@ -62,7 +62,11 @@ namespace Yes2SDK
             _delay = delay;
             _random = random;
             _openJournal = openJournal;
+            Config = new ControlPlaneConfig(() => _session?.Current);
         }
+
+        /// <summary>Typed reads of the active Deployment's config.v1 Resources.</summary>
+        public ControlPlaneConfig Config { get; }
 
         /// <summary>Raised once each time a different deploymentId becomes active.</summary>
         public event Action<ControlPlaneActivation> DeploymentActivated;
@@ -98,7 +102,7 @@ namespace Yes2SDK
         public bool TryGetResource(string resourceKey, out RuntimeResource resource)
         {
             resource = null;
-            var resources = _session?.Resources;
+            var resources = _session?.Current.Resources;
             if (resourceKey == null || resources == null || !resources.TryGetValue(resourceKey, out var entry))
             {
                 return false;
@@ -334,6 +338,7 @@ namespace Yes2SDK
             if (status.DeploymentId != session.AnnouncedDeploymentId)
             {
                 session.AnnouncedDeploymentId = status.DeploymentId;
+                Config.ResetDiagnostics();
                 try
                 {
                     DeploymentActivated?.Invoke(new ControlPlaneActivation(status));
@@ -412,6 +417,8 @@ namespace Yes2SDK
 
         private sealed class Session
         {
+            private volatile ControlPlaneActiveState _current;
+
             public Session(Context context, ControlPlaneLkgJournal journal, ControlPlaneFetcher fetcher)
             {
                 Context = context;
@@ -427,15 +434,18 @@ namespace Yes2SDK
             public Task<ControlPlaneStatus> Refreshing { get; set; }
             public ControlPlaneSnapshot Active { get; set; }
             public Dictionary<string, JObject> Resources { get; set; }
+            public ControlPlaneActiveState Current => _current;
             public bool Started { get; set; }
             public bool Persisted { get; set; }
             public string AnnouncedDeploymentId { get; set; }
             public ControlPlaneSource Source => Status.Source;
-            public ControlPlaneStatus Status { get; private set; }
+            public ControlPlaneStatus Status => _current.Status;
 
             public void SetStatus(ControlPlaneSource source, string lastError)
             {
-                Status = new ControlPlaneStatus(source, Context.GameKey, Context.EnvironmentKey, Active?.Bootstrap.DeploymentId, Active?.Bootstrap.ReleaseId, lastError);
+                _current = new ControlPlaneActiveState(
+                    new ControlPlaneStatus(source, Context.GameKey, Context.EnvironmentKey, Active?.Bootstrap.DeploymentId, Active?.Bootstrap.ReleaseId, lastError),
+                    Resources);
             }
         }
     }

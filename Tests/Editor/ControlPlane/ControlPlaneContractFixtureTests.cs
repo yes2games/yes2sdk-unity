@@ -16,7 +16,7 @@ namespace Yes2SDK.Tests
         private const string LiveOpsEvent = "modules/liveops-event-v1.schema.json";
         private const string ExpectedSuffix = ".expected.json";
 
-        private static string Fixtures => Path.Combine(
+        internal static string Fixtures => Path.Combine(
             PackageInfo.FindForAssembly(typeof(ControlPlaneContractFixtureTests).Assembly).resolvedPath, "ci~", "core-contracts", "fixtures");
 
         [TestCase(Bootstrap, 98)]
