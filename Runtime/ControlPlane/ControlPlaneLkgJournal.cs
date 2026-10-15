@@ -21,6 +21,7 @@ namespace Yes2SDK
         private readonly string _gameKey;
         private readonly string _environmentKey;
         private readonly Action _beforeMutation;
+        private Entry _loaded;
 
         public ControlPlaneLkgJournal(string directory, string gameKey, string environmentKey, Action beforeMutation = null)
         {
@@ -32,14 +33,15 @@ namespace Yes2SDK
 
         public ControlPlaneSnapshot Load()
         {
-            return LoadEntry(true)?.Snapshot;
+            _loaded = LoadEntry();
+            return _loaded?.Snapshot;
         }
 
         public void Write(ControlPlaneSnapshot snapshot)
         {
-            var active = LoadEntry(false);
+            var active = _loaded ?? LoadEntry();
             var slot = active?.Slot == SlotA ? SlotB : SlotA;
-            var generation = (active?.Generation ?? 0) + 1;
+            var generation = Math.Max(Decode(PathOf(SlotA), false)?.Generation ?? 0, Decode(PathOf(SlotB), false)?.Generation ?? 0) + 1;
 
             Mutate(() => Directory.CreateDirectory(_directory));
             var temp = PathOf(slot + TempSuffix);
@@ -53,11 +55,13 @@ namespace Yes2SDK
             var pointerTemp = PathOf(Pointer + TempSuffix);
             WriteDurably(pointerTemp, Encoding.ASCII.GetBytes(slot + " " + generation));
             Replace(pointerTemp, PathOf(Pointer));
+            _loaded = new Entry(slot, generation, snapshot);
             Persist();
         }
 
         public void Clear()
         {
+            _loaded = null;
             foreach (var name in new[] { Pointer, SlotA, SlotB, Pointer + TempSuffix, SlotA + TempSuffix, SlotB + TempSuffix })
             {
                 Mutate(() => File.Delete(PathOf(name)));
@@ -65,7 +69,7 @@ namespace Yes2SDK
             Persist();
         }
 
-        private Entry LoadEntry(bool validateSnapshot)
+        private Entry LoadEntry()
         {
             if (!Directory.Exists(_directory))
             {
@@ -74,14 +78,14 @@ namespace Yes2SDK
             var pointed = ReadPointer();
             if (pointed != null)
             {
-                var entry = Decode(PathOf(pointed.Slot), validateSnapshot);
+                var entry = Decode(PathOf(pointed.Slot), true);
                 if (entry != null && entry.Generation == pointed.Generation)
                 {
                     return entry;
                 }
             }
-            var a = Decode(PathOf(SlotA), validateSnapshot);
-            var b = Decode(PathOf(SlotB), validateSnapshot);
+            var a = Decode(PathOf(SlotA), true);
+            var b = Decode(PathOf(SlotB), true);
             if (a == null || b == null)
             {
                 return a ?? b;

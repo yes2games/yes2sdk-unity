@@ -198,6 +198,37 @@ namespace Yes2SDK.Tests
             Assert.AreEqual("lkg-a.dat 1", Pointer());
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void Write_NeverDeletesTheOnlySlotLoadAccepts(bool loadFirst)
+        {
+            Journal().Write(First);
+            Journal().Write(Second);
+            Assert.Throws<IOException>(() => Journal().Write(new ControlPlaneSnapshot(Third.Bootstrap, First.Bytes, First.Root)));
+            File.Delete(FileOf(ControlPlaneLkgJournal.SlotA));
+            File.Move(FileOf("lkg-a.dat.tmp"), FileOf(ControlPlaneLkgJournal.SlotA));
+            File.WriteAllText(FileOf(ControlPlaneLkgJournal.Pointer), "lkg-a.dat 3");
+            Assert.AreEqual("dep-2", DeploymentOf(Journal().Load()));
+
+            var count = 0;
+            var crashing = Journal(() =>
+            {
+                if (count++ == 3)
+                {
+                    throw new KilledException();
+                }
+            });
+            if (loadFirst)
+            {
+                Assert.AreEqual("dep-2", DeploymentOf(crashing.Load()));
+            }
+            Assert.Throws<KilledException>(() => crashing.Write(Third));
+
+            Assert.AreEqual("dep-2", DeploymentOf(Journal().Load()));
+            Journal().Write(Third);
+            Assert.AreEqual("dep-3", DeploymentOf(Journal().Load()));
+        }
+
         [Test]
         public void Write_FailsWhenDirectoryIsUnavailable()
         {

@@ -68,13 +68,12 @@ namespace Yes2SDK
                 {
                     throw new InvalidOperationException("ControlPlane is initialized for different options; call Shutdown() first");
                 }
-                return active.Initializing == null || active.Initializing.IsCompleted ? Task.FromResult(active.Status) : active.Initializing;
+                return active.Refreshing == null || active.Refreshing.IsCompleted ? Task.FromResult(active.Status) : Refresh(active, token);
             }
 
             var session = new Session(context, _openJournal(context.GameKey, context.EnvironmentKey), new ControlPlaneFetcher(_transport, _delay, _random));
             _session = session;
-            session.Initializing = InitializeSessionAsync(session, token);
-            return session.Initializing;
+            return InitializeSessionAsync(session, token);
         }
 
         /// <summary>Fetches the bootstrap and activates a new Deployment; concurrent calls share one refresh, and a token cancels only its own wait.</summary>
@@ -356,7 +355,6 @@ namespace Yes2SDK
             public ControlPlaneLkgJournal Journal { get; }
             public ControlPlaneFetcher Fetcher { get; }
             public CancellationTokenSource Cancellation { get; } = new CancellationTokenSource();
-            public Task<ControlPlaneStatus> Initializing { get; set; }
             public Task<ControlPlaneStatus> Refreshing { get; set; }
             public ControlPlaneSnapshot Active { get; set; }
             public Dictionary<string, JObject> Resources { get; set; }
