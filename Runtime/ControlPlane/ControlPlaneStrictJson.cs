@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -22,6 +23,11 @@ namespace Yes2SDK
 
         public static JToken Parse(byte[] utf8)
         {
+            return Parse(utf8, 0);
+        }
+
+        public static JToken Parse(byte[] utf8, int measureDepth)
+        {
             if (utf8 == null)
             {
                 throw new ArgumentNullException(nameof(utf8));
@@ -35,12 +41,24 @@ namespace Yes2SDK
             {
                 throw new FormatException("JSON is not valid UTF-8.", e);
             }
-            return Parse(json);
+            return Parse(json, measureDepth);
         }
 
         public static JToken Parse(string json)
         {
-            new Grammar(json).Validate();
+            return Parse(json, 0);
+        }
+
+        public static Measured MeasureOf(JToken token)
+        {
+            return token.Annotation<Measured>() ?? throw new InvalidOperationException("The token was not measured by Parse.");
+        }
+
+        private static JToken Parse(string json, int measureDepth)
+        {
+            var grammar = new Grammar(json, measureDepth);
+            grammar.Validate();
+            JToken root;
             using (var reader = new JsonTextReader(new StringReader(json)))
             {
                 reader.DateParseHandling = DateParseHandling.None;
@@ -48,12 +66,33 @@ namespace Yes2SDK
                 reader.MaxDepth = null;
                 try
                 {
-                    return JToken.ReadFrom(reader, LoadSettings);
+                    root = JToken.ReadFrom(reader, LoadSettings);
                 }
                 catch (JsonException e)
                 {
                     throw new FormatException(e.Message, e);
                 }
+            }
+            var next = 0;
+            Measure(root, 1, measureDepth, json, grammar.Spans, ref next);
+            return root;
+        }
+
+        private static void Measure(JToken token, int depth, int measureDepth, string json, List<(int Start, int End, bool LoneSurrogate)> spans, ref int next)
+        {
+            if (depth == measureDepth)
+            {
+                var span = spans[next++];
+                token.AddAnnotation(new Measured(Utf8.GetByteCount(json.Substring(span.Start, span.End - span.Start)), span.LoneSurrogate));
+                return;
+            }
+            if (depth > measureDepth)
+            {
+                return;
+            }
+            foreach (var child in token.Children())
+            {
+                Measure(child is JProperty property ? property.Value : child, depth + 1, measureDepth, json, spans, ref next);
             }
         }
 
@@ -85,15 +124,32 @@ namespace Yes2SDK
             return false;
         }
 
+        internal sealed class Measured
+        {
+            public Measured(int bytes, bool loneSurrogate)
+            {
+                Bytes = bytes;
+                LoneSurrogate = loneSurrogate;
+            }
+
+            public int Bytes { get; }
+            public bool LoneSurrogate { get; }
+        }
+
         private sealed class Grammar
         {
             private readonly string _s;
+            private readonly int _measureDepth;
             private int _i;
+            private int _loneSurrogates;
 
-            public Grammar(string s)
+            public Grammar(string s, int measureDepth)
             {
                 _s = s ?? throw new ArgumentNullException(nameof(s));
+                _measureDepth = measureDepth;
             }
+
+            public List<(int Start, int End, bool LoneSurrogate)> Spans { get; } = new List<(int Start, int End, bool LoneSurrogate)>();
 
             public void Validate()
             {
@@ -108,6 +164,8 @@ namespace Yes2SDK
 
             private void Value(int depth)
             {
+                var start = _i;
+                var loneSurrogates = _loneSurrogates;
                 switch (Peek())
                 {
                     case '{':
@@ -131,6 +189,10 @@ namespace Yes2SDK
                     default:
                         ReadNumber();
                         break;
+                }
+                if (depth == _measureDepth)
+                {
+                    Spans.Add((start, _i, _loneSurrogates != loneSurrogates));
                 }
             }
 
@@ -202,18 +264,25 @@ namespace Yes2SDK
             private void ReadString()
             {
                 _i++;
+                var high = false;
                 while (true)
                 {
                     var c = Peek();
                     _i++;
                     if (c == '"')
                     {
+                        if (high)
+                        {
+                            _loneSurrogates++;
+                        }
                         return;
                     }
+                    var unit = c;
                     if (c == '\\')
                     {
                         var e = Peek();
                         _i++;
+                        unit = e;
                         if (e == 'u')
                         {
                             for (var k = 0; k < 4; k++, _i++)
@@ -223,6 +292,7 @@ namespace Yes2SDK
                                     throw Fail("invalid \\u escape");
                                 }
                             }
+                            unit = (char)int.Parse(_s.Substring(_i - 4, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
                         }
                         else if ("\"\\/bfnrt".IndexOf(e) < 0)
                         {
@@ -233,6 +303,11 @@ namespace Yes2SDK
                     {
                         throw Fail("unescaped control character in string");
                     }
+                    if (high != char.IsLowSurrogate(unit))
+                    {
+                        _loneSurrogates++;
+                    }
+                    high = char.IsHighSurrogate(unit);
                 }
             }
 

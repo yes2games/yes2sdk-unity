@@ -1,0 +1,259 @@
+{
+  "schema": "modules/config-v1.schema.json",
+  "outcome": "ok",
+  "reads": [
+    {
+      "pointer": "",
+      "value": {
+        "": "empty key",
+        " ": "space key",
+        "a/b": 1,
+        "m~n": 2,
+        "~1": "tilde one",
+        "0": "numeric key",
+        "\u00e9": "NFC",
+        "e\u0301": "NFD",
+        "__proto__": {
+          "polluted": false
+        },
+        "list": [
+          10,
+          20,
+          {
+            "x": true
+          }
+        ],
+        "nested": {
+          "deep": {
+            "leaf": "v"
+          }
+        },
+        "numbers": {
+          "safe": 9007199254740991,
+          "negativeSafe": -9007199254740991,
+          "unsafe": 9007199254740992,
+          "negativeUnsafe": -9007199254740992,
+          "integralFraction": 1.0,
+          "exponent": 1000.0,
+          "fraction": 1.5,
+          "big": 1e+20
+        },
+        "text": "s",
+        "flag": false
+      }
+    },
+    {
+      "pointer": "/",
+      "value": "empty key"
+    },
+    {
+      "pointer": "/ ",
+      "value": "space key"
+    },
+    {
+      "pointer": "/a~1b",
+      "value": 1,
+      "integer": true
+    },
+    {
+      "pointer": "/m~0n",
+      "value": 2,
+      "integer": true
+    },
+    {
+      "pointer": "/~01",
+      "value": "tilde one"
+    },
+    {
+      "pointer": "/0",
+      "value": "numeric key"
+    },
+    {
+      "pointer": "/\u00e9",
+      "value": "NFC"
+    },
+    {
+      "pointer": "/e\u0301",
+      "value": "NFD"
+    },
+    {
+      "pointer": "/__proto__",
+      "value": {
+        "polluted": false
+      }
+    },
+    {
+      "pointer": "/__proto__/polluted",
+      "value": false
+    },
+    {
+      "pointer": "/list",
+      "value": [
+        10,
+        20,
+        {
+          "x": true
+        }
+      ]
+    },
+    {
+      "pointer": "/list/0",
+      "value": 10,
+      "integer": true
+    },
+    {
+      "pointer": "/list/2/x",
+      "value": true
+    },
+    {
+      "pointer": "/nested/deep",
+      "value": {
+        "leaf": "v"
+      }
+    },
+    {
+      "pointer": "/nested/deep/leaf",
+      "value": "v"
+    },
+    {
+      "pointer": "/text",
+      "value": "s"
+    },
+    {
+      "pointer": "/flag",
+      "value": false
+    },
+    {
+      "pointer": "/numbers/safe",
+      "value": 9007199254740991,
+      "integer": true
+    },
+    {
+      "pointer": "/numbers/negativeSafe",
+      "value": -9007199254740991,
+      "integer": true
+    },
+    {
+      "pointer": "/numbers/unsafe",
+      "value": 9007199254740992,
+      "integer": false
+    },
+    {
+      "pointer": "/numbers/negativeUnsafe",
+      "value": -9007199254740992,
+      "integer": false
+    },
+    {
+      "pointer": "/numbers/integralFraction",
+      "value": 1,
+      "integer": true
+    },
+    {
+      "pointer": "/numbers/exponent",
+      "value": 1000,
+      "integer": true
+    },
+    {
+      "pointer": "/numbers/fraction",
+      "value": 1.5,
+      "integer": false
+    },
+    {
+      "pointer": "/numbers/big",
+      "value": 100000000000000000000,
+      "integer": false
+    },
+    {
+      "pointer": "/missing",
+      "result": "absent"
+    },
+    {
+      "pointer": "/a/b",
+      "result": "absent"
+    },
+    {
+      "pointer": "/m~n0",
+      "result": "malformed"
+    },
+    {
+      "pointer": "/E\u0301",
+      "result": "absent"
+    },
+    {
+      "pointer": "//",
+      "result": "absent"
+    },
+    {
+      "pointer": "/nested/",
+      "result": "absent"
+    },
+    {
+      "pointer": "/nested/missing",
+      "result": "absent"
+    },
+    {
+      "pointer": "/list/3",
+      "result": "absent"
+    },
+    {
+      "pointer": "/list/-",
+      "result": "absent"
+    },
+    {
+      "pointer": "/list/01",
+      "result": "absent"
+    },
+    {
+      "pointer": "/list/+1",
+      "result": "absent"
+    },
+    {
+      "pointer": "/list/x",
+      "result": "absent"
+    },
+    {
+      "pointer": "/text/0",
+      "result": "absent"
+    },
+    {
+      "pointer": "/flag/x",
+      "result": "absent"
+    },
+    {
+      "pointer": "/a~1b/0",
+      "result": "absent"
+    },
+    {
+      "pointer": "/constructor",
+      "result": "absent"
+    },
+    {
+      "pointer": "/toString",
+      "result": "absent"
+    },
+    {
+      "pointer": "/__proto__/constructor",
+      "result": "absent"
+    },
+    {
+      "pointer": "list",
+      "result": "malformed"
+    },
+    {
+      "pointer": "#/list",
+      "result": "malformed"
+    },
+    {
+      "pointer": "/~",
+      "result": "malformed"
+    },
+    {
+      "pointer": "/~2",
+      "result": "malformed"
+    },
+    {
+      "pointer": "/list/~",
+      "result": "malformed"
+    }
+  ]
+}

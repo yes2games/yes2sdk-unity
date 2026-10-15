@@ -1,0 +1,4 @@
+{
+  "schema": "modules/liveops-event-v1.schema.json",
+  "outcome": "snapshot_invalid"
+}

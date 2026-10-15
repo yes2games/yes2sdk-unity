@@ -1,0 +1,8 @@
+{
+  "schema": "protocol/bootstrap-v1.schema.json",
+  "outcome": "bootstrap_invalid",
+  "binding": {
+    "gameKey": "n_sr",
+    "environmentKey": "production"
+  }
+}

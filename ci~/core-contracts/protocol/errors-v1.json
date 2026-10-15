@@ -1,0 +1,100 @@
+{
+  "protocolVersion": 1,
+  "categories": [
+    {
+      "code": "network_unavailable",
+      "conditions": [
+        "No HTTP response exists for the bootstrap, runtime snapshot or Artifact request: DNS failure, no network, or a connection that cannot be established."
+      ]
+    },
+    {
+      "code": "timeout",
+      "conditions": [
+        "The operation deadline passes before a complete response arrives."
+      ]
+    },
+    {
+      "code": "protocol_unsupported",
+      "conditions": [
+        "The bootstrap or runtime snapshot passes the strict JSON rules, its root is an object, and its protocolVersion is a safe integer other than 1. This is checked before every other field, so nothing else in the document is validated."
+      ]
+    },
+    {
+      "code": "bootstrap_http_failed",
+      "conditions": [
+        "The bootstrap response has an HTTP status outside 200-299, after redirects."
+      ]
+    },
+    {
+      "code": "bootstrap_invalid",
+      "conditions": [
+        "The bootstrap body exceeds 1048576 bytes.",
+        "The bootstrap bytes break a strict JSON rule: not UTF-8, a byte order mark, not one JSON value, a duplicate key in any object, nesting deeper than 64, or a number that is not a finite binary64 value.",
+        "The root is not an object, or protocolVersion is missing or is not a safe integer.",
+        "A required field is missing or does not match protocol/bootstrap-v1.schema.json, or snapshotUrl is not a parseable absolute HTTPS URL.",
+        "gameKey or environmentKey differs from the Game or Environment the client requested."
+      ]
+    },
+    {
+      "code": "snapshot_http_failed",
+      "conditions": [
+        "The runtime snapshot response has an HTTP status outside 200-299, after redirects."
+      ]
+    },
+    {
+      "code": "snapshot_invalid",
+      "conditions": [
+        "The runtime snapshot body exceeds 1048576 bytes.",
+        "The SHA-256 of the exact runtime snapshot bytes differs from the bootstrap snapshotDigest. This is checked before parsing.",
+        "The runtime snapshot bytes break a strict JSON rule: not UTF-8, a byte order mark, not one JSON value, a duplicate key in any object, nesting deeper than 64, or a number that is not a finite binary64 value.",
+        "The root is not an object, or protocolVersion is missing or is not a safe integer.",
+        "A required field is missing or does not match protocol/runtime-snapshot-v1.schema.json, an Artifact size is outside 0-16777216, or an Artifact url is not a parseable absolute HTTPS URL.",
+        "Resource keys are not unique and ascending, or Artifact digests are not unique and ascending, compared byte by byte.",
+        "gameKey or releaseId differs from the bootstrap.",
+        "A Resource with a known typeKey has an invalid payload. For config.v1 that is modules/config-v1.schema.json and its validator rules, with the 131072-byte limit counted on the exact bytes of data inside the runtime snapshot."
+      ]
+    },
+    {
+      "code": "resource_missing",
+      "conditions": [
+        "The requested Resource key is absent from the active runtime snapshot."
+      ]
+    },
+    {
+      "code": "resource_unsupported",
+      "conditions": [
+        "The requested Resource exists, but the caller or module does not support its typeKey. The runtime snapshot stays valid and the Resource is kept as opaque JSON."
+      ]
+    },
+    {
+      "code": "artifact_missing",
+      "conditions": [
+        "The requested Artifact digest has no descriptor in the active runtime snapshot."
+      ]
+    },
+    {
+      "code": "artifact_http_failed",
+      "conditions": [
+        "The Artifact response has an HTTP status outside 200-299, after redirects."
+      ]
+    },
+    {
+      "code": "artifact_integrity_failed",
+      "conditions": [
+        "The Artifact byte count differs from its descriptor size, or the SHA-256 of its exact bytes differs from its descriptor digest."
+      ]
+    },
+    {
+      "code": "cache_unavailable",
+      "conditions": [
+        "The persistent cache is unavailable or corrupt, and the cache operation itself is surfaced."
+      ]
+    },
+    {
+      "code": "cancelled",
+      "conditions": [
+        "The caller or the lifecycle cancelled the operation."
+      ]
+    }
+  ]
+}

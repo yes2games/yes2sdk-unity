@@ -782,6 +782,7 @@ if (controlPlane.TryGetResource("runtime.config", out RuntimeResource resource))
 - `Status` reports `Available`, `Source` (`None`, `Lkg` or `Remote`), the Game, Environment, Deployment and Release, and `LastError`. `LastError` is an errors-v1 code such as `network_unavailable` or `cache_unavailable`. A failed fetch keeps the active Deployment and only sets `LastError`.
 - `DeploymentActivated` fires once each time a different `deploymentId` becomes active.
 - `TryGetResource` returns the Resource's key, type, revision and a fresh copy of its `Data`.
+- A snapshot whose `config.v1` or `liveops.event.v1` Resource holds an invalid payload fails with `snapshot_invalid` and is never activated. Resources of any other type keep their `Data` as opaque JSON.
 - `ClearCacheAsync` deletes the stored LKG and leaves the active Deployment in memory.
 - `Shutdown` stops automatic refresh, cancels outstanding requests and forgets the active Deployment. Quitting the app calls it for you.
 
@@ -971,6 +972,8 @@ git config core.hooksPath .githooks
 `.githooks/pre-push` then refuses a direct push to the default branch, so changes go through a pull request and face `YES2 Unity Required CI`.
 
 **It is a soft guard, not enforcement.** It fires only in a clone that has run the command above, and `git push --no-verify` bypasses it outright. Nothing protects `main` server-side: this organization's plan and the deliberately uniform cross-SDK contract mean there is no branch protection, no ruleset and no CODEOWNERS gate on any Yes2 SDK (yes2games/yes2dashboard#141 sections 3 and 14). Read the checklist as "a mistake is caught", never as "`main` is protected".
+
+`ci~/core-contracts/` is an unchanged copy of `contracts/` from yes2games/yes2sdk-core, and `ci~/core-contracts.lock.json` records the Core commit and the aggregate digest of that copy. The `Core contracts lock` job runs `node 'ci~/verify-core-contracts.mjs'` and fails when a vendored byte differs. EditMode tests run every fixture through the control plane reader. To update the copy, replace the directory with Core's `contracts/` at the new commit, set `commit` and `aggregate` in the lock to that commit and its `CONTRACTS.json` `aggregate`, and run the script.
 
 ---
 
