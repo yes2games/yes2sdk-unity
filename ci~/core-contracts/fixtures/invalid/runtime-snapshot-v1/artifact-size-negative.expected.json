@@ -1,0 +1,9 @@
+{
+  "schema": "protocol/runtime-snapshot-v1.schema.json",
+  "outcome": "snapshot_invalid",
+  "binding": {
+    "gameKey": "nsr",
+    "releaseId": "rel_01j9z3k5w8e2r4t6y8u0i2o4p6",
+    "snapshotDigest": "sha256:919808884a7ae672bc6a9fdb7a571b7609cf1598905f3757392551a22ccc2456"
+  }
+}

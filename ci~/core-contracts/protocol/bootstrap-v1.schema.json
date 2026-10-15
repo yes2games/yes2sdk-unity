@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "bootstrap v1",
+  "description": "Mutable Environment pointer to one runtime snapshot (yes2games/yes2sdk-core#42 sections 2 and 3). The reference validator also enforces strict JSON, at most 1048576 bytes, protocolVersion classification, a parseable snapshotUrl and the gameKey and environmentKey binding. See contracts/README.md.",
+  "type": "object",
+  "required": ["protocolVersion", "gameKey", "environmentKey", "deploymentId", "releaseId", "snapshotUrl", "snapshotDigest"],
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "gameKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+    "environmentKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+    "deploymentId": { "$ref": "#/$defs/id" },
+    "releaseId": { "$ref": "#/$defs/id" },
+    "snapshotUrl": { "$ref": "#/$defs/httpsUrl" },
+    "snapshotDigest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[\\u0000-\\u007f]{1,128}$" },
+    "httpsUrl": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]://(?![/?#])[!-~]+$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

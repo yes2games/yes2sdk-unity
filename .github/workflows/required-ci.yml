@@ -150,6 +150,22 @@ jobs:
       - name: Check optimizer docs anchors
         run: node 'scripts~/check-optimizer-anchors.mjs'
 
+  core-contracts:
+    name: Core contracts lock
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.x"
+
+      - name: Verify the vendored Core contracts match their lock
+        run: node 'ci~/verify-core-contracts.mjs'
+
   # The compatibility matrix (#97 section 3). Both lanes run the package through
   # ci~/consumer, the committed minimal project that installs this checkout over a
   # local file dependency and owns the test framework, so the tests #70 built are
@@ -321,6 +337,7 @@ jobs:
       - release-state
       - wrapper-parity
       - optimizer-anchors
+      - core-contracts
       - unity-floor
       - unity-current
     if: always()
@@ -329,14 +346,14 @@ jobs:
     permissions: {}
 
     steps:
-      # Step one is the release contract. These four never get an exception: no
+      # Step one is the release contract. These five never get an exception: no
       # credential state, no event, no fork makes a contract assertion optional.
       - name: Assert every release-contract result is an exact success
         env:
           CONTRACT_RESULTS: ${{ toJSON(needs) }}
         run: |
           node -e '
-            const CONTRACT = ["workflow-governance", "release-state", "wrapper-parity", "optimizer-anchors"];
+            const CONTRACT = ["workflow-governance", "release-state", "wrapper-parity", "optimizer-anchors", "core-contracts"];
             const needs = JSON.parse(process.env.CONTRACT_RESULTS);
             const entries = CONTRACT.map((job) => [job, needs[job]?.result]);
             const missing = entries.filter(([, result]) => result === undefined).map(([job]) => job);

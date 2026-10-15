@@ -1,0 +1,1 @@
+{"true":true,"false":false,"integer":-17,"fraction":0.5,"exponent":1.5E-7,"string":"text","array":[1,"a",false,[],{}],"object":{"nested":{"k":"v"}}}

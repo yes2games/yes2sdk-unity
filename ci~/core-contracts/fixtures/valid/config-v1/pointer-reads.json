@@ -1,0 +1,37 @@
+{
+  "": "empty key",
+  " ": "space key",
+  "a/b": 1,
+  "m~n": 2,
+  "~1": "tilde one",
+  "0": "numeric key",
+  "\u00e9": "NFC",
+  "e\u0301": "NFD",
+  "__proto__": {
+    "polluted": false
+  },
+  "list": [
+    10,
+    20,
+    {
+      "x": true
+    }
+  ],
+  "nested": {
+    "deep": {
+      "leaf": "v"
+    }
+  },
+  "numbers": {
+    "safe": 9007199254740991,
+    "negativeSafe": -9007199254740991,
+    "unsafe": 9007199254740992,
+    "negativeUnsafe": -9007199254740992,
+    "integralFraction": 1.0,
+    "exponent": 1e3,
+    "fraction": 1.5,
+    "big": 1e20
+  },
+  "text": "s",
+  "flag": false
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "config.v1 data",
+  "description": "Payload of a config.v1 Resource (yes2games/yes2sdk-core#42 section 7). The reference validator also enforces nesting depth 16, keys of at most 128 UTF-8 bytes, strings of at most 65536 UTF-8 bytes, well-formed Unicode, finite numbers, unique keys and at most 131072 bytes in total. See contracts/README.md.",
+  "$ref": "#/$defs/object",
+  "$defs": {
+    "value": {
+      "anyOf": [
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string", "maxLength": 65536 },
+        { "$ref": "#/$defs/array" },
+        { "$ref": "#/$defs/object" }
+      ]
+    },
+    "object": {
+      "type": "object",
+      "maxProperties": 1024,
+      "propertyNames": { "type": "string", "maxLength": 128 },
+      "additionalProperties": { "$ref": "#/$defs/value" }
+    },
+    "array": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/value" }
+    }
+  }
+}

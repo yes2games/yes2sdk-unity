@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -439,6 +440,58 @@ namespace Yes2SDK.Tests
         public void ReadSnapshot_RejectsDuplicateArtifactDigest()
         {
             Assert.AreEqual("snapshot_invalid", ControlPlaneFixture.Code(ReadSnapshot(s => s["artifacts"][1]["digest"] = ControlPlaneFixture.DigestA).Error));
+        }
+
+        [TestCase(0, null)]
+        [TestCase(1, "snapshot_invalid")]
+        public void ReadSnapshot_CountsConfigDataInUtf8Bytes(int extra, string expected)
+        {
+            var data = new JObject
+            {
+                ["a"] = new string('\u00e9', 32000),
+                ["b"] = string.Concat(Enumerable.Repeat("\U0001F600", 16000)),
+                ["c"] = new string('\u00e9', 1525) + new string('x', extra)
+            };
+            Assert.AreEqual(ControlPlaneDocuments.MaxPayloadBytes + extra, Encoding.UTF8.GetByteCount(data.ToString(Formatting.None)));
+
+            var result = ReadSnapshot(s => s["resources"][0]["data"] = data);
+
+            Assert.AreEqual(expected, ControlPlaneFixture.Code(result.Error), result.Detail);
+            if (expected != null)
+            {
+                StringAssert.Contains("exceeds " + ControlPlaneDocuments.MaxPayloadBytes + " bytes", result.Detail);
+            }
+        }
+
+        [Test]
+        public void ReadSnapshot_ReadsUnpairedSurrogatesInOpaqueDataAsReplacementCharacters()
+        {
+            var opaque = ReadSnapshotText(SnapshotText("{\"s\":\"\\ud800\"}"));
+            var colliding = ReadSnapshotText(SnapshotText("{\"\\ud800\":1,\"\\ud801\":2}"));
+
+            Assert.IsTrue(opaque.Succeeded, opaque.Detail);
+            Assert.AreEqual("\ufffd", (string)opaque.Value.Root["resources"][0]["data"]["s"]);
+            Assert.AreEqual("snapshot_invalid", ControlPlaneFixture.Code(colliding.Error));
+        }
+
+        private static string SnapshotText(string opaqueData)
+        {
+            return "{\"protocolVersion\":1,\"gameKey\":\"nsr\",\"releaseId\":\"rel-1\",\"resources\":[{\"key\":\"zz.future\",\"typeKey\":\"future.v9\",\"revisionId\":\"rev-1\",\"data\":"
+                + opaqueData + "}],\"artifacts\":[]}";
+        }
+
+        [TestCase("{\"s\":\"\\ud83d\\ude00\"}", true)]
+        [TestCase("{\"s\":\"\U0001F600\"}", true)]
+        [TestCase("{\"s\":\"\\\\ud800\"}", true)]
+        [TestCase("{\"s\":\"\\ud83dx\"}", false)]
+        [TestCase("{\"s\":\"\\ud83d\U0001F600\"}", false)]
+        [TestCase("{\"s\":\"x\\ude00\"}", false)]
+        [TestCase("{\"s\":\"\\ud83d\"}", false)]
+        [TestCase("{\"\\ud83dx\":1}", false)]
+        [TestCase("{\"s\":[\"ok\",\"\\udbff\\udfff\",\"\\ud800\\ud800\\udc00\"]}", false)]
+        public void ReadPayload_RejectsOnlyUnpairedSurrogateEscapes(string json, bool accepted)
+        {
+            Assert.AreEqual(accepted, ControlPlaneDocuments.ReadPayload(Encoding.UTF8.GetBytes(json), ControlPlaneDocuments.ConfigTypeKey).Succeeded);
         }
     }
 }

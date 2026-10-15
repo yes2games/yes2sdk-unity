@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "runtime snapshot v1",
+  "description": "Immutable Release-scoped runtime document (yes2games/yes2sdk-core#42 sections 4 to 6). The reference validator also enforces at most 1048576 bytes, the SHA-256 match with the bootstrap snapshotDigest, strict JSON, protocolVersion classification, ascending unique Resource keys and Artifact digests, parseable Artifact URLs, the payload of each known typeKey and the gameKey and releaseId binding. See contracts/README.md.",
+  "type": "object",
+  "required": ["protocolVersion", "gameKey", "releaseId", "resources", "artifacts"],
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "gameKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+    "releaseId": { "$ref": "#/$defs/id" },
+    "resources": { "type": "array", "items": { "$ref": "#/$defs/resource" } },
+    "artifacts": { "type": "array", "items": { "$ref": "#/$defs/artifact" } }
+  },
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "required": ["key", "typeKey", "revisionId", "data"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+        "typeKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+        "revisionId": { "$ref": "#/$defs/id" },
+        "data": true
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["digest", "mediaType", "size", "url"],
+      "properties": {
+        "digest": { "$ref": "#/$defs/digest" },
+        "mediaType": { "type": "string", "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$" },
+        "size": { "type": "integer", "minimum": 0, "maximum": 16777216 },
+        "url": { "$ref": "#/$defs/httpsUrl" }
+      }
+    },
+    "id": { "type": "string", "pattern": "^[\\u0000-\\u007f]{1,128}$" },
+    "httpsUrl": { "type": "string", "pattern": "^[Hh][Tt][Tt][Pp][Ss]://(?![/?#])[!-~]+$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}
