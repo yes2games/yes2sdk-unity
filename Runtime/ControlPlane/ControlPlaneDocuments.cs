@@ -75,6 +75,16 @@ namespace Yes2SDK
         private static readonly Regex TypeKey = new Regex(@"^[a-z0-9][a-z0-9._-]{0,63}\z", RegexOptions.CultureInvariant);
         private static readonly Regex MediaType = new Regex(@"^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}\z", RegexOptions.CultureInvariant);
 
+        public static bool IsGameKey(string value)
+        {
+            return value != null && GameKey.IsMatch(value);
+        }
+
+        public static bool IsEnvironmentKey(string value)
+        {
+            return value != null && EnvironmentKey.IsMatch(value);
+        }
+
         public static ControlPlaneResult<ControlPlaneBootstrap> ReadBootstrap(byte[] bytes, string gameKey, string environmentKey)
         {
             try

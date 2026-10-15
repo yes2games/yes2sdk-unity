@@ -2,7 +2,8 @@
     "name": "Yes2SDK.Runtime",
     "rootNamespace": "Yes2SDK",
     "references": [
-        "Unity.Nuget.Newtonsoft-Json"
+        "Unity.Nuget.Newtonsoft-Json",
+        "Yes2SDK.ControlPlane"
     ],
     "includePlatforms": [
         "Editor",

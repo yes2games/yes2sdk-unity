@@ -3,6 +3,7 @@
     "rootNamespace": "Yes2SDK.Tests",
     "references": [
         "Yes2SDK.ControlPlane",
+        "Yes2SDK.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
