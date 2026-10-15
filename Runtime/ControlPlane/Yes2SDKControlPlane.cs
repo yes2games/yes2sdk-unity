@@ -338,6 +338,7 @@ namespace Yes2SDK
             if (status.DeploymentId != session.AnnouncedDeploymentId)
             {
                 session.AnnouncedDeploymentId = status.DeploymentId;
+                Config.ResetDiagnostics();
                 try
                 {
                     DeploymentActivated?.Invoke(new ControlPlaneActivation(status));

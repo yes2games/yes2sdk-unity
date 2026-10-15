@@ -805,9 +805,9 @@ ConfigLookup lookup = config.Inspect("runtime.config", "/lives");
 
 - Every read names a Resource key and an RFC 6901 JSON Pointer. `""` is the whole payload, `~1` is `/` and `~0` is `~`. A malformed pointer throws `ArgumentException`, whatever the control plane state.
 - A read returns your default when no Deployment is active, the Resource is missing or not `config.v1`, the path is absent, or the value has another JSON type. Values are never coerced: `"true"` is not a boolean and `1` is not `true`.
-- `GetInteger` accepts integral numbers within ±(2^53−1), including `3.0` and `1e3`. `GetNumber` accepts any number.
+- `GetInteger` accepts integral numbers within ±(2^53−1), including `3.0` and `1e3`. `GetNumber` accepts any number and returns the nearest double: an integer literal at or beyond ±2^63, such as `18446744073709551617`, rounds to `18446744073709551616`. `-0.0` and `-0` read as `0`: Unity's number parser drops the sign of a negative zero, so do not rely on it.
 - `GetJson` and `Inspect(...).Value` return a copy you own. `GetJson` returns `null` where a typed read would return your default.
-- `Inspect` reports `State` (`Value`, `NoActiveControlPlane`, `ResourceMissing`, `ResourceWrongType` or `PathMissing`), `Source`, `RevisionId`, `DeploymentId` and `ReleaseId`. A wrong Resource type or a type mismatch also logs one warning per distinct read, at most 64.
+- `Inspect` reports `State` (`Value`, `NoActiveControlPlane`, `ResourceMissing`, `ResourceWrongType` or `PathMissing`), `Source`, `RevisionId`, `DeploymentId` and `ReleaseId`. A wrong Resource type or a type mismatch also logs one warning per distinct read, at most 64 per Deployment.
 - Reads are in memory and never touch the network or disk. Config has no event of its own: after `DeploymentActivated`, every read sees the new Deployment, and a read never mixes two Deployments.
 
 ---

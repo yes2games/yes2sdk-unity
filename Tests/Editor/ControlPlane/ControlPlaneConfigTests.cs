@@ -16,7 +16,7 @@ namespace Yes2SDK.Tests
         private const string SnapshotUrl = "https://runtime.yes2games.com/releases/{0}/runtime-snapshot-v1.json";
 
         private const string RuntimeConfig = "{\"flag\":true,\"off\":false,\"count\":42,\"integral\":3.0,\"exponent\":1e3,\"fraction\":1.5," +
-            "\"max\":9007199254740991,\"min\":-9007199254740991,\"over\":9007199254740992,\"under\":-9007199254740992,\"huge\":100000000000000000000," +
+            "\"max\":9007199254740991,\"min\":-9007199254740991,\"over\":9007199254740992,\"under\":-9007199254740992,\"huge\":100000000000000000000,\"unsigned\":18446744073709551617,\"negativeZero\":-0.0,\"integerNegativeZero\":-0," +
             "\"text\":\"h\\u00e9llo \\ud83d\\ude00\",\"numeric\":\"1\",\"truthy\":\"true\",\"one\":1,\"zero\":0,\"empty\":\"\"," +
             "\"list\":[10,{\"x\":\"y\"}],\"nested\":{\"deep\":{\"leaf\":\"v\"}},\"a/b\":\"slash\",\"m~n\":\"tilde\"}";
 
@@ -125,6 +125,10 @@ namespace Yes2SDK.Tests
             Assert.AreEqual(42.0, Config.GetNumber("runtime.config", "/count", -1));
             Assert.AreEqual(1e20, Config.GetNumber("runtime.config", "/huge", -1));
             Assert.AreEqual(9007199254740992.0, Config.GetNumber("runtime.config", "/over", -1));
+            Assert.AreEqual(18446744073709551616.0, Config.GetNumber("runtime.config", "/unsigned", -1));
+            Assert.AreEqual(0.0, Config.GetNumber("runtime.config", "/negativeZero", -1));
+            Assert.AreEqual(0.0, Config.GetNumber("runtime.config", "/integerNegativeZero", -1));
+            Assert.AreEqual(0L, Config.GetInteger("runtime.config", "/negativeZero", -1));
             Assert.AreEqual("héllo 😀", Config.GetString("runtime.config", "/text", "default"));
             Assert.AreEqual("", Config.GetString("runtime.config", "/empty", "default"));
             Assert.AreEqual("y", Config.GetString("runtime.config", "/list/1/x", "default"));
@@ -199,6 +203,30 @@ namespace Yes2SDK.Tests
             });
 
             Assert.AreEqual(64, warnings.Count);
+        }
+
+        [Test]
+        public void Diagnostics_ResetOnDeploymentActivated()
+        {
+            InitializeRuntimeConfig();
+            Warnings(() =>
+            {
+                for (var i = 0; i < 64; i++)
+                {
+                    Config.GetBool("zz.future", "/flag/" + i, false);
+                }
+            });
+            Serve("dep-2", "rel-2", SnapshotBytes("rel-2", Resource("zz.future", "future.v9", "rev-9", "{\"flag\":true}")));
+
+            var warnings = Warnings(() =>
+            {
+                Config.GetBool("zz.future", "/flag/0", false);
+                Refresh();
+                Config.GetBool("zz.future", "/flag/0", false);
+                Config.GetBool("zz.future", "/flag/0", false);
+            });
+
+            CollectionAssert.AreEqual(new[] { "[Yes2SDK] ControlPlane.Config ResourceWrongType for zz.future /flag/0: Resource is future.v9, not config.v1; returning the default" }, warnings);
         }
 
         private static List<string> Warnings(Action action)

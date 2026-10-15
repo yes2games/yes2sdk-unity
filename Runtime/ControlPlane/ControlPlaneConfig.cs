@@ -104,6 +104,14 @@ namespace Yes2SDK
             return new ConfigLookup(state, status, resourceKey, pointer, revisionId, token?.DeepClone());
         }
 
+        internal void ResetDiagnostics()
+        {
+            lock (_diagnosed)
+            {
+                _diagnosed.Clear();
+            }
+        }
+
         private JToken Typed(string resourceKey, string pointer, string expected, Func<JToken, bool> accepts)
         {
             var token = Find(resourceKey, pointer, out _, out _, out _);
