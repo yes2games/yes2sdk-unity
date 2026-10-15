@@ -758,7 +758,32 @@ To opt in:
 1. Add `YES2SDK_CONTROL_PLANE` to **Scripting Define Symbols** (*Project Settings > Player > Script Compilation*) for every target you build, or to your Unity 6 Build Profile's scripting defines. A `-define:YES2SDK_CONTROL_PLANE` line in `Assets/csc.rsp` sets it for every target at once.
 2. Keep the built-in **UnityWebRequest** module enabled (*Window > Package Manager > Built-in*). It is on by default; turn it back on if your project disabled it.
 
-With the define you get the `Yes2SDK.ControlPlane` assembly: the strict JSON reader, the SHA-256 digest check, and the UnityWebRequest transport that fetches the bootstrap and snapshot documents with bounded retries. It has no public API yet. The `Yes2ControlPlane` entry point is coming, and it will exist only under the same define. You need no `link.xml` entry for it: the assembly uses no reflection, so managed stripping keeps everything your calls reach.
+With the define you get the `Yes2SDK.ControlPlane` assembly and its entry point. `Yes2ControlPlane.Instance` works on every platform. On WebGL and in the Editor, `Yes2SDK.ControlPlane` returns the same instance. You need no `link.xml` entry: the assembly uses no reflection, so managed stripping keeps everything your calls reach.
+
+```csharp
+var controlPlane = Yes2ControlPlane.Instance;
+controlPlane.DeploymentActivated += activation => Debug.Log("Deployment " + activation.DeploymentId);
+
+ControlPlaneStatus status = await controlPlane.InitializeAsync(
+    new ControlPlaneOptions { GameKey = "nsr", EnvironmentKey = "production" },
+    CancellationToken.None);
+
+if (controlPlane.TryGetResource("runtime.config", out RuntimeResource resource))
+{
+    JToken data = resource.Data;
+}
+```
+
+- `InitializeAsync` activates the last-known-good (LKG) Deployment from disk first. Then it fetches the bootstrap and activates a newer Deployment. Calling it again with the same options returns the current status. To use different options, call `Shutdown()` first.
+- `RefreshAsync` checks for a new Deployment. Concurrent calls share one refresh. An unchanged Deployment fetches no snapshot.
+- Automatic refresh is not active yet, so `RefreshIntervalSeconds` is validated but has no effect. Call `RefreshAsync` yourself, for example on resume.
+- `Status` reports `Available`, `Source` (`None`, `Lkg` or `Remote`), the Game, Environment, Deployment and Release, and `LastError`. `LastError` is an errors-v1 code such as `network_unavailable` or `cache_unavailable`. A failed fetch keeps the active Deployment and only sets `LastError`.
+- `DeploymentActivated` fires once each time a different `deploymentId` becomes active.
+- `TryGetResource` returns the Resource's key, type, revision and a fresh copy of its `Data`.
+- `ClearCacheAsync` deletes the stored LKG and leaves the active Deployment in memory.
+- `Shutdown` cancels outstanding requests and forgets the active Deployment.
+
+The LKG is stored under `Application.persistentDataPath/Yes2SDK/control-plane/v1/<gameKey>/<environmentKey>/`. On WebGL that path is backed by IndexedDB, and the SDK flushes it after every write.
 
 ---
 

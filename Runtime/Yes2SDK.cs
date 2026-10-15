@@ -375,6 +375,11 @@ namespace Yes2SDK
             }
         }
 
+#if YES2SDK_CONTROL_PLANE
+        /// <summary>Native control-plane runtime; the same instance as <see cref="Yes2ControlPlane.Instance"/>.</summary>
+        public static Yes2SDKControlPlane ControlPlane => Yes2ControlPlane.Instance;
+
+#endif
         private static Yes2SDKReview _review;
 
         /// <summary>

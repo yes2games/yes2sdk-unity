@@ -59,6 +59,28 @@ namespace Yes2SDK.Tests
             return ControlPlaneDocuments.ReadBootstrap(Bytes(Bootstrap(snapshot)), Game, Environment).Value;
         }
 
+        public static byte[] SnapshotBytesFor(string releaseId)
+        {
+            var snapshot = Snapshot();
+            snapshot["releaseId"] = releaseId;
+            return Bytes(snapshot);
+        }
+
+        public static byte[] BootstrapBytesFor(string deploymentId, string releaseId, byte[] snapshot)
+        {
+            var bootstrap = Bootstrap(snapshot);
+            bootstrap["deploymentId"] = deploymentId;
+            bootstrap["releaseId"] = releaseId;
+            return Bytes(bootstrap);
+        }
+
+        public static ControlPlaneSnapshot Deployment(string deploymentId, string releaseId)
+        {
+            var snapshot = SnapshotBytesFor(releaseId);
+            var bootstrap = ControlPlaneDocuments.ReadBootstrap(BootstrapBytesFor(deploymentId, releaseId, snapshot), Game, Environment).Value;
+            return ControlPlaneDocuments.ReadSnapshot(snapshot, bootstrap).Value;
+        }
+
         public static string Code(ControlPlaneErrorCategory? error)
         {
             return error?.Code();
