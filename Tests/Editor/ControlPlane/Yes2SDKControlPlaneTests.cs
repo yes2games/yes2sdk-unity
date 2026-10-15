@@ -291,6 +291,23 @@ namespace Yes2SDK.Tests
 
             AssertActive(status, ControlPlaneSource.Lkg, "dep-1", "rel-1", "cancelled");
             AssertActivations("dep-1");
+            Assert.IsEmpty(_transport.Requests);
+        }
+
+        [Test]
+        public void Initialize_ReentrantInitializeFromActivationHandlerReturnsCurrentStatus()
+        {
+            Journal().Write(ControlPlaneFixture.Deployment("dep-1", "rel-1"));
+            var pending = _transport.Hold(ControlPlaneFixture.BootstrapUrl);
+            Task<ControlPlaneStatus> reentrant = null;
+            _controlPlane.DeploymentActivated += _ => reentrant ??= _controlPlane.InitializeAsync(Options(), CancellationToken.None);
+
+            var initializing = _controlPlane.InitializeAsync(Options(), CancellationToken.None);
+
+            Assert.IsTrue(reentrant.IsCompleted);
+            AssertActive(reentrant.Result, ControlPlaneSource.Lkg, "dep-1", "rel-1", null);
+            pending.SetResult(ControlPlaneTransportResponse.Completed(200, Bootstrap1));
+            AssertActive(initializing.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", null);
         }
 
         [Test]
@@ -451,11 +468,36 @@ namespace Yes2SDK.Tests
             var first = _controlPlane.RefreshAsync(CancellationToken.None);
             var second = _controlPlane.RefreshAsync(CancellationToken.None);
 
-            Assert.AreSame(first, second);
             Assert.AreEqual(3, _transport.Requests.Count);
             pending.SetResult(ControlPlaneTransportResponse.Completed(200, Bootstrap1));
             AssertActive(first.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", null);
-            Assert.AreNotSame(first, _controlPlane.RefreshAsync(CancellationToken.None));
+            AssertActive(second.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", null);
+            Refresh();
+            Assert.AreEqual(4, _transport.Requests.Count);
+        }
+
+        [Test]
+        public void Refresh_CoalescedCallerIsNotCancelledByAnotherCallersToken()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+            var pending = _transport.Hold(ControlPlaneFixture.BootstrapUrl);
+            _transport.Respond(ControlPlaneFixture.SnapshotUrl, ControlPlaneTransportResponse.Completed(200, Snapshot2));
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var cancelledCaller = _controlPlane.RefreshAsync(cancellation.Token);
+                var otherCaller = _controlPlane.RefreshAsync(CancellationToken.None);
+
+                cancellation.Cancel();
+
+                AssertActive(cancelledCaller.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", "cancelled");
+                Assert.IsFalse(otherCaller.IsCompleted);
+                Assert.IsFalse(pending.Task.IsCompleted);
+                pending.SetResult(ControlPlaneTransportResponse.Completed(200, Bootstrap2));
+                AssertActive(otherCaller.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-2", "rel-2", null);
+            }
+            Assert.AreEqual(2, _transport.Requests.Count(url => url == ControlPlaneFixture.BootstrapUrl));
+            AssertActivations("dep-1", "dep-2");
         }
 
         [Test]
@@ -471,7 +513,10 @@ namespace Yes2SDK.Tests
 
                 AssertActive(refresh.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", "cancelled");
             }
-            Assert.IsTrue(pending.Task.IsCanceled);
+            AssertActive(_controlPlane.Status, ControlPlaneSource.Remote, "dep-1", "rel-1", null);
+            Assert.IsFalse(pending.Task.IsCompleted);
+            pending.SetResult(ControlPlaneTransportResponse.Completed(200, Bootstrap1));
+            AssertActive(_controlPlane.Status, ControlPlaneSource.Remote, "dep-1", "rel-1", null);
         }
 
         [Test]
@@ -517,6 +562,30 @@ namespace Yes2SDK.Tests
             Initialize();
 
             AssertActivations("dep-1", "dep-1");
+        }
+
+        [Test]
+        public void Reset_ShutsDownAndDropsSubscribers()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+
+            _controlPlane.Reset();
+
+            Assert.IsFalse(_controlPlane.Status.Available);
+            Initialize();
+            AssertActivations("dep-1");
+        }
+
+        [Test]
+        public void Entry_ResetsOnEveryPlayModeEntryInTheEditor()
+        {
+            var reset = typeof(Yes2ControlPlane).GetMethod("ResetEditorState", BindingFlags.Static | BindingFlags.NonPublic);
+            var attribute = reset.GetCustomAttribute<RuntimeInitializeOnLoadMethodAttribute>();
+
+            Assert.AreEqual(RuntimeInitializeLoadType.SubsystemRegistration, attribute.loadType);
+            Yes2ControlPlane.ResetEditorState();
+            Assert.IsFalse(Yes2ControlPlane.Instance.Status.Available);
         }
 
         [Test]

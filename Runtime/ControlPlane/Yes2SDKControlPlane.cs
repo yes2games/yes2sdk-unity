@@ -19,6 +19,14 @@ namespace Yes2SDK
                 Path.Combine(Application.persistentDataPath, "Yes2SDK", "control-plane", "v1", gameKey, environmentKey),
                 gameKey,
                 environmentKey));
+
+#if UNITY_EDITOR
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        internal static void ResetEditorState()
+        {
+            Instance.Reset();
+        }
+#endif
     }
 
     /// <summary>Native control-plane runtime (yes2games/yes2sdk-unity#98).</summary>
@@ -60,7 +68,7 @@ namespace Yes2SDK
                 {
                     throw new InvalidOperationException("ControlPlane is initialized for different options; call Shutdown() first");
                 }
-                return active.Initializing.IsCompleted ? Task.FromResult(active.Status) : active.Initializing;
+                return active.Initializing == null || active.Initializing.IsCompleted ? Task.FromResult(active.Status) : active.Initializing;
             }
 
             var session = new Session(context, _openJournal(context.GameKey, context.EnvironmentKey), new ControlPlaneFetcher(_transport, _delay, _random));
@@ -69,7 +77,7 @@ namespace Yes2SDK
             return session.Initializing;
         }
 
-        /// <summary>Fetches the bootstrap and activates a new Deployment; concurrent calls share one refresh.</summary>
+        /// <summary>Fetches the bootstrap and activates a new Deployment; concurrent calls share one refresh, and a token cancels only its own wait.</summary>
         public Task<ControlPlaneStatus> RefreshAsync(CancellationToken token)
         {
             var session = _session ?? throw new InvalidOperationException("Call InitializeAsync before RefreshAsync");
@@ -114,6 +122,12 @@ namespace Yes2SDK
             session?.Cancellation.Cancel();
         }
 
+        internal void Reset()
+        {
+            Shutdown();
+            DeploymentActivated = null;
+        }
+
         private async Task<ControlPlaneStatus> InitializeSessionAsync(Session session, CancellationToken token)
         {
             ControlPlaneSnapshot lkg = null;
@@ -133,39 +147,65 @@ namespace Yes2SDK
             return await Refresh(session, token);
         }
 
-        private Task<ControlPlaneStatus> Refresh(Session session, CancellationToken token)
+        private async Task<ControlPlaneStatus> Refresh(Session session, CancellationToken token)
         {
+            if (token.IsCancellationRequested)
+            {
+                return CallerCancelled(session);
+            }
             if (session.Refreshing == null || session.Refreshing.IsCompleted)
             {
-                session.Refreshing = RefreshSessionAsync(session, token);
+                session.Refreshing = RefreshSessionAsync(session);
             }
-            return session.Refreshing;
+            var shared = session.Refreshing;
+            if (shared.IsCompleted || !token.CanBeCanceled)
+            {
+                return await shared;
+            }
+
+            var cancelled = new TaskCompletionSource<bool>();
+            using (token.Register(() => cancelled.TrySetResult(true)))
+            {
+                if (await Task.WhenAny(shared, cancelled.Task) == shared)
+                {
+                    return await shared;
+                }
+            }
+            return CallerCancelled(session);
         }
 
-        private async Task<ControlPlaneStatus> RefreshSessionAsync(Session session, CancellationToken token)
+        private ControlPlaneStatus CallerCancelled(Session session)
         {
-            using (var linked = CancellationTokenSource.CreateLinkedTokenSource(session.Cancellation.Token, token))
+            if (session != _session)
             {
-                var bootstrap = await session.Fetcher.FetchBootstrapAsync(session.Context.BootstrapUrl, session.Context.GameKey, session.Context.EnvironmentKey, linked.Token);
-                if (!bootstrap.Succeeded)
-                {
-                    return Fail(session, bootstrap.Error.Value);
-                }
-
-                var active = session.Active?.Bootstrap;
-                var candidate = bootstrap.Value;
-                if (active != null && active.DeploymentId == candidate.DeploymentId && active.ReleaseId == candidate.ReleaseId && active.SnapshotDigest == candidate.SnapshotDigest)
-                {
-                    return Activate(session, session.Active, ControlPlaneSource.Remote, session.Persisted ? null : Persist(session, session.Active));
-                }
-
-                var snapshot = await session.Fetcher.FetchSnapshotAsync(candidate, linked.Token);
-                if (!snapshot.Succeeded)
-                {
-                    return Fail(session, snapshot.Error.Value);
-                }
-                return Activate(session, snapshot.Value, ControlPlaneSource.Remote, Persist(session, snapshot.Value));
+                return Status;
             }
+            var status = session.Status;
+            return new ControlPlaneStatus(status.Source, status.GameKey, status.EnvironmentKey, status.DeploymentId, status.ReleaseId, ControlPlaneErrorCategory.Cancelled.Code());
+        }
+
+        private async Task<ControlPlaneStatus> RefreshSessionAsync(Session session)
+        {
+            var token = session.Cancellation.Token;
+            var bootstrap = await session.Fetcher.FetchBootstrapAsync(session.Context.BootstrapUrl, session.Context.GameKey, session.Context.EnvironmentKey, token);
+            if (!bootstrap.Succeeded)
+            {
+                return Fail(session, bootstrap.Error.Value);
+            }
+
+            var active = session.Active?.Bootstrap;
+            var candidate = bootstrap.Value;
+            if (active != null && active.DeploymentId == candidate.DeploymentId && active.ReleaseId == candidate.ReleaseId && active.SnapshotDigest == candidate.SnapshotDigest)
+            {
+                return Activate(session, session.Active, ControlPlaneSource.Remote, session.Persisted ? null : Persist(session, session.Active));
+            }
+
+            var snapshot = await session.Fetcher.FetchSnapshotAsync(candidate, token);
+            if (!snapshot.Succeeded)
+            {
+                return Fail(session, snapshot.Error.Value);
+            }
+            return Activate(session, snapshot.Value, ControlPlaneSource.Remote, Persist(session, snapshot.Value));
         }
 
         private string Persist(Session session, ControlPlaneSnapshot snapshot)

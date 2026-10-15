@@ -32,19 +32,19 @@ namespace Yes2SDK
 
         public ControlPlaneSnapshot Load()
         {
-            return LoadEntry()?.Snapshot;
+            return LoadEntry(true)?.Snapshot;
         }
 
         public void Write(ControlPlaneSnapshot snapshot)
         {
-            var active = LoadEntry();
+            var active = LoadEntry(false);
             var slot = active?.Slot == SlotA ? SlotB : SlotA;
             var generation = (active?.Generation ?? 0) + 1;
 
             Mutate(() => Directory.CreateDirectory(_directory));
             var temp = PathOf(slot + TempSuffix);
             WriteDurably(temp, Encode(generation, snapshot));
-            if (Decode(temp) == null)
+            if (Decode(temp, true) == null)
             {
                 throw new IOException(slot + " did not verify after it was written");
             }
@@ -65,7 +65,7 @@ namespace Yes2SDK
             Persist();
         }
 
-        private Entry LoadEntry()
+        private Entry LoadEntry(bool validateSnapshot)
         {
             if (!Directory.Exists(_directory))
             {
@@ -74,14 +74,14 @@ namespace Yes2SDK
             var pointed = ReadPointer();
             if (pointed != null)
             {
-                var entry = Decode(PathOf(pointed.Slot));
+                var entry = Decode(PathOf(pointed.Slot), validateSnapshot);
                 if (entry != null && entry.Generation == pointed.Generation)
                 {
                     return entry;
                 }
             }
-            var a = Decode(PathOf(SlotA));
-            var b = Decode(PathOf(SlotB));
+            var a = Decode(PathOf(SlotA), validateSnapshot);
+            var b = Decode(PathOf(SlotB), validateSnapshot);
             if (a == null || b == null)
             {
                 return a ?? b;
@@ -132,7 +132,7 @@ namespace Yes2SDK
             return record;
         }
 
-        private Entry Decode(string path)
+        private Entry Decode(string path, bool validateSnapshot)
         {
             if (!File.Exists(path))
             {
@@ -185,8 +185,13 @@ namespace Yes2SDK
             {
                 return null;
             }
+            var slot = Path.GetFileName(path) == SlotB ? SlotB : SlotA;
+            if (!validateSnapshot)
+            {
+                return new Entry(slot, generation, null);
+            }
             var snapshot = ControlPlaneDocuments.ReadSnapshot(bytes, bootstrap);
-            return snapshot.Succeeded ? new Entry(Path.GetFileName(path) == SlotB ? SlotB : SlotA, generation, snapshot.Value) : null;
+            return snapshot.Succeeded ? new Entry(slot, generation, snapshot.Value) : null;
         }
 
         private void WriteDurably(string path, byte[] bytes)
