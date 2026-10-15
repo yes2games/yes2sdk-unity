@@ -783,6 +783,7 @@ if (controlPlane.TryGetResource("runtime.config", out RuntimeResource resource))
 - `DeploymentActivated` fires once each time a different `deploymentId` becomes active.
 - `TryGetResource` returns the Resource's key, type, revision and a fresh copy of its `Data`.
 - A snapshot whose `config.v1` or `liveops.event.v1` Resource holds an invalid payload fails with `snapshot_invalid` and is never activated. Resources of any other type keep their `Data` as opaque JSON.
+- Opaque `Data` and additive fields are read with Newtonsoft, which turns an unpaired surrogate escape such as `"\ud800"` into U+FFFD. `Data` returns U+FFFD in its place, and two keys that differ only in unpaired surrogates count as duplicates, so that snapshot fails with `snapshot_invalid`.
 - `ClearCacheAsync` deletes the stored LKG and leaves the active Deployment in memory.
 - `Shutdown` stops automatic refresh, cancels outstanding requests and forgets the active Deployment. Quitting the app calls it for you.
 

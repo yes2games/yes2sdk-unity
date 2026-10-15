@@ -285,14 +285,18 @@ namespace Yes2SDK
                         unit = e;
                         if (e == 'u')
                         {
+                            var code = 0;
                             for (var k = 0; k < 4; k++, _i++)
                             {
-                                if (!Uri.IsHexDigit(Peek()))
+                                var h = Peek();
+                                var digit = h >= '0' && h <= '9' ? h - '0' : h >= 'a' && h <= 'f' ? h - 'a' + 10 : h >= 'A' && h <= 'F' ? h - 'A' + 10 : -1;
+                                if (digit < 0)
                                 {
                                     throw Fail("invalid \\u escape");
                                 }
+                                code = code * 16 + digit;
                             }
-                            unit = (char)int.Parse(_s.Substring(_i - 4, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
+                            unit = (char)code;
                         }
                         else if ("\"\\/bfnrt".IndexOf(e) < 0)
                         {

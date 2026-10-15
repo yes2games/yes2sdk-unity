@@ -18,7 +18,8 @@ function walk(dir) {
 }
 
 const lock = readJson(join(ci, "core-contracts.lock.json"));
-const manifest = readJson(join(root, "CONTRACTS.json"));
+const manifestText = readFileSync(join(root, "CONTRACTS.json"), "utf8");
+const manifest = JSON.parse(manifestText);
 const paths = walk(root)
     .filter((path) => path !== "CONTRACTS.json")
     .sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)));
@@ -50,6 +51,9 @@ for (const path of listed.keys()) {
 const aggregate = sha256(files.map((file) => `${file.sha256.slice(7)}  ${file.path}\n`).join(""));
 if (aggregate !== manifest.aggregate) {
     failures.push(`aggregate ${aggregate} does not match CONTRACTS.json ${manifest.aggregate}`);
+}
+if (manifestText !== `${JSON.stringify({ schemaVersion: 1, files, aggregate }, null, 2)}\n`) {
+    failures.push("CONTRACTS.json is not the canonical manifest Core's generate-contracts.mjs writes");
 }
 if (aggregate !== lock.aggregate) {
     failures.push(`aggregate ${aggregate} does not match the lock ${lock.aggregate}`);
