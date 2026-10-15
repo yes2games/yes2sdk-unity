@@ -776,12 +776,14 @@ if (controlPlane.TryGetResource("runtime.config", out RuntimeResource resource))
 
 - `InitializeAsync` activates the last-known-good (LKG) Deployment from disk first. Then it fetches the bootstrap and activates a newer Deployment. Calling it again with the same options returns the current status. To use different options, call `Shutdown()` first.
 - `RefreshAsync` checks for a new Deployment. Concurrent calls share one refresh. An unchanged Deployment fetches no snapshot.
-- Automatic refresh is not active yet, so `RefreshIntervalSeconds` is validated but has no effect. Call `RefreshAsync` yourself, for example on resume.
+- After `InitializeAsync`, the SDK refreshes on its own every `RefreshIntervalSeconds` (default 60, allowed 15 to 3600) with ±10% jitter. Set it to `0` to turn automatic refresh off and call `RefreshAsync` yourself.
+- Automatic refresh stops while the app is paused (`OnApplicationPause`). When the app resumes and a refresh is overdue, it runs at once. A hidden WebGL tab stops the player loop, so it also refreshes at once on return if overdue.
+- Automatic and manual refreshes share one in-flight refresh. Cancelling your `RefreshAsync` token ends only your wait; it never cancels an automatic refresh, and an automatic refresh never cancels yours.
 - `Status` reports `Available`, `Source` (`None`, `Lkg` or `Remote`), the Game, Environment, Deployment and Release, and `LastError`. `LastError` is an errors-v1 code such as `network_unavailable` or `cache_unavailable`. A failed fetch keeps the active Deployment and only sets `LastError`.
 - `DeploymentActivated` fires once each time a different `deploymentId` becomes active.
 - `TryGetResource` returns the Resource's key, type, revision and a fresh copy of its `Data`.
 - `ClearCacheAsync` deletes the stored LKG and leaves the active Deployment in memory.
-- `Shutdown` cancels outstanding requests and forgets the active Deployment.
+- `Shutdown` stops automatic refresh, cancels outstanding requests and forgets the active Deployment. Quitting the app calls it for you.
 
 The LKG is stored under `Application.persistentDataPath/Yes2SDK/control-plane/v1/<gameKey>/<environmentKey>/`. On WebGL that path is backed by IndexedDB, and the SDK flushes it after every write.
 

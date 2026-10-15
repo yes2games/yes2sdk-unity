@@ -23,6 +23,7 @@ namespace Yes2SDK.Tests
 
         private string _root;
         private RoutingTransport _transport;
+        private ManualTimer _timer;
         private Yes2SDKControlPlane _controlPlane;
         private List<ControlPlaneActivation> _activations;
         private SynchronizationContext _context;
@@ -34,6 +35,7 @@ namespace Yes2SDK.Tests
             SynchronizationContext.SetSynchronizationContext(null);
             _root = Path.Combine(Path.GetTempPath(), "yes2sdk-cp-" + Guid.NewGuid().ToString("N"));
             _transport = new RoutingTransport();
+            _timer = new ManualTimer();
             _controlPlane = NewControlPlane();
         }
 
@@ -52,7 +54,7 @@ namespace Yes2SDK.Tests
         {
             var controlPlane = new Yes2SDKControlPlane(
                 _transport,
-                (delay, token) => Task.CompletedTask,
+                _timer.Delay,
                 new System.Random(0),
                 (game, environment) => new ControlPlaneLkgJournal(JournalDirectory(game, environment), game, environment));
             _activations = new List<ControlPlaneActivation>();
@@ -84,6 +86,8 @@ namespace Yes2SDK.Tests
         {
             return _controlPlane.RefreshAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
+
+        private int BootstrapRequests => _transport.Requests.Count(url => url == ControlPlaneFixture.BootstrapUrl);
 
         private void Serve(byte[] bootstrap, byte[] snapshot)
         {
@@ -776,6 +780,234 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Schedule_RefreshesEveryIntervalWithTenPercentJitter()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+
+            for (var cycle = 1; cycle <= 20; cycle++)
+            {
+                _timer.Elapse();
+                Assert.AreEqual(cycle + 1, BootstrapRequests);
+            }
+
+            Assert.AreEqual(21, _timer.Waits.Count);
+            Assert.IsTrue(_timer.Waits.All(wait => wait >= TimeSpan.FromSeconds(54) && wait <= TimeSpan.FromSeconds(66)), string.Join(", ", _timer.Waits));
+            Assert.Less(_timer.Waits.Min(), TimeSpan.FromSeconds(56), string.Join(", ", _timer.Waits));
+            Assert.Greater(_timer.Waits.Max(), TimeSpan.FromSeconds(64), string.Join(", ", _timer.Waits));
+            Assert.AreEqual(1, _transport.Requests.Count(url => url == ControlPlaneFixture.SnapshotUrl));
+            AssertActivations("dep-1");
+        }
+
+        [Test]
+        public void Schedule_IntervalZeroRunsNoLoop()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            var options = Options();
+            options.RefreshIntervalSeconds = 0;
+
+            AssertActive(_controlPlane.InitializeAsync(options, CancellationToken.None).GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", null);
+
+            CollectionAssert.IsEmpty(_timer.Waits);
+            Assert.AreEqual(1, BootstrapRequests);
+        }
+
+        [Test]
+        public void Schedule_StartsAfterPreCancelledInitialize()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize(new CancellationToken(true));
+
+            _timer.Elapse();
+
+            AssertActive(_controlPlane.Status, ControlPlaneSource.Remote, "dep-1", "rel-1", null);
+        }
+
+        [Test]
+        public void Schedule_PausedOverdueCycleRefreshesAtOnceOnResume()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+            _controlPlane.SetApplicationPaused(true);
+
+            _timer.Elapse();
+            Assert.AreEqual(1, BootstrapRequests);
+
+            _controlPlane.SetApplicationPaused(false);
+            Assert.AreEqual(2, BootstrapRequests);
+            Assert.IsTrue(_timer.Waiting);
+            Assert.AreEqual(2, _timer.Waits.Count);
+        }
+
+        [Test]
+        public void Schedule_RepeatedPauseKeepsTheCycleWaitingUntilResume()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+            _controlPlane.SetApplicationPaused(true);
+            _timer.Elapse();
+
+            _controlPlane.SetApplicationPaused(true);
+            Assert.AreEqual(1, BootstrapRequests);
+
+            _controlPlane.SetApplicationPaused(false);
+            Assert.AreEqual(2, BootstrapRequests);
+        }
+
+        [Test]
+        public void Schedule_ResumeBeforeDueWaitsForTheInterval()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+
+            _controlPlane.SetApplicationPaused(true);
+            _controlPlane.SetApplicationPaused(false);
+            Assert.AreEqual(1, BootstrapRequests);
+
+            _timer.Elapse();
+            Assert.AreEqual(2, BootstrapRequests);
+        }
+
+        [Test]
+        public void Schedule_ManualCallerTokenNeverCancelsAutomaticCycle()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+            var pending = _transport.Hold(ControlPlaneFixture.BootstrapUrl);
+            _transport.Respond(ControlPlaneFixture.SnapshotUrl, ControlPlaneTransportResponse.Completed(200, Snapshot2));
+            _timer.Elapse();
+
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var manual = _controlPlane.RefreshAsync(cancellation.Token);
+                cancellation.Cancel();
+                AssertActive(manual.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", "cancelled");
+            }
+
+            Assert.IsFalse(pending.Task.IsCompleted);
+            pending.SetResult(ControlPlaneTransportResponse.Completed(200, Bootstrap2));
+            AssertActive(_controlPlane.Status, ControlPlaneSource.Remote, "dep-2", "rel-2", null);
+            Assert.AreEqual(2, BootstrapRequests);
+            AssertActivations("dep-1", "dep-2");
+            Assert.IsTrue(_timer.Waiting);
+        }
+
+        [Test]
+        public void Schedule_AutomaticCycleJoinsManualRefreshAndOutlivesItsToken()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+            var pending = _transport.Hold(ControlPlaneFixture.BootstrapUrl);
+            _transport.Respond(ControlPlaneFixture.SnapshotUrl, ControlPlaneTransportResponse.Completed(200, Snapshot2));
+
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var manual = _controlPlane.RefreshAsync(cancellation.Token);
+                _timer.Elapse();
+                Assert.AreEqual(2, BootstrapRequests);
+                cancellation.Cancel();
+                AssertActive(manual.GetAwaiter().GetResult(), ControlPlaneSource.Remote, "dep-1", "rel-1", "cancelled");
+            }
+
+            Assert.IsFalse(pending.Task.IsCompleted);
+            Assert.IsFalse(_timer.Waiting);
+            pending.SetResult(ControlPlaneTransportResponse.Completed(200, Bootstrap2));
+            AssertActive(_controlPlane.Status, ControlPlaneSource.Remote, "dep-2", "rel-2", null);
+            Assert.IsTrue(_timer.Waiting);
+            Assert.AreEqual(2, _timer.Waits.Count);
+        }
+
+        [Test]
+        public void Shutdown_DuringAutomaticCycleCancelsItAndStopsTheLoop()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+            var pending = _transport.Hold(ControlPlaneFixture.BootstrapUrl);
+            _timer.Elapse();
+
+            _controlPlane.Shutdown();
+
+            Assert.IsTrue(pending.Task.IsCanceled);
+            Assert.IsFalse(_timer.Waiting);
+            Assert.AreEqual(1, _timer.Waits.Count);
+        }
+
+        [Test]
+        public void Shutdown_WhilePausedStopsTheLoop()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+            _controlPlane.SetApplicationPaused(true);
+            _timer.Elapse();
+
+            _controlPlane.Shutdown();
+            _controlPlane.SetApplicationPaused(false);
+
+            Assert.AreEqual(1, BootstrapRequests);
+            Assert.AreEqual(1, _timer.Waits.Count);
+        }
+
+        [Test]
+        public void Reset_StopsTheLoopAndClearsPause()
+        {
+            Serve(Bootstrap1, Snapshot1);
+            Initialize();
+            _controlPlane.SetApplicationPaused(true);
+
+            _controlPlane.Reset();
+            Assert.IsFalse(_timer.Waiting);
+
+            Initialize();
+            _timer.Elapse();
+            Assert.AreEqual(3, BootstrapRequests);
+        }
+
+        [Test]
+        public void Entry_ObservesApplicationEventsBeforeTheFirstScene()
+        {
+            var observe = typeof(Yes2ControlPlane).GetMethod("ObserveApplication", BindingFlags.Static | BindingFlags.NonPublic);
+
+            Assert.AreEqual(RuntimeInitializeLoadType.BeforeSceneLoad, observe.GetCustomAttribute<RuntimeInitializeOnLoadMethodAttribute>().loadType);
+        }
+
+        [Test]
+        public void ApplicationEvents_ForwardPauseAndQuitToTheInstance()
+        {
+            var paused = typeof(Yes2SDKControlPlane).GetField("_paused", BindingFlags.Instance | BindingFlags.NonPublic);
+            var go = new GameObject("ControlPlaneApplicationEventsTest");
+            try
+            {
+                var events = go.AddComponent<ControlPlaneApplicationEvents>();
+                Message(events, "OnApplicationPause", true);
+                Assert.IsTrue((bool)paused.GetValue(Yes2ControlPlane.Instance));
+                Message(events, "OnApplicationPause", false);
+                Assert.IsFalse((bool)paused.GetValue(Yes2ControlPlane.Instance));
+
+                var options = Options();
+                options.RuntimeOrigin = "https://127.0.0.1";
+                options.RefreshIntervalSeconds = 0;
+                Yes2ControlPlane.Instance.InitializeAsync(options, new CancellationToken(true)).GetAwaiter().GetResult();
+                Assert.AreEqual(ControlPlaneFixture.Game, Yes2ControlPlane.Instance.Status.GameKey);
+
+                Message(events, "OnApplicationQuit");
+
+                Assert.AreEqual(ControlPlaneSource.None, Yes2ControlPlane.Instance.Status.Source);
+                Assert.IsNull(Yes2ControlPlane.Instance.Status.GameKey);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                Yes2ControlPlane.Instance.Reset();
+            }
+        }
+
+        private static void Message(MonoBehaviour behaviour, string name, params object[] arguments)
+        {
+            var parameters = arguments.Select(argument => argument.GetType()).ToArray();
+            behaviour.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic, null, parameters, null).Invoke(behaviour, arguments);
+        }
+
+        [Test]
         public void Assembly_HasNoAsyncVoidMethods()
         {
             var asyncVoid = typeof(Yes2SDKControlPlane).Assembly.GetTypes()
@@ -804,6 +1036,38 @@ namespace Yes2SDK.Tests
                     return ControlPlaneTransportResponse.TimedOut();
                 default:
                     return ControlPlaneTransportResponse.Completed(long.Parse(kind), null);
+            }
+        }
+
+        private sealed class ManualTimer
+        {
+            private TaskCompletionSource<bool> _pending;
+
+            public List<TimeSpan> Waits { get; } = new List<TimeSpan>();
+
+            public bool Waiting => _pending != null && !_pending.Task.IsCompleted;
+
+            public Task Delay(TimeSpan delay, CancellationToken token)
+            {
+                if (delay < TimeSpan.FromSeconds(1))
+                {
+                    return Task.CompletedTask;
+                }
+                if (token.IsCancellationRequested)
+                {
+                    return Task.FromCanceled(token);
+                }
+                Waits.Add(delay);
+                var pending = new TaskCompletionSource<bool>();
+                token.Register(() => pending.TrySetCanceled());
+                _pending = pending;
+                return pending.Task;
+            }
+
+            public void Elapse()
+            {
+                Assert.IsTrue(Waiting);
+                _pending.SetResult(true);
             }
         }
 
