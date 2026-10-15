@@ -45,6 +45,16 @@ namespace Yes2SDK.Tests
             CollectionAssert.IsEmpty(mismatches);
         }
 
+        [Test]
+        public void EveryExpectedOutcome_NamesAKnownSchema()
+        {
+            var expected = Directory.GetFiles(Fixtures, "*" + ExpectedSuffix, SearchOption.AllDirectories);
+            var unknown = expected.Where(path => !new[] { Bootstrap, Snapshot, Config, LiveOpsEvent }.Contains((string)JObject.Parse(File.ReadAllText(path))["schema"]));
+
+            Assert.AreEqual(318, expected.Length);
+            CollectionAssert.IsEmpty(unknown);
+        }
+
         [TestCase(1048576, "ok", "ok")]
         [TestCase(1048577, "bootstrap_invalid", "snapshot_invalid")]
         public void GeneratedDocumentSizeFixtures_ProduceTheirExpectedOutcome(int bytes, string bootstrapOutcome, string snapshotOutcome)
