@@ -793,7 +793,8 @@ namespace Yes2SDK.Tests
 
             Assert.AreEqual(21, _timer.Waits.Count);
             Assert.IsTrue(_timer.Waits.All(wait => wait >= TimeSpan.FromSeconds(54) && wait <= TimeSpan.FromSeconds(66)), string.Join(", ", _timer.Waits));
-            Assert.Greater(_timer.Waits.Distinct().Count(), 1);
+            Assert.Less(_timer.Waits.Min(), TimeSpan.FromSeconds(56), string.Join(", ", _timer.Waits));
+            Assert.Greater(_timer.Waits.Max(), TimeSpan.FromSeconds(64), string.Join(", ", _timer.Waits));
             Assert.AreEqual(1, _transport.Requests.Count(url => url == ControlPlaneFixture.SnapshotUrl));
             AssertActivations("dep-1");
         }
@@ -839,15 +840,14 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
-        public void Schedule_WaitsUntilBothPauseAndFocusClear()
+        public void Schedule_RepeatedPauseKeepsTheCycleWaitingUntilResume()
         {
             Serve(Bootstrap1, Snapshot1);
             Initialize();
-            _controlPlane.SetApplicationFocused(false);
             _controlPlane.SetApplicationPaused(true);
             _timer.Elapse();
 
-            _controlPlane.SetApplicationFocused(true);
+            _controlPlane.SetApplicationPaused(true);
             Assert.AreEqual(1, BootstrapRequests);
 
             _controlPlane.SetApplicationPaused(false);
@@ -960,6 +960,51 @@ namespace Yes2SDK.Tests
             Initialize();
             _timer.Elapse();
             Assert.AreEqual(3, BootstrapRequests);
+        }
+
+        [Test]
+        public void Entry_ObservesApplicationEventsBeforeTheFirstScene()
+        {
+            var observe = typeof(Yes2ControlPlane).GetMethod("ObserveApplication", BindingFlags.Static | BindingFlags.NonPublic);
+
+            Assert.AreEqual(RuntimeInitializeLoadType.BeforeSceneLoad, observe.GetCustomAttribute<RuntimeInitializeOnLoadMethodAttribute>().loadType);
+        }
+
+        [Test]
+        public void ApplicationEvents_ForwardPauseAndQuitToTheInstance()
+        {
+            var paused = typeof(Yes2SDKControlPlane).GetField("_paused", BindingFlags.Instance | BindingFlags.NonPublic);
+            var go = new GameObject("ControlPlaneApplicationEventsTest");
+            try
+            {
+                var events = go.AddComponent<ControlPlaneApplicationEvents>();
+                Message(events, "OnApplicationPause", true);
+                Assert.IsTrue((bool)paused.GetValue(Yes2ControlPlane.Instance));
+                Message(events, "OnApplicationPause", false);
+                Assert.IsFalse((bool)paused.GetValue(Yes2ControlPlane.Instance));
+
+                var options = Options();
+                options.RuntimeOrigin = "https://127.0.0.1";
+                options.RefreshIntervalSeconds = 0;
+                Yes2ControlPlane.Instance.InitializeAsync(options, new CancellationToken(true)).GetAwaiter().GetResult();
+                Assert.AreEqual(ControlPlaneFixture.Game, Yes2ControlPlane.Instance.Status.GameKey);
+
+                Message(events, "OnApplicationQuit");
+
+                Assert.AreEqual(ControlPlaneSource.None, Yes2ControlPlane.Instance.Status.Source);
+                Assert.IsNull(Yes2ControlPlane.Instance.Status.GameKey);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                Yes2ControlPlane.Instance.Reset();
+            }
+        }
+
+        private static void Message(MonoBehaviour behaviour, string name, params object[] arguments)
+        {
+            var parameters = arguments.Select(argument => argument.GetType()).ToArray();
+            behaviour.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic, null, parameters, null).Invoke(behaviour, arguments);
         }
 
         [Test]

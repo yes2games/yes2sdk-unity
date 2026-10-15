@@ -50,7 +50,6 @@ namespace Yes2SDK
         private readonly Func<string, string, ControlPlaneLkgJournal> _openJournal;
         private Session _session;
         private bool _paused;
-        private bool _unfocused;
         private TaskCompletionSource<bool> _foreground = Foreground();
 
         internal Yes2SDKControlPlane(
@@ -139,31 +138,12 @@ namespace Yes2SDK
             Shutdown();
             DeploymentActivated = null;
             SetApplicationPaused(false);
-            SetApplicationFocused(true);
         }
 
         internal void SetApplicationPaused(bool paused)
         {
             _paused = paused;
-            UpdateForeground();
-        }
-
-        internal void SetApplicationFocused(bool focused)
-        {
-            _unfocused = !focused;
-            UpdateForeground();
-        }
-
-        private static TaskCompletionSource<bool> Foreground()
-        {
-            var foreground = new TaskCompletionSource<bool>();
-            foreground.SetResult(true);
-            return foreground;
-        }
-
-        private void UpdateForeground()
-        {
-            if (!_paused && !_unfocused)
+            if (!paused)
             {
                 _foreground.TrySetResult(true);
             }
@@ -171,6 +151,13 @@ namespace Yes2SDK
             {
                 _foreground = new TaskCompletionSource<bool>();
             }
+        }
+
+        private static TaskCompletionSource<bool> Foreground()
+        {
+            var foreground = new TaskCompletionSource<bool>();
+            foreground.SetResult(true);
+            return foreground;
         }
 
         private async Task ScheduleAsync(Session session)

@@ -777,7 +777,7 @@ if (controlPlane.TryGetResource("runtime.config", out RuntimeResource resource))
 - `InitializeAsync` activates the last-known-good (LKG) Deployment from disk first. Then it fetches the bootstrap and activates a newer Deployment. Calling it again with the same options returns the current status. To use different options, call `Shutdown()` first.
 - `RefreshAsync` checks for a new Deployment. Concurrent calls share one refresh. An unchanged Deployment fetches no snapshot.
 - After `InitializeAsync`, the SDK refreshes on its own every `RefreshIntervalSeconds` (default 60, allowed 15 to 3600) with ±10% jitter. Set it to `0` to turn automatic refresh off and call `RefreshAsync` yourself.
-- Automatic refresh stops while the app is paused or out of focus (`OnApplicationPause` / `OnApplicationFocus`). When the app comes back and a refresh is overdue, it runs at once.
+- Automatic refresh stops while the app is paused (`OnApplicationPause`). When the app resumes and a refresh is overdue, it runs at once. A hidden WebGL tab stops the player loop, so it also refreshes at once on return if overdue.
 - Automatic and manual refreshes share one in-flight refresh. Cancelling your `RefreshAsync` token ends only your wait; it never cancels an automatic refresh, and an automatic refresh never cancels yours.
 - `Status` reports `Available`, `Source` (`None`, `Lkg` or `Remote`), the Game, Environment, Deployment and Release, and `LastError`. `LastError` is an errors-v1 code such as `network_unavailable` or `cache_unavailable`. A failed fetch keeps the active Deployment and only sets `LastError`.
 - `DeploymentActivated` fires once each time a different `deploymentId` becomes active.

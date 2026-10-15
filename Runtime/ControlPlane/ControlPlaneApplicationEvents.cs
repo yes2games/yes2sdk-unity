@@ -9,11 +9,6 @@ namespace Yes2SDK
             Yes2ControlPlane.Instance.SetApplicationPaused(paused);
         }
 
-        private void OnApplicationFocus(bool focused)
-        {
-            Yes2ControlPlane.Instance.SetApplicationFocused(focused);
-        }
-
         private void OnApplicationQuit()
         {
             Yes2ControlPlane.Instance.Shutdown();
