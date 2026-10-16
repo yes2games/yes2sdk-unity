@@ -209,6 +209,13 @@
       productName: "{{{ PRODUCT_NAME }}}",
       productVersion: "{{{ PRODUCT_VERSION }}}",
     };
+#if MOBILE_MAX_DPR
+
+    if (((navigator.maxTouchPoints || 0) > 0 && window.matchMedia('(hover: none)').matches) ||
+        /android|mobi|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent)) {
+      config.devicePixelRatio = Math.min({{{ MOBILE_MAX_DPR }}}, window.devicePixelRatio);
+    }
+#endif
 
     var canvas = document.querySelector("#unity-canvas");
 
