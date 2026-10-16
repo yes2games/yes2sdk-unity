@@ -11,6 +11,7 @@ namespace Yes2SDK.Tests
         [TestCase("1")]
         [TestCase("2.25")]
         [TestCase("4")]
+        [TestCase("0.5")]
         public void IsValidMobileMaxDpr_EmptyOrPlainDecimalInRange_Accepts(string value)
         {
             Assert.IsTrue(Yes2SDKBuildGuard.IsValidMobileMaxDpr(value));
@@ -20,6 +21,10 @@ namespace Yes2SDK.Tests
         [TestCase("0")]
         [TestCase("0.0")]
         [TestCase("-1")]
+        [TestCase("0.49")]
+        [TestCase("01.4")]
+        [TestCase("00.5")]
+        [TestCase("01")]
         [TestCase("4.5")]
         [TestCase("1,4")]
         [TestCase(" 1.4 ")]

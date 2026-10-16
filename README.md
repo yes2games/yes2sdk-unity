@@ -877,9 +877,9 @@ The template renders at the browser's full `devicePixelRatio` by default. A 1080
 
 - **Where:** *Project Settings > Player > WebGL > Resolution and Presentation*, under the template's custom variables (Unity 6+: your Build Profile's Player Settings). If the field is missing, click **Reinstall Template** after updating the SDK. Reinstalling replaces your template copy, so if you customised it, paste the `#if MOBILE_MAX_DPR` ... `#endif` block from the package's `Assets/WebGLTemplates/Yes2SDK-SuperSDK/index.html` into your copy instead. Without the block, setting the value caps nothing.
 - **Off (default):** leave it empty. The built `index.html` is the same as without the setting, and every device renders at full DPR.
-- **On:** a plain decimal above 0 and at most 4, such as `1.4`. The template sets `config.devicePixelRatio = min(MOBILE_MAX_DPR, devicePixelRatio)` before `createUnityInstance`.
+- **On:** a plain decimal from 0.5 to 4 with no leading zeros, such as `1.4`. The template sets `config.devicePixelRatio = min(MOBILE_MAX_DPR, devicePixelRatio)` before `createUnityInstance`.
 - **Who is capped:** a touch device without hover (this also catches iPadOS Safari and Android tablets in desktop mode, which send a desktop user agent), or a mobile user agent. Mouse or trackpad desktops are not capped.
-- **Invalid values** (`0`, a negative number, above `4`, `1,4`, exponents such as `1e3`, spaces, text) fail the build in the Yes2SDK build guard.
+- **Invalid values** (below `0.5`, above `4`, leading zeros such as `01.4`, `1,4`, exponents such as `1e3`, spaces, text) fail the build in the Yes2SDK build guard.
 
 Backbuffer size is CSS viewport × min(cap, DPR):
 
