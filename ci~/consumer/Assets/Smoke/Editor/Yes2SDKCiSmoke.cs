@@ -163,6 +163,12 @@ namespace Yes2Games.CI
             }
             Debug.Log("[smoke] built WebGL player at High stripping: " + loaders.First());
 
+            string builtIndex = Path.Combine(outputPath, "index.html");
+            if (File.ReadAllText(builtIndex).Contains("devicePixelRatio"))
+            {
+                throw new Exception("MOBILE_MAX_DPR is unset but " + builtIndex + " still sets devicePixelRatio");
+            }
+
             if (!CompileWebGLPlayerScripts().Contains(ControlPlaneAssembly))
             {
                 throw new Exception(ControlPlaneAssembly + " did not compile for WebGL with YES2SDK_CONTROL_PLANE defined");
