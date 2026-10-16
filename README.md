@@ -875,11 +875,11 @@ The override saves and restores Player Settings around each build, so it never l
 
 The template renders at the browser's full `devicePixelRatio` by default. A 1080p Android phone (CSS 915×412, DPR 2.625) then renders 2402×1082, and an iPhone 14 renders 2532×1170. Set `MOBILE_MAX_DPR` to cap the ratio on mobile and tablets:
 
-- **Where:** *Project Settings > Player > WebGL > Resolution and Presentation*, under the template's custom variables (Unity 6+: your Build Profile's Player Settings). Click **Reinstall Template** after updating the SDK if the field is missing.
+- **Where:** *Project Settings > Player > WebGL > Resolution and Presentation*, under the template's custom variables (Unity 6+: your Build Profile's Player Settings). If the field is missing, click **Reinstall Template** after updating the SDK. Reinstalling replaces your template copy, so if you customised it, paste the `#if MOBILE_MAX_DPR` ... `#endif` block from the package's `Assets/WebGLTemplates/Yes2SDK-SuperSDK/index.html` into your copy instead. Without the block, setting the value caps nothing.
 - **Off (default):** leave it empty. The built `index.html` is the same as without the setting, and every device renders at full DPR.
-- **On:** a positive number such as `1.4`. The template sets `config.devicePixelRatio = min(MOBILE_MAX_DPR, devicePixelRatio)` before `createUnityInstance`.
-- **Who is capped:** a touch device without hover (this also catches iPadOS Safari and Android tablets in desktop mode, which send a desktop user agent), or a mobile user agent. Desktop browsers are never capped.
-- **Invalid values** (`0`, a negative number, `1,4`, text) fail the build in the Yes2SDK build guard.
+- **On:** a plain decimal above 0 and at most 4, such as `1.4`. The template sets `config.devicePixelRatio = min(MOBILE_MAX_DPR, devicePixelRatio)` before `createUnityInstance`.
+- **Who is capped:** a touch device without hover (this also catches iPadOS Safari and Android tablets in desktop mode, which send a desktop user agent), or a mobile user agent. Mouse or trackpad desktops are not capped.
+- **Invalid values** (`0`, a negative number, above `4`, `1,4`, exponents such as `1e3`, spaces, text) fail the build in the Yes2SDK build guard.
 
 Backbuffer size is CSS viewport × min(cap, DPR):
 
@@ -889,7 +889,7 @@ Backbuffer size is CSS viewport × min(cap, DPR):
 | 720p Android (CSS 800×360, DPR 2) | 1600×720 | 1280×576 | **1120×504** | 1000×450 |
 | iPhone 13/14 (CSS 844×390, DPR 3) | 2532×1170 | 1350×624 | **1182×546** | 1055×488 |
 
-`1.4` is the value NSR ships on mobile Web. It renders 23% fewer pixels than `1.6`. In its evaluation, small HUD labels stayed readable down to `1.25` and broke up at `1.0`. Pick a value in the 1.25–1.6 range, and check your smallest text on a phone before going lower.
+`1.4` is the value Yes2Games ships in its own titles on mobile Web. It renders 23% fewer pixels than `1.6`. In the evaluation behind it, small HUD labels stayed readable down to `1.25` and broke up at `1.0`. Pick a value in the 1.25–1.6 range, and check your smallest text on a phone before going lower.
 
 ---
 

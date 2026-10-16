@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -59,17 +60,18 @@ namespace Yes2SDK.Editor
             {
                 throw new BuildFailedException(
                     $"[Yes2SDK] WebGL template variable {MobileMaxDprVariable} is '{mobileMaxDpr}'. " +
-                    "Leave it empty to keep the full device pixel ratio, or set a positive number " +
-                    "such as 1.4 in Project Settings > Player > WebGL > Resolution and Presentation.");
+                    "Leave it empty to keep the full device pixel ratio, or set a plain decimal above 0 " +
+                    "and at most 4, such as 1.4, in Project Settings > Player > WebGL > Resolution and Presentation.");
             }
         }
 
-        /// <summary>True when the MOBILE_MAX_DPR template variable is empty (no cap) or a positive finite number.</summary>
+        /// <summary>True when the MOBILE_MAX_DPR template variable is empty (no cap) or a plain decimal above 0 and at most 4.</summary>
         public static bool IsValidMobileMaxDpr(string value)
         {
             return string.IsNullOrEmpty(value) ||
-                (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float cap) &&
-                 cap > 0f && !float.IsInfinity(cap));
+                (Regex.IsMatch(value, @"^[0-9]+(\.[0-9]+)?\z") &&
+                 float.TryParse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out float cap) &&
+                 cap > 0f && cap <= 4f);
         }
     }
 }

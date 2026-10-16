@@ -32,6 +32,7 @@ namespace Yes2Games.CI
         private const string TemplateSetting = "PROJECT:" + TemplateName;
         private const string ScenePath = "Assets/Smoke/Smoke.unity";
         private const string ControlPlaneAssembly = "Yes2SDK.ControlPlane";
+        private const string MobileMaxDprVariable = "MOBILE_MAX_DPR";
 
         public static void BuildWebGL()
         {
@@ -167,6 +168,34 @@ namespace Yes2Games.CI
             if (File.ReadAllText(builtIndex).Contains("devicePixelRatio"))
             {
                 throw new Exception("MOBILE_MAX_DPR is unset but " + builtIndex + " still sets devicePixelRatio");
+            }
+
+            try
+            {
+                PlayerSettings.SetTemplateCustomValue(MobileMaxDprVariable, "abc");
+                BuildResult invalid = BuildPipeline.BuildPlayer(
+                    new[] { ScenePath }, outputPath, BuildTarget.WebGL, BuildOptions.None).summary.result;
+                if (invalid != BuildResult.Failed)
+                {
+                    throw new Exception("MOBILE_MAX_DPR 'abc' build result is " + invalid + ", expected the build guard to fail it");
+                }
+
+                PlayerSettings.SetTemplateCustomValue(MobileMaxDprVariable, "1.4");
+                BuildResult capped = BuildPipeline.BuildPlayer(
+                    new[] { ScenePath }, outputPath, BuildTarget.WebGL, BuildOptions.None).summary.result;
+                if (capped != BuildResult.Succeeded)
+                {
+                    throw new Exception("MOBILE_MAX_DPR '1.4' build result is " + capped);
+                }
+                if (!File.ReadAllText(builtIndex).Contains("Math.min(1.4, window.devicePixelRatio)"))
+                {
+                    throw new Exception("MOBILE_MAX_DPR is 1.4 but " + builtIndex + " does not cap devicePixelRatio at 1.4");
+                }
+                Debug.Log("[smoke] MOBILE_MAX_DPR: 'abc' failed the build, '1.4' capped devicePixelRatio");
+            }
+            finally
+            {
+                PlayerSettings.SetTemplateCustomValue(MobileMaxDprVariable, "");
             }
 
             if (!CompileWebGLPlayerScripts().Contains(ControlPlaneAssembly))
