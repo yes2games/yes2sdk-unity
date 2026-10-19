@@ -43,6 +43,7 @@ jobs:
           HAS_LICENSE: ${{ secrets.UNITY_LICENSE != '' }}
           HAS_EMAIL: ${{ secrets.UNITY_EMAIL != '' }}
           HAS_PASSWORD: ${{ secrets.UNITY_PASSWORD != '' }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork || false }}
         run: |
           set -euo pipefail
           if [ "$HAS_LICENSE" = "true" ] && [ "$HAS_EMAIL" = "true" ] && [ "$HAS_PASSWORD" = "true" ]; then
@@ -50,7 +51,12 @@ jobs:
             echo "Unity credentials are present; the Android lane will run."
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Unity credentials missing::the Android lane is skipped because UNITY_LICENSE, UNITY_EMAIL or UNITY_PASSWORD is not available to this run."
+            if [ "$IS_FORK" = "true" ]; then
+              echo "::notice title=Android lane skipped for a fork::a fork pull request gets no repository secrets, so the Android lane is skipped by design."
+            else
+              echo "::error title=PROVISIONING: Unity credentials missing::UNITY_LICENSE, UNITY_EMAIL or UNITY_PASSWORD is not available to this run, so the Android lane cannot run. Set the repository secrets and re-run; no change to this branch is needed."
+              exit 1
+            fi
           fi
 
   android-il2cpp:
