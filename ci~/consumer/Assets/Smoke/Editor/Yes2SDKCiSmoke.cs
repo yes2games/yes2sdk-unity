@@ -29,11 +29,11 @@ namespace Yes2Games.CI
     public static class Yes2SDKCiSmoke
     {
         private const string PackageName = "com.yes2games.yes2sdk";
+        private const string AndroidIdentifier = "com.yes2games.yes2sdk.ciproof";
         private const string TemplateName = "Yes2SDK-SuperSDK";
         private const string TemplateSetting = "PROJECT:" + TemplateName;
         private const string ScenePath = "Assets/Smoke/Smoke.unity";
         private const string ControlPlaneAssembly = "Yes2SDK.ControlPlane";
-        private const string AndroidIdentifier = "com.yes2games.yes2sdk.ciproof";
 
         public static void BuildWebGL()
         {
