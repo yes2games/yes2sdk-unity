@@ -65,8 +65,9 @@ const browser = spawn(
         `--user-data-dir=${profile}`,
         "about:blank",
     ],
-    { stdio: ["ignore", "ignore", "pipe"] }
+    { stdio: ["ignore", "ignore", "pipe"], detached: true }
 );
+const browserExited = new Promise((exited) => browser.once("exit", exited));
 
 let exitCode = 1;
 try {
@@ -79,7 +80,7 @@ try {
                 found(match[1]);
             }
         });
-        browser.on("exit", (code) => failed(new Error(`Chrome exited with ${code} before DevTools listened:\n${stderr}`)));
+        browserExited.then((code) => failed(new Error(`Chrome exited with ${code} before DevTools listened:\n${stderr}`)));
     });
 
     const socket = new WebSocket(endpoint);
@@ -183,7 +184,10 @@ try {
 } catch (error) {
     console.error(`::error title=WebGL control plane proof failed::${error.message}`);
 } finally {
-    browser.kill("SIGKILL");
+    if (browser.exitCode === null && browser.signalCode === null) {
+        process.kill(-browser.pid, "SIGKILL");
+    }
+    await browserExited;
     server.close();
     rmSync(profile, { recursive: true, force: true, maxRetries: 5 });
 }
