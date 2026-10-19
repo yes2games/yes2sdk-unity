@@ -3,7 +3,8 @@ name: YES2 Unity ControlPlane Native Proof
 on:
   pull_request:
     paths:
-      - "Runtime/ControlPlane/**"
+      - "Runtime/**"
+      - "Editor/**"
       - "ci~/consumer/**"
       - "ci~/run-android-proof.sh"
       - ".github/workflows/control-plane-native-proof.yml"
@@ -12,7 +13,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "Runtime/ControlPlane/**"
+      - "Runtime/**"
+      - "Editor/**"
       - "ci~/consumer/**"
       - "ci~/run-android-proof.sh"
       - ".github/workflows/control-plane-native-proof.yml"
@@ -28,9 +30,33 @@ permissions:
   contents: read
 
 jobs:
+  credentials:
+    name: Unity credentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      present: ${{ steps.probe.outputs.present }}
+    steps:
+      - name: Probe for Unity credentials
+        id: probe
+        env:
+          HAS_LICENSE: ${{ secrets.UNITY_LICENSE != '' }}
+          HAS_EMAIL: ${{ secrets.UNITY_EMAIL != '' }}
+          HAS_PASSWORD: ${{ secrets.UNITY_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+          if [ "$HAS_LICENSE" = "true" ] && [ "$HAS_EMAIL" = "true" ] && [ "$HAS_PASSWORD" = "true" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Unity credentials are present; the Android lane will run."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Unity credentials missing::the Android lane is skipped because UNITY_LICENSE, UNITY_EMAIL or UNITY_PASSWORD is not available to this run."
+          fi
+
   android-il2cpp:
     name: Android IL2CPP ControlPlane proof
-    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
+    needs: [credentials]
+    if: needs.credentials.outputs.present == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     concurrency:
@@ -49,6 +75,7 @@ jobs:
           df -h /
 
       - name: Android IL2CPP build of the control plane proof scene
+        id: build
         uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -85,3 +112,13 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash 'ci~/run-android-proof.sh' build/Android/Yes2SDKProof.apk
+
+      - name: Explain a possible licence failure
+        if: failure() && steps.build.conclusion == 'failure'
+        run: |
+          echo "::warning title=PROVISIONING: this may be a licence failure rather than a build failure::\
+          Search this job's log for 'Missing Unity License' or 'Licensing'. If the build step failed during \
+          activation rather than during the build, it is provisioning and no change to this branch will \
+          fix it: check that UNITY_LICENSE, UNITY_EMAIL and UNITY_PASSWORD are set, and that a Personal \
+          seat is free. If instead the log shows a compile or player build error, it belongs to the change \
+          under review."

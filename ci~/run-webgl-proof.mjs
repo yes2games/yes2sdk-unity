@@ -116,16 +116,24 @@ try {
 
     const proof = (url) =>
         new Promise((done, failed) => {
-            const timer = setTimeout(() => {
+            const settle = (outcome) => {
+                clearTimeout(timer);
                 listeners.delete(listener);
-                failed(new Error(`no ${MARKER} line from ${url} within ${PROOF_TIMEOUT_MS / 1000} s`));
-            }, PROOF_TIMEOUT_MS);
+                outcome();
+            };
+            const timer = setTimeout(
+                () => settle(() => failed(new Error(`no ${MARKER} line from ${url} within ${PROOF_TIMEOUT_MS / 1000} s`))),
+                PROOF_TIMEOUT_MS
+            );
             const listener = (message) => {
                 if (message.sessionId !== sessionId) {
                     return;
                 }
                 if (message.method === "Runtime.exceptionThrown") {
-                    console.log(`[page exception] ${message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text}`);
+                    const details = message.params.exceptionDetails;
+                    const text = details.exception?.description ?? details.text;
+                    console.log(`[page exception] ${text}`);
+                    settle(() => failed(new Error(`the player threw before reporting from ${url}: ${text}`)));
                     return;
                 }
                 if (message.method !== "Runtime.consoleAPICalled") {
@@ -133,11 +141,19 @@ try {
                 }
                 const text = message.params.args.map((arg) => arg.value ?? arg.description ?? "").join(" ");
                 console.log(`[page ${message.params.type}] ${text}`);
+                if (message.params.type === "error" && text.includes("Halting program")) {
+                    settle(() => failed(new Error(`the player halted before reporting from ${url}: ${text}`)));
+                    return;
+                }
                 const at = text.indexOf(MARKER);
                 if (at >= 0) {
-                    clearTimeout(timer);
-                    listeners.delete(listener);
-                    done(JSON.parse(text.slice(at + MARKER.length).split("\n")[0]));
+                    settle(() => {
+                        try {
+                            done(JSON.parse(text.slice(at + MARKER.length).split("\n")[0]));
+                        } catch (error) {
+                            failed(new Error(`unreadable ${MARKER} line from ${url}: ${error.message}`));
+                        }
+                    });
                 }
             };
             listeners.add(listener);
