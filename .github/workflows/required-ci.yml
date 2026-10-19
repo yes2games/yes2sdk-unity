@@ -185,7 +185,9 @@ jobs:
     timeout-minutes: 90
     # One floor lane at a time across the whole repository, so two open pull
     # requests queue rather than stacking Unity seats. Paired with the same rule on
-    # the current lane, the ceiling is the two seats a single run needs. The groups
+    # the current lane, the ceiling is the two seats a single run needs, plus an
+    # optional third: control-plane-native-proof.yml takes one in its own group,
+    # yes2-unity-seat-android, only when its paths change. The groups
     # sit on the jobs rather than on the workflow because a workflow-level group
     # shared across pull requests cannot also cancel a superseded run of the same
     # pull request, and #97 section 11 requires that cancellation.
@@ -296,6 +298,15 @@ jobs:
           versioning: None
           allowDirtyBuild: true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.x"
+
+      - name: Control plane proof and LKG reload in headless Chromium
+        id: webgl-proof
+        run: node 'ci~/run-webgl-proof.mjs' build/WebGL/Yes2SDKSmoke
+
       - name: Drop the control plane opt-in
         run: rm 'ci~/consumer/Assets/csc.rsp'
 
@@ -320,7 +331,7 @@ jobs:
       # strings to look for rather than claiming to know. Unity refusing to start
       # with a message that points nowhere is the failure this exists to prevent.
       - name: Explain a possible licence failure
-        if: failure()
+        if: failure() && steps.webgl-proof.conclusion != 'failure'
         run: |
           echo "::warning title=PROVISIONING: this may be a licence failure rather than a test failure::\
           Search this job's log for 'Missing Unity License' or 'Licensing'. If the step failed during \

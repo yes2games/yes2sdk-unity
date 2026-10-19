@@ -15,10 +15,15 @@ namespace Yes2SDK
             new UnityWebRequestControlPlaneTransport(UnityWebRequestControlPlaneTransport.MonotonicClock()),
             UnityWebRequestControlPlaneTransport.DelayAsync,
             new System.Random(),
-            (gameKey, environmentKey) => new ControlPlaneLkgJournal(
+            OpenJournal);
+
+        internal static ControlPlaneLkgJournal OpenJournal(string gameKey, string environmentKey)
+        {
+            return new ControlPlaneLkgJournal(
                 Path.Combine(Application.persistentDataPath, "Yes2SDK", "control-plane", "v1", gameKey, environmentKey),
                 gameKey,
-                environmentKey));
+                environmentKey);
+        }
 
 #if UNITY_EDITOR
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
