@@ -7,6 +7,7 @@ using UnityEditor.Build.Player;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using Yes2SDK.Editor;
 
@@ -32,10 +33,43 @@ namespace Yes2Games.CI
         private const string TemplateSetting = "PROJECT:" + TemplateName;
         private const string ScenePath = "Assets/Smoke/Smoke.unity";
         private const string ControlPlaneAssembly = "Yes2SDK.ControlPlane";
+        private const string AndroidIdentifier = "com.yes2games.yes2sdk.ciproof";
 
         public static void BuildWebGL()
         {
             RunAndExit("WebGL package smoke", Run);
+        }
+
+        public static void BuildAndroid()
+        {
+            RunAndExit("Android IL2CPP control plane proof build", () =>
+            {
+                if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+                {
+                    throw new Exception(
+                        "active build target is " + EditorUserBuildSettings.activeBuildTarget +
+                        "; this build must run in an Editor started with -buildTarget Android");
+                }
+
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, AndroidIdentifier);
+                PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+                PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.Android, ManagedStrippingLevel.High);
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.X86_64;
+                PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+                PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.OpenGLES3 });
+                EditorUserBuildSettings.buildAppBundle = false;
+
+                CreateProofScene();
+                string outputPath = CustomBuildPath() ?? Path.GetFullPath(
+                    Path.Combine(Application.dataPath, "..", "build", "Android", "Yes2SDKProof.apk"));
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+                BuildScene(outputPath, BuildTarget.Android);
+                if (!File.Exists(outputPath))
+                {
+                    throw new Exception("Android build reported success but produced no APK at " + outputPath);
+                }
+                Debug.Log("[smoke] built Android IL2CPP ARM64+x86_64 player at High stripping: " + outputPath);
+            });
         }
 
         public static void CompileWithoutControlPlane()
@@ -123,17 +157,11 @@ namespace Yes2Games.CI
             }
 
             PlayerSettings.WebGL.template = TemplateSetting;
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
             PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL, ManagedStrippingLevel.High);
             AssetDatabase.Refresh();
 
-            // Build the scene here rather than committing a .unity file: its
-            // serialized form differs between the floor and the current lane, and a
-            // scene checked in under one of them is a diff waiting to happen.
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-            if (!EditorSceneManager.SaveScene(scene, ScenePath))
-            {
-                throw new Exception("could not save the smoke scene to " + ScenePath);
-            }
+            CreateProofScene();
 
             string outputPath = CustomBuildPath() ?? Path.GetFullPath(
                 Path.Combine(Application.dataPath, "..", "build", "WebGL"));
@@ -142,15 +170,7 @@ namespace Yes2Games.CI
             // Yes2SDKBuildGuard runs as a preprocess callback here, so a missing or
             // wrong template fails the build rather than shipping a player with no
             // JS bridge wired up.
-            BuildReport report = BuildPipeline.BuildPlayer(
-                new[] { ScenePath }, outputPath, BuildTarget.WebGL, BuildOptions.None);
-
-            if (report.summary.result != BuildResult.Succeeded)
-            {
-                throw new Exception(
-                    "WebGL player build result is " + report.summary.result + " with " +
-                    report.summary.totalErrors + " error(s)");
-            }
+            BuildScene(outputPath, BuildTarget.WebGL);
 
             // A "succeeded" build with no loader is not a player. Unity writes the
             // loader under Build/ for every WebGL output layout this lane uses.
@@ -166,6 +186,32 @@ namespace Yes2Games.CI
             if (!CompileWebGLPlayerScripts().Contains(ControlPlaneAssembly))
             {
                 throw new Exception(ControlPlaneAssembly + " did not compile for WebGL with YES2SDK_CONTROL_PLANE defined");
+            }
+        }
+
+        private static void CreateProofScene()
+        {
+            // Build the scene here rather than committing a .unity file: its
+            // serialized form differs between the floor and the current lane, and a
+            // scene checked in under one of them is a diff waiting to happen.
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+#if YES2SDK_CONTROL_PLANE
+            new GameObject(nameof(ControlPlaneNativeProof)).AddComponent<ControlPlaneNativeProof>();
+#endif
+            if (!EditorSceneManager.SaveScene(scene, ScenePath))
+            {
+                throw new Exception("could not save the smoke scene to " + ScenePath);
+            }
+        }
+
+        private static void BuildScene(string outputPath, BuildTarget target)
+        {
+            BuildReport report = BuildPipeline.BuildPlayer(new[] { ScenePath }, outputPath, target, BuildOptions.None);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                throw new Exception(
+                    target + " player build result is " + report.summary.result + " with " +
+                    report.summary.totalErrors + " error(s)");
             }
         }
 

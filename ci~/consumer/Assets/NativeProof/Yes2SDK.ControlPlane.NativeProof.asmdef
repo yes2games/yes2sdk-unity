@@ -1,0 +1,19 @@
+{
+    "name": "Yes2SDK.ControlPlane.NativeProof",
+    "rootNamespace": "Yes2Games.CI",
+    "references": [
+        "Yes2SDK.ControlPlane",
+        "Unity.Nuget.Newtonsoft-Json"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "YES2SDK_CONTROL_PLANE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,87 @@
+name: YES2 Unity ControlPlane Native Proof
+
+on:
+  pull_request:
+    paths:
+      - "Runtime/ControlPlane/**"
+      - "ci~/consumer/**"
+      - "ci~/run-android-proof.sh"
+      - ".github/workflows/control-plane-native-proof.yml"
+      - "link.xml"
+      - "package.json"
+  push:
+    branches: [main]
+    paths:
+      - "Runtime/ControlPlane/**"
+      - "ci~/consumer/**"
+      - "ci~/run-android-proof.sh"
+      - ".github/workflows/control-plane-native-proof.yml"
+      - "link.xml"
+      - "package.json"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  android-il2cpp:
+    name: Android IL2CPP ControlPlane proof
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    concurrency:
+      group: yes2-unity-seat-android
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Free disk space for the Unity Android editor image
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost /usr/share/swift /usr/local/lib/android/sdk/ndk /opt/microsoft \
+            /usr/local/share/powershell /usr/local/share/chromium
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Android IL2CPP build of the control plane proof scene
+        uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ci~/consumer
+          unityVersion: 6000.3.16f1
+          customImage: unityci/editor:ubuntu-6000.3.16f1-android-3
+          targetPlatform: Android
+          buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildAndroid
+          buildName: Yes2SDKProof
+          versioning: None
+          allowDirtyBuild: true
+
+      - name: Free the editor image before the emulator
+        run: |
+          sudo docker image rm unityci/editor:ubuntu-6000.3.16f1-android-3 || true
+          ls -l build/Android
+          df -h /
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the proof on an x86_64 emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash 'ci~/run-android-proof.sh' build/Android/Yes2SDKProof.apk
