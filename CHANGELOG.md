@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.12.1...v2.13.0) (2026-10-20)
+
+
+### Features
+
+* **control-plane:** automatic refresh scheduler with pause and resume (CP-6.5b) ([#135](https://github.com/yes2games/yes2sdk-unity/issues/135)) ([84e4c3c](https://github.com/yes2games/yes2sdk-unity/commit/84e4c3c8af6a148ed8c6bcc45a8f86ab1fa5f3a7))
+* **control-plane:** LKG two-slot journal and public lifecycle API (CP-6.4, CP-6.5a) ([#134](https://github.com/yes2games/yes2sdk-unity/issues/134)) ([630215e](https://github.com/yes2games/yes2sdk-unity/commit/630215e446d3f825f7bd839e4ddb3dd4efa6e664))
+* **control-plane:** typed Config reads by RFC 6901 pointer (CP-6.6) ([#137](https://github.com/yes2games/yes2sdk-unity/issues/137)) ([67811dd](https://github.com/yes2games/yes2sdk-unity/commit/67811ddc456b6e39019dea536b6c1d5a73f4184d))
+* **control-plane:** vendor Core contracts and validate known module payloads (CP-6.2) ([#136](https://github.com/yes2games/yes2sdk-unity/issues/136)) ([4ba589f](https://github.com/yes2games/yes2sdk-unity/commit/4ba589f00ff60da8feeeb22ca98274886fed4574))
+* **template:** opt-in mobile devicePixelRatio cap via MOBILE_MAX_DPR ([#138](https://github.com/yes2games/yes2sdk-unity/issues/138)) ([cc969f2](https://github.com/yes2games/yes2sdk-unity/commit/cc969f2af8c71d8e0d4d28a3e0e204e00677c531))
+
 ## [2.12.1](https://github.com/yes2games/yes2sdk-unity/compare/v2.12.0...v2.12.1) (2026-10-12)
 
 
