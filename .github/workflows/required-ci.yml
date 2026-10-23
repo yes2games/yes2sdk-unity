@@ -48,7 +48,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22.x"
+          node-version: "26.12.1"
 
       - name: Verify canonical workflow and final-gate identities
         run: node 'ci~/verify-workflow-governance.mjs'
@@ -67,7 +67,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22.x"
+          node-version: "26.12.1"
 
       - name: Verify version authority, mirrors and the Release Please contract
         run: node 'ci~/verify-release-state.mjs'
@@ -126,7 +126,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22.x"
+          node-version: "26.12.1"
 
       - name: Check wrapper method parity
         run: node 'scripts~/check-wrapper-parity.mjs'
@@ -145,7 +145,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22.x"
+          node-version: "26.12.1"
 
       - name: Check optimizer docs anchors
         run: node 'scripts~/check-optimizer-anchors.mjs'
@@ -161,7 +161,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22.x"
+          node-version: "26.12.1"
 
       - name: Verify the vendored Core contracts match their lock
         run: node 'ci~/verify-core-contracts.mjs'
@@ -301,7 +301,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22.x"
+          node-version: "26.12.1"
 
       - name: Control plane proof and LKG reload in headless Chromium
         id: webgl-proof
@@ -569,7 +569,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22.x"
+          node-version: "26.12.1"
 
       # A hosted runner does not have room for a Unity editor image without this.
       # Safe to run unguarded now that every job is hosted: the VM is ephemeral and
