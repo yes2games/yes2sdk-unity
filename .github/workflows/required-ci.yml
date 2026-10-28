@@ -894,32 +894,40 @@ jobs:
           TARGET: ${{ github.repository }}
         run: |
           set -Eeuo pipefail
+          umask 077
+          work=$(mktemp -d "$RUNNER_TEMP/broker.XXXXXX")
+          trap 'rm -rf "$work"' EXIT
 
           for attempt in 1 2 3; do
-            id_token=$(curl -fsS --max-time 30 \
-              -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=butler-token-broker" | jq -re '.value')
-            echo "::add-mask::$id_token"
-            status=$(curl -sS --max-time 30 -o broker.json -w '%{http_code}' \
-              -X POST "$BROKER_URL" \
-              -H "Authorization: Bearer ${id_token}" \
-              -H 'Content-Type: application/json' \
-              -d "$(jq -nc --arg target "$TARGET" '{target: $target}')") || status=000
+            stage="OIDC token request"
+            status=$(printf 'header = "Authorization: bearer %s"\n' "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              | curl -sS --max-time 30 -o "$work/response.json" -w '%{http_code}' --config - \
+                "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=butler-token-broker") || status=000
+            if [[ "$status" == 200 ]]; then
+              id_token=$(jq -re '.value' "$work/response.json") || status=000
+            fi
+            if [[ "$status" == 200 ]]; then
+              echo "::add-mask::$id_token"
+              stage=broker
+              status=$(printf 'header = "Authorization: Bearer %s"\nheader = "Content-Type: application/json"\n' "$id_token" \
+                | curl -sS --max-time 30 -o "$work/response.json" -w '%{http_code}' --config - \
+                  -X POST "$BROKER_URL" \
+                  -d "$(jq -nc --arg target "$TARGET" '{target: $target}')") || status=000
+            fi
             [[ "$status" == 5?? || "$status" == 000 ]] && (( attempt < 3 )) || break
-            echo "::warning::broker attempt ${attempt} got HTTP ${status}; retrying"
+            echo "::warning::${stage} attempt ${attempt} got HTTP ${status}; retrying"
             sleep $((attempt * 10))
           done
 
           if [[ "$status" != "200" ]]; then
-            echo "::error::broker refused with HTTP $status: $(jq -r '.error // "no error field"' broker.json)"
+            echo "::error::${stage} refused with HTTP $status: $(jq -r '.error // "no error field"' "$work/response.json" 2>/dev/null || echo "no error field")"
             exit 1
           fi
 
-          token=$(jq -re '.token' broker.json)
+          token=$(jq -re '.token' "$work/response.json")
           echo "::add-mask::$token"
-          expires_at=$(jq -r '.expires_at // "unknown"' broker.json)
+          expires_at=$(jq -r '.expires_at // "unknown"' "$work/response.json")
           echo "token=$token" >> "$GITHUB_OUTPUT"
-          rm -f broker.json
           echo "::notice::brokered a token for ${TARGET}, expiring ${expires_at}"
 
       - name: Release Please maintenance
