@@ -896,12 +896,13 @@ jobs:
           set -Eeuo pipefail
           umask 077
           work=$(mktemp -d "$RUNNER_TEMP/broker.XXXXXX")
+          export CURL_HOME="$work"
           trap 'rm -rf "$work"' EXIT
 
           for attempt in 1 2 3; do
             stage="OIDC token request"
             status=$(printf 'header = "Authorization: bearer %s"\n' "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              | curl -sS --max-time 30 -o "$work/response.json" -w '%{http_code}' --config - \
+              | curl -q -sS --max-time 30 -o "$work/response.json" -w '%{http_code}' --config - \
                 "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=butler-token-broker") || status=000
             if [[ "$status" == 200 ]]; then
               id_token=$(jq -re '.value' "$work/response.json") || status=000
@@ -910,7 +911,7 @@ jobs:
               echo "::add-mask::$id_token"
               stage=broker
               status=$(printf 'header = "Authorization: Bearer %s"\nheader = "Content-Type: application/json"\n' "$id_token" \
-                | curl -sS --max-time 30 -o "$work/response.json" -w '%{http_code}' --config - \
+                | curl -q -sS --max-time 30 -o "$work/response.json" -w '%{http_code}' --config - \
                   -X POST "$BROKER_URL" \
                   -d "$(jq -nc --arg target "$TARGET" '{target: $target}')") || status=000
             fi
