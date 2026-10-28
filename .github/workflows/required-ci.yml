@@ -549,6 +549,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      id-token: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CANDIDATE: ${{ github.sha }}
@@ -888,15 +889,47 @@ jobs:
       - name: Mint the Butler App token
         id: app-token
         if: steps.state.outputs.mode == 'rp'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.BUTLER_APP_ID }}
-          private-key: ${{ secrets.BUTLER_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: ${{ github.event.repository.name }}
-          permission-contents: write
-          permission-pull-requests: write
-          permission-metadata: read
+        env:
+          BROKER_URL: https://butler.yes2games.com/token
+          TARGET: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          work=$(mktemp -d "$RUNNER_TEMP/broker.XXXXXX")
+          export CURL_HOME="$work"
+          trap 'rm -rf "$work"' EXIT
+
+          for attempt in 1 2 3; do
+            stage="OIDC token request"
+            status=$(printf 'header = "Authorization: bearer %s"\n' "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              | curl -q -sS --max-time 30 -o "$work/response.json" -w '%{http_code}' --config - \
+                "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=butler-token-broker") || status=000
+            if [[ "$status" == 200 ]]; then
+              id_token=$(jq -re '.value' "$work/response.json") || status=000
+            fi
+            if [[ "$status" == 200 ]]; then
+              echo "::add-mask::$id_token"
+              stage=broker
+              status=$(printf 'header = "Authorization: Bearer %s"\nheader = "Content-Type: application/json"\n' "$id_token" \
+                | curl -q -sS --max-time 30 -o "$work/response.json" -w '%{http_code}' --config - \
+                  -X POST "$BROKER_URL" \
+                  -d "$(jq -nc --arg target "$TARGET" '{target: $target}')") || status=000
+            fi
+            [[ "$status" == 5?? || "$status" == 000 ]] && (( attempt < 3 )) || break
+            echo "::warning::${stage} attempt ${attempt} got HTTP ${status}; retrying"
+            sleep $((attempt * 10))
+          done
+
+          if [[ "$status" != "200" ]]; then
+            echo "::error::${stage} refused with HTTP $status: $(jq -r '.error // "no error field"' "$work/response.json" 2>/dev/null || echo "no error field")"
+            exit 1
+          fi
+
+          token=$(jq -re '.token' "$work/response.json")
+          echo "::add-mask::$token"
+          expires_at=$(jq -r '.expires_at // "unknown"' "$work/response.json")
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+          echo "::notice::brokered a token for ${TARGET}, expiring ${expires_at}"
 
       - name: Release Please maintenance
         if: steps.state.outputs.mode == 'rp'
