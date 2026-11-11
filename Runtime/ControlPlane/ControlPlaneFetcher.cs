@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -76,6 +77,10 @@ namespace Yes2SDK
                     try
                     {
                         response = await _transport.GetAsync(request, token);
+                    }
+                    catch (Exception e) when (request.FilePath != null && (e is IOException || e is UnauthorizedAccessException))
+                    {
+                        return ControlPlaneResult<T>.Failure(ControlPlaneErrorCategory.CacheUnavailable, e.GetType().Name + ": " + e.Message);
                     }
                     catch (Exception e) when (!(e is OperationCanceledException && token.IsCancellationRequested))
                     {

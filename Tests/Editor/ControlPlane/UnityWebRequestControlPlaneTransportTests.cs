@@ -1,10 +1,12 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using UnityEditor.PackageManager;
 using UnityEngine.TestTools;
 
 namespace Yes2SDK.Tests
@@ -71,6 +73,33 @@ namespace Yes2SDK.Tests
                 yield return Wait(task);
 
                 Assert.IsTrue(task.IsCanceled);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator GetAsync_StreamsToAFileAndStopsPastMaxBytes()
+        {
+            var source = Path.Combine(PackageInfo.FindForAssembly(typeof(UnityWebRequestControlPlaneTransportTests).Assembly).resolvedPath, "ci~", "consumer", "Assets", "StreamingAssets", "yes2sdk-proof-png.bytes");
+            var url = new Uri(source).AbsoluteUri;
+            var directory = Path.Combine(Path.GetTempPath(), "yes2sdk-cp-transport-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var transport = new UnityWebRequestControlPlaneTransport(UnityWebRequestControlPlaneTransport.MonotonicClock());
+
+                var tooLarge = transport.GetAsync(new ControlPlaneTransportRequest(url, TimeSpan.FromSeconds(15), 64, false, Path.Combine(directory, "short.tmp")), CancellationToken.None);
+                yield return Wait(tooLarge);
+                var exact = transport.GetAsync(new ControlPlaneTransportRequest(url, TimeSpan.FromSeconds(15), 75, false, Path.Combine(directory, "exact.tmp")), CancellationToken.None);
+                yield return Wait(exact);
+
+                Assert.AreEqual(ControlPlaneTransportStatus.TooLarge, tooLarge.Result.Status);
+                Assert.AreEqual(ControlPlaneTransportStatus.Completed, exact.Result.Status);
+                Assert.IsNull(exact.Result.Body);
+                CollectionAssert.AreEqual(File.ReadAllBytes(source), File.ReadAllBytes(Path.Combine(directory, "exact.tmp")));
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
             }
         }
 

@@ -142,7 +142,7 @@ namespace Yes2SDK
             }
             token.ThrowIfCancellationRequested();
             var session = _session;
-            var descriptor = session?.Active?.Root["artifacts"].FirstOrDefault(artifact => (string)artifact["digest"] == digest);
+            var descriptor = Descriptor(digest);
             if (descriptor == null)
             {
                 throw new ControlPlaneException(ControlPlaneErrorCategory.ArtifactMissing, digest + " is not an Artifact of the active Deployment");
@@ -190,6 +190,11 @@ namespace Yes2SDK
                     }
                 }
             }
+        }
+
+        internal JToken Descriptor(string digest)
+        {
+            return _session?.Active?.Root["artifacts"].FirstOrDefault(artifact => (string)artifact["digest"] == digest);
         }
 
         /// <summary>Deletes the persisted last-known-good Deployment; the active Deployment stays active.</summary>

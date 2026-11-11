@@ -156,6 +156,17 @@ namespace Yes2SDK.Tests
             }
         }
 
+        private static byte[] PngHeader(int width, int height)
+        {
+            var header = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 0, 0, 0, 0, 0, 8, 6, 0, 0, 0, 0, 0, 0, 0 };
+            for (var i = 0; i < 4; i++)
+            {
+                header[16 + i] = (byte)(width >> (24 - 8 * i));
+                header[20 + i] = (byte)(height >> (24 - 8 * i));
+            }
+            return header;
+        }
+
         private static int LiveTextures()
         {
             return Resources.FindObjectsOfTypeAll<Texture2D>().Length;
@@ -509,12 +520,14 @@ namespace Yes2SDK.Tests
         public void Content_SeesIntegrityFailureBeforeAnyDecode()
         {
             var digest = Publish(Png(2, 2), "image/png");
+            var text = Publish(Encoding.UTF8.GetBytes("text"), "text/plain");
             Activate();
             _transport.Routes[UrlOf(digest)] = Png(2, 2).Select(b => (byte)~b).ToArray();
+            _transport.Routes[UrlOf(text)] = Encoding.UTF8.GetBytes("tex\u00ff");
             var before = LiveTextures();
 
             Assert.AreEqual("artifact_integrity_failed", Failure(() => _controlPlane.Content.LoadTextureAsync(digest, CancellationToken.None)));
-            Assert.AreEqual("artifact_integrity_failed", Failure(() => _controlPlane.Content.LoadTextAsync(digest, CancellationToken.None)));
+            Assert.AreEqual("artifact_integrity_failed", Failure(() => _controlPlane.Content.LoadTextAsync(text, CancellationToken.None)));
             Assert.AreEqual(before, LiveTextures());
         }
 
@@ -537,6 +550,93 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Content_ChecksTheDescriptorBeforeDownloading()
+        {
+            var oversize = Publish(Encoding.ASCII.GetBytes(new string('x', 4 * 1024 * 1024 + 1)), "text/plain");
+            var webp = Publish(new byte[] { 1, 2, 3 }, "image/webp");
+            Activate();
+            var content = _controlPlane.Content;
+
+            Assert.Throws<InvalidDataException>(() => content.LoadTextAsync(oversize, CancellationToken.None).GetAwaiter().GetResult());
+            Assert.Throws<NotSupportedException>(() => content.LoadTextureAsync(webp, CancellationToken.None).GetAwaiter().GetResult());
+            Assert.Throws<NotSupportedException>(() => content.LoadTextAsync(webp, CancellationToken.None).GetAwaiter().GetResult());
+            Assert.AreEqual(0, ArtifactRequests(oversize) + ArtifactRequests(webp));
+            Assert.AreEqual("artifact_missing", Failure(() => content.LoadTextAsync(ControlPlaneFixture.DigestA, CancellationToken.None)));
+        }
+
+        [Test]
+        public void LoadTexture_RejectsADeclared8192HeaderBeforeDecoding()
+        {
+            var digest = Publish(PngHeader(8192, 1), "image/png");
+            Activate();
+            var before = LiveTextures();
+
+            var error = Assert.Throws<InvalidDataException>(() => _controlPlane.Content.LoadTextureAsync(digest, CancellationToken.None).GetAwaiter().GetResult());
+
+            StringAssert.Contains("header does not declare", error.Message);
+            StringAssert.Contains("(8192x1)", error.Message);
+            Assert.AreEqual(before, LiveTextures());
+        }
+
+        [Test]
+        public void DeclaredSize_ReadsPngIhdrAndTheFirstJpegFrameHeader()
+        {
+            var jpeg = Jpeg(4, 5);
+            var wide = (byte[])jpeg.Clone();
+            var sof = Enumerable.Range(2, wide.Length - 3).First(i => wide[i] == 0xFF && wide[i + 1] >= 0xC0 && wide[i + 1] <= 0xCF && wide[i + 1] != 0xC4 && wide[i + 1] != 0xC8 && wide[i + 1] != 0xCC);
+            wide[sof + 7] = 0x20;
+            wide[sof + 8] = 0x00;
+            var dhtFirst = new byte[] { 0xFF, 0xD8, 0xFF, 0xFF, 0xC4, 0x00, 0x04, 0x07, 0x07, 0xFF, 0xD0, 0xFF, 0xC2, 0x00, 0x0B, 0x08, 0x00, 0x05, 0x00, 0x04, 0x01, 0x01, 0x11, 0x00 };
+
+            Assert.AreEqual(new Vector2Int(3, 2), ControlPlaneContent.DeclaredSize(Png(3, 2)));
+            Assert.AreEqual(new Vector2Int(4, 5), ControlPlaneContent.DeclaredSize(jpeg));
+            Assert.AreEqual(new Vector2Int(8192, 5), ControlPlaneContent.DeclaredSize(wide));
+            Assert.AreEqual(new Vector2Int(4, 5), ControlPlaneContent.DeclaredSize(dhtFirst));
+            Assert.AreEqual(new Vector2Int(8192, 1), ControlPlaneContent.DeclaredSize(PngHeader(8192, 1)));
+            Assert.AreEqual(new Vector2Int(0, 1), ControlPlaneContent.DeclaredSize(PngHeader(0, 1)));
+            Assert.AreEqual(new Vector2Int(-1, 1), ControlPlaneContent.DeclaredSize(PngHeader(-1, 1)));
+            Assert.IsNull(ControlPlaneContent.DeclaredSize(PngHeader(1, 1).Take(23).ToArray()));
+            Assert.IsNull(ControlPlaneContent.DeclaredSize(jpeg.Take(sof + 8).ToArray()));
+            Assert.IsNull(ControlPlaneContent.DeclaredSize(new byte[] { 0xFF, 0xD8, 0xFF, 0xDA, 0x00, 0x02 }));
+            Assert.IsNull(ControlPlaneContent.DeclaredSize(Encoding.ASCII.GetBytes("not an image")));
+            Assert.IsNull(ControlPlaneContent.DeclaredSize(new byte[0]));
+        }
+
+        [Test]
+        public void ClearCache_LeavesAnInFlightDownloadToFinish()
+        {
+            var bytes = Encoding.UTF8.GetBytes("in flight");
+            var digest = Publish(bytes, "text/plain");
+            Activate();
+            var hold = _transport.Hold(UrlOf(digest), 3);
+            var pending = _controlPlane.GetArtifactAsync(digest, CancellationToken.None);
+
+            _controlPlane.ClearCacheAsync(CancellationToken.None).GetAwaiter().GetResult();
+            Assert.IsTrue(File.Exists(hold.Request.FilePath));
+            File.WriteAllBytes(hold.Request.FilePath, bytes);
+            hold.Pending.SetResult(ControlPlaneTransportResponse.Completed(200, null));
+
+            CollectionAssert.AreEqual(bytes, File.ReadAllBytes(pending.GetAwaiter().GetResult().FilePath));
+            CollectionAssert.AreEqual(new[] { digest.Substring(7) }, CacheFiles());
+        }
+
+        [Test]
+        public void TransportFileErrors_AreCacheUnavailableWithoutRetry()
+        {
+            var digest = Publish(new byte[] { 1 }, "application/octet-stream");
+            var denied = Publish(new byte[] { 2 }, "application/octet-stream");
+            Activate();
+            _transport.Throw[UrlOf(digest)] = new IOException("disk full");
+            _transport.Throw[UrlOf(denied)] = new UnauthorizedAccessException("read-only");
+
+            Assert.AreEqual("cache_unavailable", Failure(() => _controlPlane.GetArtifactAsync(digest, CancellationToken.None)));
+            Assert.AreEqual("cache_unavailable", Failure(() => _controlPlane.GetArtifactAsync(denied, CancellationToken.None)));
+            Assert.AreEqual(1, ArtifactRequests(digest));
+            Assert.AreEqual(1, ArtifactRequests(denied));
+            CollectionAssert.IsEmpty(CacheFiles());
+        }
+
+        [Test]
         public void PublicSurface_IsExactlyTheLockedMembers()
         {
             var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly;
@@ -552,6 +652,7 @@ namespace Yes2SDK.Tests
 
             public Dictionary<string, byte[]> Routes { get; } = new Dictionary<string, byte[]>();
             public Dictionary<string, ControlPlaneTransportResponse> Fail { get; } = new Dictionary<string, ControlPlaneTransportResponse>();
+            public Dictionary<string, Exception> Throw { get; } = new Dictionary<string, Exception>();
             public List<ControlPlaneTransportRequest> Requests { get; } = new List<ControlPlaneTransportRequest>();
 
             public Held Hold(string url, int partialBytes)
@@ -579,6 +680,10 @@ namespace Yes2SDK.Tests
                         held.Pending.TrySetCanceled();
                     });
                     return held.Pending.Task;
+                }
+                if (Throw.TryGetValue(request.Url, out var exception))
+                {
+                    throw exception;
                 }
                 if (Fail.TryGetValue(request.Url, out var failure))
                 {

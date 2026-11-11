@@ -79,7 +79,7 @@ namespace Yes2SDK
             {
                 return;
             }
-            foreach (var file in new DirectoryInfo(_directory).GetFiles().Where(file => IsEntry(file) || file.Name.EndsWith(TempSuffix, StringComparison.Ordinal)))
+            foreach (var file in new DirectoryInfo(_directory).GetFiles().Where(IsEntry))
             {
                 file.Delete();
             }
