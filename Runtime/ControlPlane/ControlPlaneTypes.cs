@@ -83,6 +83,7 @@ namespace Yes2SDK
         public ControlPlaneSource Source { get; }
     }
 
+    /// <summary>A cached Artifact file whose size and SHA-256 matched its descriptor.</summary>
     public sealed class VerifiedArtifact
     {
         internal VerifiedArtifact(string digest, string mediaType, long size, string filePath)
@@ -99,6 +100,7 @@ namespace Yes2SDK
         public string FilePath { get; }
     }
 
+    /// <summary>A failed control-plane operation; <see cref="Code"/> is its errors-v1 code.</summary>
     public sealed class ControlPlaneException : Exception
     {
         internal ControlPlaneException(ControlPlaneErrorCategory category, string detail)

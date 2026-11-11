@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace Yes2SDK
 {
+    /// <summary>Decodes verified Artifacts into UTF-8 text or caller-owned PNG/JPEG textures.</summary>
     public sealed class ControlPlaneContent
     {
         public const long MaxTextBytes = 4L * 1024 * 1024;

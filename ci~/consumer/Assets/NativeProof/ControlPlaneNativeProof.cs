@@ -305,7 +305,7 @@ namespace Yes2Games.CI
                         File.WriteAllBytes(request.FilePath, new byte[16]);
                         return new TaskCompletionSource<ControlPlaneTransportResponse>().Task;
                     }
-                    var streamed = Application.streamingAssetsPath + "/yes2sdk-proof.png";
+                    var streamed = Application.streamingAssetsPath + "/yes2sdk-proof-png.bytes";
                     return _web.GetAsync(new ControlPlaneTransportRequest(streamed, request.Timeout, request.MaxBytes, request.BypassCache, request.FilePath), token);
                 }
             }

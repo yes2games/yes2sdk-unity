@@ -382,6 +382,21 @@ namespace Yes2SDK.Tests
         }
 
         [Test]
+        public void Shutdown_EmptiesEveryQuery()
+        {
+            InitializeFixture();
+            _now = At("2026-12-05T00:00:00Z");
+            Assert.AreEqual(2, LiveOps.GetActiveEvents().Count);
+
+            _controlPlane.Shutdown();
+
+            CollectionAssert.IsEmpty(LiveOps.GetEvents());
+            CollectionAssert.IsEmpty(LiveOps.GetActiveEvents());
+            Assert.IsFalse(LiveOps.TryGetEvent("event.winter", out var winter));
+            Assert.IsNull(winter);
+        }
+
+        [Test]
         public void LkgAndRemote_AnswerTheSameQueries()
         {
             InitializeFixture();

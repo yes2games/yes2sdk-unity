@@ -84,8 +84,10 @@ namespace Yes2SDK
         /// <summary>Typed reads of the active Deployment's config.v1 Resources.</summary>
         public ControlPlaneConfig Config { get; }
 
+        /// <summary>Scheduled-event queries over the active Deployment's liveops.event.v1 Resources.</summary>
         public ControlPlaneLiveOps LiveOps { get; }
 
+        /// <summary>Text and Texture2D decoders over verified Artifacts.</summary>
         public ControlPlaneContent Content { get; }
 
         /// <summary>Raised once each time a different deploymentId becomes active.</summary>
@@ -131,6 +133,7 @@ namespace Yes2SDK
             return true;
         }
 
+        /// <summary>Returns the Artifact's verified cached file, downloading and checking it first when needed; failures throw <see cref="ControlPlaneException"/>.</summary>
         public async Task<VerifiedArtifact> GetArtifactAsync(string digest, CancellationToken token)
         {
             if (!ControlPlaneSha256.IsDigest(digest))
