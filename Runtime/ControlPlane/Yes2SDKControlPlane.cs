@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -23,6 +24,11 @@ namespace Yes2SDK
                 Path.Combine(Application.persistentDataPath, "Yes2SDK", "control-plane", "v1", gameKey, environmentKey),
                 gameKey,
                 environmentKey);
+        }
+
+        internal static ControlPlaneArtifactCache OpenArtifacts(string gameKey)
+        {
+            return new ControlPlaneArtifactCache(Path.Combine(Application.persistentDataPath, "Yes2SDK", "control-plane", "v1", gameKey, "artifacts"));
         }
 
 #if UNITY_EDITOR
@@ -53,6 +59,7 @@ namespace Yes2SDK
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
         private readonly System.Random _random;
         private readonly Func<string, string, ControlPlaneLkgJournal> _openJournal;
+        private readonly Func<string, ControlPlaneArtifactCache> _openArtifacts;
         private Session _session;
         private bool _paused;
         private TaskCompletionSource<bool> _foreground = Foreground();
@@ -61,20 +68,25 @@ namespace Yes2SDK
             IControlPlaneTransport transport,
             Func<TimeSpan, CancellationToken, Task> delay,
             System.Random random,
-            Func<string, string, ControlPlaneLkgJournal> openJournal)
+            Func<string, string, ControlPlaneLkgJournal> openJournal,
+            Func<string, ControlPlaneArtifactCache> openArtifacts = null)
         {
             _transport = transport;
             _delay = delay;
             _random = random;
             _openJournal = openJournal;
+            _openArtifacts = openArtifacts ?? Yes2ControlPlane.OpenArtifacts;
             Config = new ControlPlaneConfig(() => _session?.Current);
             LiveOps = new ControlPlaneLiveOps(() => _session?.Current);
+            Content = new ControlPlaneContent(this);
         }
 
         /// <summary>Typed reads of the active Deployment's config.v1 Resources.</summary>
         public ControlPlaneConfig Config { get; }
 
         public ControlPlaneLiveOps LiveOps { get; }
+
+        public ControlPlaneContent Content { get; }
 
         /// <summary>Raised once each time a different deploymentId becomes active.</summary>
         public event Action<ControlPlaneActivation> DeploymentActivated;
@@ -95,7 +107,7 @@ namespace Yes2SDK
                 return !active.Started || active.Refreshing?.IsCompleted == true ? Task.FromResult(active.Status) : Refresh(active, token);
             }
 
-            var session = new Session(context, _openJournal(context.GameKey, context.EnvironmentKey), new ControlPlaneFetcher(_transport, _delay, _random));
+            var session = new Session(context, _openJournal(context.GameKey, context.EnvironmentKey), _openArtifacts(context.GameKey), new ControlPlaneFetcher(_transport, _delay, _random));
             _session = session;
             return InitializeSessionAsync(session, token);
         }
@@ -119,6 +131,64 @@ namespace Yes2SDK
             return true;
         }
 
+        public async Task<VerifiedArtifact> GetArtifactAsync(string digest, CancellationToken token)
+        {
+            if (!ControlPlaneSha256.IsDigest(digest))
+            {
+                throw new ArgumentException("digest is not a sha256 digest", nameof(digest));
+            }
+            token.ThrowIfCancellationRequested();
+            var session = _session;
+            var descriptor = session?.Active?.Root["artifacts"].FirstOrDefault(artifact => (string)artifact["digest"] == digest);
+            if (descriptor == null)
+            {
+                throw new ControlPlaneException(ControlPlaneErrorCategory.ArtifactMissing, digest + " is not an Artifact of the active Deployment");
+            }
+            var mediaType = (string)descriptor["mediaType"];
+            ControlPlaneStrictJson.TryGetSafeInteger(descriptor["size"], out var size);
+            string temp = null;
+            try
+            {
+                var cached = session.Artifacts.TryGetVerified(digest, size);
+                if (cached != null)
+                {
+                    return new VerifiedArtifact(digest, mediaType, size, cached);
+                }
+                temp = session.Artifacts.NewTempPath(digest);
+                ControlPlaneResult<string> download;
+                using (var linked = CancellationTokenSource.CreateLinkedTokenSource(token, session.Cancellation.Token))
+                {
+                    download = await session.Fetcher.FetchArtifactAsync((string)descriptor["url"], digest, size, temp, linked.Token);
+                }
+                if (download.Error == ControlPlaneErrorCategory.Cancelled)
+                {
+                    throw new OperationCanceledException(token);
+                }
+                if (!download.Succeeded)
+                {
+                    throw new ControlPlaneException(download.Error.Value, download.Detail);
+                }
+                return new VerifiedArtifact(digest, mediaType, size, session.Artifacts.Promote(temp, digest, size));
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                throw new ControlPlaneException(ControlPlaneErrorCategory.CacheUnavailable, e.GetType().Name + ": " + e.Message);
+            }
+            finally
+            {
+                if (temp != null)
+                {
+                    try
+                    {
+                        File.Delete(temp);
+                    }
+                    catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+                    {
+                    }
+                }
+            }
+        }
+
         /// <summary>Deletes the persisted last-known-good Deployment; the active Deployment stays active.</summary>
         public Task ClearCacheAsync(CancellationToken token)
         {
@@ -129,6 +199,7 @@ namespace Yes2SDK
             try
             {
                 _session?.Journal.Clear();
+                _session?.Artifacts.Clear();
                 return Task.CompletedTask;
             }
             catch (Exception e)
@@ -428,16 +499,18 @@ namespace Yes2SDK
         {
             private volatile ControlPlaneActiveState _current;
 
-            public Session(Context context, ControlPlaneLkgJournal journal, ControlPlaneFetcher fetcher)
+            public Session(Context context, ControlPlaneLkgJournal journal, ControlPlaneArtifactCache artifacts, ControlPlaneFetcher fetcher)
             {
                 Context = context;
                 Journal = journal;
+                Artifacts = artifacts;
                 Fetcher = fetcher;
                 SetStatus(ControlPlaneSource.None, null);
             }
 
             public Context Context { get; }
             public ControlPlaneLkgJournal Journal { get; }
+            public ControlPlaneArtifactCache Artifacts { get; }
             public ControlPlaneFetcher Fetcher { get; }
             public CancellationTokenSource Cancellation { get; } = new CancellationTokenSource();
             public Task<ControlPlaneStatus> Refreshing { get; set; }

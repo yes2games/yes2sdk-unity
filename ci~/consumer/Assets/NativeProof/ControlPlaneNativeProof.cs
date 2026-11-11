@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,10 +41,12 @@ namespace Yes2Games.CI
                 if (mode == "full")
                 {
                     await WritesAndReloadsLkg();
+                    await ArtifactProof.DownloadsVerifiesAndAbandons();
                 }
                 else
                 {
                     await ActivatesFromLkg();
+                    await ArtifactProof.ServesTheCacheAfterAKill();
                 }
             }
             catch (Exception e)
@@ -156,6 +159,155 @@ namespace Yes2Games.CI
             public void ExpectGreeting()
             {
                 Expect(Greeting == "hello", "Config.GetString(e2e.config, /greeting) returned " + (Greeting ?? "null"));
+            }
+        }
+
+        private static class ArtifactProof
+        {
+            private const string Environment = "artifact-proof";
+            private const string Png = "sha256:9ccfc2abaa3984dc34c93aee16be0afa8a5e1395f25492b3df67897e6d00df10";
+            private const string Corrupt = "sha256:e370287b46516b2e9330db6f32aab272b998e5944d1296055e926af9ecaa6081";
+            private const string Pending = "sha256:62a2fed3d6e08c44835fce71f02210b1ddabfb066e39edf1e6c261988f824dd3";
+            private const long PngSize = 75;
+            private const string ArtifactOrigin = Yes2SDKControlPlane.DefaultRuntimeOrigin + "/artifacts/";
+
+            private static string Directory => Path.Combine(Application.persistentDataPath, "Yes2SDK", "control-plane", "v1", GameKey, "artifacts");
+
+            public static async Task DownloadsVerifiesAndAbandons()
+            {
+                foreach (var path in new[] { Directory, Path.Combine(Application.persistentDataPath, "Yes2SDK", "control-plane", "v1", GameKey, Environment) })
+                {
+                    if (System.IO.Directory.Exists(path))
+                    {
+                        System.IO.Directory.Delete(path, true);
+                    }
+                }
+
+                var transport = new ArtifactTransport(true);
+                var controlPlane = await Initialize(transport, ControlPlaneSource.Remote, null);
+
+                var corrupt = await Failure(controlPlane, Corrupt);
+                Expect(corrupt == "artifact_integrity_failed", "the corrupt-digest Artifact gave " + corrupt);
+                Expect(!System.IO.Directory.GetFiles(Directory).Any(), "the corrupt-digest Artifact left " + string.Join(", ", System.IO.Directory.GetFiles(Directory)));
+
+                await ExpectTexture(controlPlane);
+
+                _ = controlPlane.GetArtifactAsync(Pending, CancellationToken.None);
+                Expect(Temps().Length == 1, "the abandoned download left " + Temps().Length + " temp files");
+                Expect(!File.Exists(Path.Combine(Directory, Pending.Substring(7))), "the abandoned download reached the cache");
+                ControlPlaneLkgJournal.Persist();
+            }
+
+            public static async Task ServesTheCacheAfterAKill()
+            {
+                var transport = new ArtifactTransport(false);
+                var controlPlane = await Initialize(transport, ControlPlaneSource.Lkg, "network_unavailable");
+                Expect(Temps().Length == 1, "the killed download left " + Temps().Length + " temp files after the reload");
+
+                await ExpectTexture(controlPlane);
+                Expect(transport.ArtifactRequests == 0, "the cached Artifact made " + transport.ArtifactRequests + " requests");
+
+                var pending = await Failure(controlPlane, Pending);
+                Expect(pending == "network_unavailable", "the killed Artifact offline gave " + pending);
+                Expect(Temps().Length == 0, "the killed download's temp file survived the next download");
+                controlPlane.Shutdown();
+            }
+
+            private static async Task<Yes2SDKControlPlane> Initialize(ArtifactTransport transport, ControlPlaneSource source, string lastError)
+            {
+                var controlPlane = new Yes2SDKControlPlane(transport, UnityWebRequestControlPlaneTransport.DelayAsync, new System.Random(), Yes2ControlPlane.OpenJournal);
+                var status = await controlPlane.InitializeAsync(
+                    new ControlPlaneOptions { GameKey = GameKey, EnvironmentKey = Environment, RefreshIntervalSeconds = 0 },
+                    CancellationToken.None);
+                Expect(status.Source == source && status.DeploymentId == "artifact-proof" && status.LastError == lastError, "artifact initialization gave " + Describe(status));
+                return controlPlane;
+            }
+
+            private static async Task ExpectTexture(Yes2SDKControlPlane controlPlane)
+            {
+                var artifact = await controlPlane.GetArtifactAsync(Png, CancellationToken.None);
+                Expect(artifact.FilePath == Path.Combine(Directory, Png.Substring(7)) && artifact.Size == PngSize && artifact.MediaType == "image/png", "GetArtifactAsync returned " + artifact.FilePath);
+                var texture = await controlPlane.Content.LoadTextureAsync(Png, CancellationToken.None);
+                Expect(texture.width == 2 && texture.height == 2 && texture.GetPixel(0, 1) == Color.red, "LoadTextureAsync decoded " + texture.width + "x" + texture.height + " " + texture.GetPixel(0, 1));
+                UnityEngine.Object.Destroy(texture);
+            }
+
+            private static async Task<string> Failure(Yes2SDKControlPlane controlPlane, string digest)
+            {
+                try
+                {
+                    await controlPlane.GetArtifactAsync(digest, CancellationToken.None);
+                    return "success";
+                }
+                catch (ControlPlaneException e)
+                {
+                    return e.Code;
+                }
+            }
+
+            private static string[] Temps()
+            {
+                return System.IO.Directory.Exists(Directory) ? System.IO.Directory.GetFiles(Directory, "*.tmp") : new string[0];
+            }
+
+            private sealed class ArtifactTransport : IControlPlaneTransport
+            {
+                private readonly bool _online;
+                private readonly byte[] _snapshot;
+                private readonly byte[] _bootstrap;
+                private readonly UnityWebRequestControlPlaneTransport _web = new UnityWebRequestControlPlaneTransport(UnityWebRequestControlPlaneTransport.MonotonicClock());
+
+                public ArtifactTransport(bool online)
+                {
+                    _online = online;
+                    _snapshot = Encoding.UTF8.GetBytes(new JObject
+                    {
+                        ["protocolVersion"] = 1,
+                        ["gameKey"] = GameKey,
+                        ["releaseId"] = "artifact-proof",
+                        ["resources"] = new JArray(),
+                        ["artifacts"] = new JArray(new[] { Pending, Png, Corrupt }.OrderBy(d => d, StringComparer.Ordinal).Select(digest => new JObject
+                        {
+                            ["digest"] = digest,
+                            ["mediaType"] = "image/png",
+                            ["size"] = digest == Pending ? 64 : PngSize,
+                            ["url"] = ArtifactOrigin + digest.Substring(7)
+                        }))
+                    }.ToString(Formatting.None));
+                    _bootstrap = Encoding.UTF8.GetBytes(new JObject
+                    {
+                        ["protocolVersion"] = 1,
+                        ["gameKey"] = GameKey,
+                        ["environmentKey"] = Environment,
+                        ["deploymentId"] = "artifact-proof",
+                        ["releaseId"] = "artifact-proof",
+                        ["snapshotUrl"] = Yes2SDKControlPlane.DefaultRuntimeOrigin + "/releases/artifact-proof.json",
+                        ["snapshotDigest"] = ControlPlaneSha256.Digest(_snapshot)
+                    }.ToString(Formatting.None));
+                }
+
+                public int ArtifactRequests { get; private set; }
+
+                public Task<ControlPlaneTransportResponse> GetAsync(ControlPlaneTransportRequest request, CancellationToken token)
+                {
+                    if (!_online)
+                    {
+                        ArtifactRequests += request.FilePath != null ? 1 : 0;
+                        return Task.FromResult(ControlPlaneTransportResponse.NetworkUnavailable("recorded offline"));
+                    }
+                    if (request.FilePath == null)
+                    {
+                        return Task.FromResult(ControlPlaneTransportResponse.Completed(200, request.Url.EndsWith("artifact-proof.json") ? _snapshot : _bootstrap));
+                    }
+                    ArtifactRequests++;
+                    if (request.Url.EndsWith(Pending.Substring(7)))
+                    {
+                        File.WriteAllBytes(request.FilePath, new byte[16]);
+                        return new TaskCompletionSource<ControlPlaneTransportResponse>().Task;
+                    }
+                    var streamed = Application.streamingAssetsPath + "/yes2sdk-proof.png";
+                    return _web.GetAsync(new ControlPlaneTransportRequest(streamed, request.Timeout, request.MaxBytes, request.BypassCache, request.FilePath), token);
+                }
             }
         }
 

@@ -10,6 +10,7 @@ namespace Yes2SDK
         public const int MinRetryDelayMilliseconds = 250;
         public const int MaxRetryDelayMilliseconds = 500;
         public static readonly TimeSpan AttemptTimeout = TimeSpan.FromSeconds(5);
+        public static readonly TimeSpan ArtifactAttemptTimeout = TimeSpan.FromSeconds(15);
 
         private readonly IControlPlaneTransport _transport;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
@@ -39,6 +40,18 @@ namespace Yes2SDK
                 ControlPlaneErrorCategory.SnapshotHttpFailed,
                 ControlPlaneErrorCategory.SnapshotInvalid,
                 body => ControlPlaneDocuments.ReadSnapshot(body, bootstrap),
+                token);
+        }
+
+        public Task<ControlPlaneResult<string>> FetchArtifactAsync(string url, string digest, long size, string filePath, CancellationToken token)
+        {
+            return FetchAsync(
+                new ControlPlaneTransportRequest(url, ArtifactAttemptTimeout, size, false, filePath),
+                ControlPlaneErrorCategory.ArtifactHttpFailed,
+                ControlPlaneErrorCategory.ArtifactIntegrityFailed,
+                body => ControlPlaneArtifactCache.Verify(filePath, digest, size)
+                    ? ControlPlaneResult<string>.Success(filePath)
+                    : ControlPlaneResult<string>.Failure(ControlPlaneErrorCategory.ArtifactIntegrityFailed, "downloaded bytes do not match size " + size + " and " + digest),
                 token);
         }
 

@@ -7,6 +7,8 @@ import { extname, join, resolve, sep } from "node:path";
 
 const MARKER = "YES2SDK_CONTROL_PLANE_PROOF";
 const JOURNAL_POINTER = "/Yes2SDK/control-plane/v1/cp-sandbox/development/lkg-current";
+const ARTIFACT = "/Yes2SDK/control-plane/v1/cp-sandbox/artifacts/9ccfc2abaa3984dc34c93aee16be0afa8a5e1395f25492b3df67897e6d00df10";
+const ABANDONED = /\/Yes2SDK\/control-plane\/v1\/cp-sandbox\/artifacts\/62a2fed3d6e08c44835fce71f02210b1ddabfb066e39edf1e6c261988f824dd3\.[0-9a-f]{32}\.tmp$/;
 const PROOF_TIMEOUT_MS = 180_000;
 const FLUSH_TIMEOUT_MS = 30_000;
 const TYPES = {
@@ -177,24 +179,29 @@ try {
             if (!db.objectStoreNames.contains("FILE_DATA")) { db.close(); answer(false); return; }
             const keys = db.transaction("FILE_DATA").objectStore("FILE_DATA").getAllKeys();
             keys.onerror = () => { db.close(); answer(false); };
-            keys.onsuccess = () => { db.close(); answer(keys.result.some((key) => String(key).endsWith(${JSON.stringify(JOURNAL_POINTER)}))); };
+            keys.onsuccess = () => {
+                db.close();
+                const names = keys.result.map(String);
+                answer([${JSON.stringify(JOURNAL_POINTER)}, ${JSON.stringify(ARTIFACT)}].every((path) => names.some((name) => name.endsWith(path)))
+                    && names.some((name) => ${ABANDONED}.test(name)));
+            };
         };
     })`;
     const deadline = Date.now() + FLUSH_TIMEOUT_MS;
     for (;;) {
         const { result } = await send("Runtime.evaluate", { expression: flushed, awaitPromise: true, returnByValue: true }, sessionId);
         if (result.value === true) {
-            console.log(`IndexedDB /idbfs holds ${JOURNAL_POINTER}`);
+            console.log(`IndexedDB /idbfs holds ${JOURNAL_POINTER}, ${ARTIFACT} and the abandoned download's temp file`);
             break;
         }
         if (Date.now() > deadline) {
-            throw new Error(`the LKG pointer never reached IndexedDB /idbfs within ${FLUSH_TIMEOUT_MS / 1000} s`);
+            throw new Error(`the LKG pointer, the verified Artifact or the abandoned temp file never reached IndexedDB /idbfs within ${FLUSH_TIMEOUT_MS / 1000} s`);
         }
         await new Promise((wait) => setTimeout(wait, 250));
     }
 
     expectPass(await proof(`${origin}/index.html?proof=reload`), "reload");
-    console.log("WebGL control plane proof passed: LKG written, flushed to IndexedDB, and activated after a reload");
+    console.log("WebGL control plane proof passed: LKG and verified Artifact flushed to IndexedDB, corrupt digest rejected, and both served offline after a reload that killed a download");
     exitCode = 0;
     socket.close();
 } catch (error) {

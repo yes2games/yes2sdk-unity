@@ -231,12 +231,12 @@ namespace Yes2SDK
         [DllImport("__Internal")]
         private static extern void JS_FileSystem_Sync();
 
-        private static void Persist()
+        internal static void Persist()
         {
             JS_FileSystem_Sync();
         }
 #else
-        private static void Persist()
+        internal static void Persist()
         {
         }
 #endif

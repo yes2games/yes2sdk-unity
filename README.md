@@ -831,6 +831,26 @@ bool found = liveOps.TryGetEvent("event.winter", out LiveOpsEvent winter);
 - The device clock decides what is active. It is for presentation, not for economy decisions.
 - Queries are in memory. LiveOps has no timer, poller or event of its own: re-query after `DeploymentActivated`, or whenever you need the current set. Crossing `StartAt` or `EndAt` makes no request.
 
+#### Artifacts and content
+
+An Artifact is a file of the active Deployment, named by its SHA-256 digest. It is downloaded the first time you ask for it, never at activation.
+
+```csharp
+VerifiedArtifact artifact = await Yes2SDK.ControlPlane.GetArtifactAsync(digest, token);
+string json = await Yes2SDK.ControlPlane.Content.LoadTextAsync(digest, token);
+Texture2D banner = await Yes2SDK.ControlPlane.Content.LoadTextureAsync(digest, token);
+Destroy(banner);
+```
+
+- `GetArtifactAsync` returns `Digest`, `MediaType`, `Size` and `FilePath`, a verified file under `Application.persistentDataPath/Yes2SDK/control-plane/v1/<gameKey>/artifacts/`. The file is downloaded to a temporary file of at most 16 MiB and checked against the descriptor's size and SHA-256. Only a file that passes replaces anything in the cache.
+- A cached file is checked again on every call, and downloaded again if it no longer matches. The cache keeps up to 64 MiB per Game and evicts the least recently used files first. It never evicts a file returned during the current session.
+- Failures throw `ControlPlaneException` with an errors-v1 `Code`: `artifact_missing` (no such digest in the active Deployment), `artifact_http_failed`, `artifact_integrity_failed` (wrong size or digest), `network_unavailable`, `timeout` or `cache_unavailable`. A malformed digest throws `ArgumentException`. Cancellation, including `Shutdown()`, throws `OperationCanceledException`.
+- A download is tried twice with a 15 s limit per attempt. The retry happens only after no response, a timeout, HTTP 408, 429 or 5xx.
+- With a last-known-good Deployment and no network, Artifacts already in the cache are still served. An interrupted download, even a killed process, leaves the LKG and the cache as they were. Its temporary file is deleted on the next download.
+- `LoadTextAsync` accepts `text/plain` and `application/json` up to 4 MiB. It decodes strict UTF-8 and throws `InvalidDataException` on malformed bytes. JSON comes back as text.
+- `LoadTextureAsync` accepts `image/png` and `image/jpeg` up to 16 MiB and 4096 pixels per side. Each call returns a new `Texture2D` that you own and must `Destroy`. A file that does not decode throws `InvalidDataException`. Another media type throws `NotSupportedException`. Call it from the main thread.
+- No Sprite, audio, AssetBundle or Addressables helper exists, and no code is ever loaded from an Artifact.
+
 ---
 
 ## Integration Checklist
