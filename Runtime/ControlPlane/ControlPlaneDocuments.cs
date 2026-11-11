@@ -227,7 +227,7 @@ namespace Yes2SDK
             }
         }
 
-        private static long ReadInstant(JObject parent, string name)
+        internal static long ReadInstant(JObject parent, string name)
         {
             var match = Timestamp.Match(ReadString(parent, name));
             Require(match.Success, name + " is not an RFC 3339 UTC timestamp");

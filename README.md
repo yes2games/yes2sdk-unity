@@ -810,6 +810,27 @@ ConfigLookup lookup = config.Inspect("runtime.config", "/lives");
 - `Inspect` reports `State` (`Value`, `NoActiveControlPlane`, `ResourceMissing`, `ResourceWrongType` or `PathMissing`), `Source`, `RevisionId`, `DeploymentId` and `ReleaseId`. A wrong Resource type or a type mismatch also logs one warning per distinct read, at most 64 per Deployment.
 - Reads are in memory and never touch the network or disk. Config has no event of its own: after `DeploymentActivated`, every read sees the new Deployment, and a read never mixes two Deployments.
 
+#### LiveOps
+
+`Yes2SDK.ControlPlane.LiveOps` lists the `liveops.event.v1` Resources of the active Deployment.
+
+```csharp
+var liveOps = Yes2SDK.ControlPlane.LiveOps;
+foreach (LiveOpsEvent liveOpsEvent in liveOps.GetActiveEvents())
+{
+    Debug.Log(liveOpsEvent.ResourceKey + " until " + liveOpsEvent.EndAt + ": " + liveOpsEvent.PayloadJson);
+}
+IReadOnlyList<LiveOpsEvent> all = liveOps.GetEvents();
+bool found = liveOps.TryGetEvent("event.winter", out LiveOpsEvent winter);
+```
+
+- An event is active when `StartAt <= now < EndAt`, with `now` from `DateTimeOffset.UtcNow`. Events may overlap: `GetActiveEvents` returns all of them, and there is no current or priority event.
+- `GetEvents` returns every event of the Deployment, whether upcoming, active or ended. Both lists are in ordinal Resource key order, read-only, and empty when nothing is active.
+- `TryGetEvent` matches the Resource key exactly and returns `false` for a missing key or a Resource of another type.
+- `PayloadJson` is the event's `payload` as compact JSON text. Its meaning belongs to the game: the SDK grants no reward and checks no eligibility. `ArtifactRefs` are `sha256:` digests.
+- The device clock decides what is active. It is for presentation, not for economy decisions.
+- Queries are in memory. LiveOps has no timer, poller or event of its own: re-query after `DeploymentActivated`, or whenever you need the current set. Crossing `StartAt` or `EndAt` makes no request.
+
 ---
 
 ## Integration Checklist

@@ -68,10 +68,13 @@ namespace Yes2SDK
             _random = random;
             _openJournal = openJournal;
             Config = new ControlPlaneConfig(() => _session?.Current);
+            LiveOps = new ControlPlaneLiveOps(() => _session?.Current);
         }
 
         /// <summary>Typed reads of the active Deployment's config.v1 Resources.</summary>
         public ControlPlaneConfig Config { get; }
+
+        public ControlPlaneLiveOps LiveOps { get; }
 
         /// <summary>Raised once each time a different deploymentId becomes active.</summary>
         public event Action<ControlPlaneActivation> DeploymentActivated;
@@ -336,6 +339,7 @@ namespace Yes2SDK
                 }
                 session.Active = snapshot;
                 session.Resources = resources;
+                session.Events = ControlPlaneLiveOps.Read(snapshot);
             }
             session.SetStatus(source, lastError);
 
@@ -439,6 +443,7 @@ namespace Yes2SDK
             public Task<ControlPlaneStatus> Refreshing { get; set; }
             public ControlPlaneSnapshot Active { get; set; }
             public Dictionary<string, JObject> Resources { get; set; }
+            public IReadOnlyList<LiveOpsEvent> Events { get; set; }
             public ControlPlaneActiveState Current => _current;
             public bool Started { get; set; }
             public bool Persisted { get; set; }
@@ -450,7 +455,8 @@ namespace Yes2SDK
             {
                 _current = new ControlPlaneActiveState(
                     new ControlPlaneStatus(source, Context.GameKey, Context.EnvironmentKey, Active?.Bootstrap.DeploymentId, Active?.Bootstrap.ReleaseId, lastError),
-                    Resources);
+                    Resources,
+                    Events);
             }
         }
     }

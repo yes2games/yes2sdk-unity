@@ -43,14 +43,16 @@ namespace Yes2SDK
 
     internal sealed class ControlPlaneActiveState
     {
-        public ControlPlaneActiveState(ControlPlaneStatus status, Dictionary<string, JObject> resources)
+        public ControlPlaneActiveState(ControlPlaneStatus status, Dictionary<string, JObject> resources, IReadOnlyList<LiveOpsEvent> events)
         {
             Status = status;
             Resources = resources;
+            Events = events;
         }
 
         public ControlPlaneStatus Status { get; }
         public Dictionary<string, JObject> Resources { get; }
+        public IReadOnlyList<LiveOpsEvent> Events { get; }
     }
 
     /// <summary>Typed reads of config.v1 Resources by RFC 6901 pointer; every miss returns the caller's default.</summary>
