@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.13.0...v2.14.0) (2026-11-11)
+
+
+### Features
+
+* **control-plane:** lazy verified Artifact download and text/texture decoders ([#144](https://github.com/yes2games/yes2sdk-unity/issues/144)) ([8de341e](https://github.com/yes2games/yes2sdk-unity/commit/8de341e50f02d92eddcabf59c6c22ef08c824ab6)), closes [#99](https://github.com/yes2games/yes2sdk-unity/issues/99) [#98](https://github.com/yes2games/yes2sdk-unity/issues/98)
+* **control-plane:** LiveOps query API over active liveops.event.v1 Resources ([#143](https://github.com/yes2games/yes2sdk-unity/issues/143)) ([bfdd8f9](https://github.com/yes2games/yes2sdk-unity/commit/bfdd8f96f77e15717094ae82a63af45676a239bf)), closes [#101](https://github.com/yes2games/yes2sdk-unity/issues/101)
+
 ## [2.13.0](https://github.com/yes2games/yes2sdk-unity/compare/v2.12.1...v2.13.0) (2026-10-20)
 
 
