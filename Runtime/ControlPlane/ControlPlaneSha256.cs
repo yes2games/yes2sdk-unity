@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -10,10 +11,20 @@ namespace Yes2SDK
 
         public static string Digest(byte[] bytes)
         {
+            return Digest(sha => sha.ComputeHash(bytes));
+        }
+
+        public static string Digest(Stream stream)
+        {
+            return Digest(sha => sha.ComputeHash(stream));
+        }
+
+        private static string Digest(Func<SHA256, byte[]> compute)
+        {
             byte[] hash;
             using (var sha = new SHA256Managed())
             {
-                hash = sha.ComputeHash(bytes);
+                hash = compute(sha);
             }
 
             var digest = new StringBuilder(Prefix, Prefix.Length + hash.Length * 2);

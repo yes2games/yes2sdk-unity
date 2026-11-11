@@ -1,3 +1,4 @@
+using System;
 using Newtonsoft.Json.Linq;
 
 namespace Yes2SDK
@@ -80,5 +81,34 @@ namespace Yes2SDK
         public string DeploymentId { get; }
         public string ReleaseId { get; }
         public ControlPlaneSource Source { get; }
+    }
+
+    /// <summary>A cached Artifact file whose size and SHA-256 matched its descriptor.</summary>
+    public sealed class VerifiedArtifact
+    {
+        internal VerifiedArtifact(string digest, string mediaType, long size, string filePath)
+        {
+            Digest = digest;
+            MediaType = mediaType;
+            Size = size;
+            FilePath = filePath;
+        }
+
+        public string Digest { get; }
+        public string MediaType { get; }
+        public long Size { get; }
+        public string FilePath { get; }
+    }
+
+    /// <summary>A failed control-plane operation; <see cref="Code"/> is its errors-v1 code.</summary>
+    public sealed class ControlPlaneException : Exception
+    {
+        internal ControlPlaneException(ControlPlaneErrorCategory category, string detail)
+            : base(detail == null ? category.Code() : category.Code() + ": " + detail)
+        {
+            Code = category.Code();
+        }
+
+        public string Code { get; }
     }
 }

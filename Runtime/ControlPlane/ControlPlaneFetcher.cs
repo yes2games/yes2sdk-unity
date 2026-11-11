@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,6 +11,7 @@ namespace Yes2SDK
         public const int MinRetryDelayMilliseconds = 250;
         public const int MaxRetryDelayMilliseconds = 500;
         public static readonly TimeSpan AttemptTimeout = TimeSpan.FromSeconds(5);
+        public static readonly TimeSpan ArtifactAttemptTimeout = TimeSpan.FromSeconds(15);
 
         private readonly IControlPlaneTransport _transport;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
@@ -42,6 +44,18 @@ namespace Yes2SDK
                 token);
         }
 
+        public Task<ControlPlaneResult<string>> FetchArtifactAsync(string url, string digest, long size, string filePath, CancellationToken token)
+        {
+            return FetchAsync(
+                new ControlPlaneTransportRequest(url, ArtifactAttemptTimeout, size, false, filePath),
+                ControlPlaneErrorCategory.ArtifactHttpFailed,
+                ControlPlaneErrorCategory.ArtifactIntegrityFailed,
+                body => ControlPlaneArtifactCache.Verify(filePath, digest, size)
+                    ? ControlPlaneResult<string>.Success(filePath)
+                    : ControlPlaneResult<string>.Failure(ControlPlaneErrorCategory.ArtifactIntegrityFailed, "downloaded bytes do not match size " + size + " and " + digest),
+                token);
+        }
+
         private async Task<ControlPlaneResult<T>> FetchAsync<T>(
             ControlPlaneTransportRequest request,
             ControlPlaneErrorCategory httpFailed,
@@ -63,6 +77,10 @@ namespace Yes2SDK
                     try
                     {
                         response = await _transport.GetAsync(request, token);
+                    }
+                    catch (Exception e) when (request.FilePath != null && (e is IOException || e is UnauthorizedAccessException))
+                    {
+                        return ControlPlaneResult<T>.Failure(ControlPlaneErrorCategory.CacheUnavailable, e.GetType().Name + ": " + e.Message);
                     }
                     catch (Exception e) when (!(e is OperationCanceledException && token.IsCancellationRequested))
                     {

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine.Networking;
@@ -31,6 +32,10 @@ namespace Yes2SDK
                 {
                     web.SetRequestHeader("Cache-Control", "no-cache");
                 }
+                if (request.FilePath != null)
+                {
+                    web.downloadHandler = new DownloadHandlerFile(request.FilePath) { removeFileOnAbort = true };
+                }
 #endif
                 var deadline = _clock() + request.Timeout;
                 var operation = web.SendWebRequest();
@@ -58,6 +63,15 @@ namespace Yes2SDK
 
                 switch (web.result)
                 {
+                    case UnityWebRequest.Result.Success when request.FilePath != null:
+                        if (web.downloadedBytes > (ulong)request.MaxBytes)
+                        {
+                            return ControlPlaneTransportResponse.TooLarge(web.responseCode);
+                        }
+#if UNITY_WEBGL && !UNITY_EDITOR
+                        File.WriteAllBytes(request.FilePath, web.downloadHandler.data);
+#endif
+                        return ControlPlaneTransportResponse.Completed(web.responseCode, null);
                     case UnityWebRequest.Result.Success:
                         var body = web.downloadHandler.data;
                         return body != null && body.LongLength > request.MaxBytes

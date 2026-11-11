@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Yes2SDK
 {
+    /// <summary>One liveops.event.v1 Resource of the active Deployment, detached from it and immutable.</summary>
     public sealed class LiveOpsEvent
     {
         internal LiveOpsEvent(JObject resource, ControlPlaneBootstrap bootstrap)
@@ -37,6 +37,7 @@ namespace Yes2SDK
         }
     }
 
+    /// <summary>In-memory queries over the active Deployment's liveops.event.v1 Resources, active on [StartAt, EndAt).</summary>
     public sealed class ControlPlaneLiveOps
     {
         private static readonly IReadOnlyList<LiveOpsEvent> None = Array.AsReadOnly(new LiveOpsEvent[0]);

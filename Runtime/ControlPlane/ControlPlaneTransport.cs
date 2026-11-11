@@ -11,18 +11,20 @@ namespace Yes2SDK
 
     internal sealed class ControlPlaneTransportRequest
     {
-        public ControlPlaneTransportRequest(string url, TimeSpan timeout, long maxBytes, bool bypassCache)
+        public ControlPlaneTransportRequest(string url, TimeSpan timeout, long maxBytes, bool bypassCache, string filePath = null)
         {
             Url = url;
             Timeout = timeout;
             MaxBytes = maxBytes;
             BypassCache = bypassCache;
+            FilePath = filePath;
         }
 
         public string Url { get; }
         public TimeSpan Timeout { get; }
         public long MaxBytes { get; }
         public bool BypassCache { get; }
+        public string FilePath { get; }
     }
 
     internal enum ControlPlaneTransportStatus
