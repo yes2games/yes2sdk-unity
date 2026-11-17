@@ -53,7 +53,8 @@ namespace Yes2SDK
         /// Called when the platform's audio-enabled state changes (e.g., user
         /// muted/unmuted via the platform UI). Required for YouTube Playables
         /// certification (integration requirement #14): the game MUST update
-        /// its audio state to match.
+        /// its audio state to match. Fires on YouTube Playables and CrazyGames;
+        /// other platforms have no native signal and never raise it.
         /// </summary>
         public static event Action<bool> OnAudioEnabledChange;
 
