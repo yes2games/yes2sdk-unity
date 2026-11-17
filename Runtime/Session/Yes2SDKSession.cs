@@ -250,9 +250,9 @@ namespace Yes2SDK
         /// Yes2SDK.OnAudioEnabledChange += enabled => AudioListener.volume = enabled ? 1f : 0f;
         /// </code>
         ///
-        /// On platforms without a native audio-enabled signal (Poki, CrazyGames,
-        /// Yandex, GameDistribution), this returns true so games don't mute by
-        /// accident.
+        /// YouTube Playables and CrazyGames report the real platform state. On
+        /// platforms without a native audio-enabled signal (Poki, Yandex,
+        /// GameDistribution), this returns true so games don't mute by accident.
         /// </summary>
         /// <returns>True if audio is enabled.</returns>
         public bool IsAudioEnabled()

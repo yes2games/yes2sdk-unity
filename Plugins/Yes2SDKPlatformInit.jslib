@@ -358,10 +358,16 @@ mergeInto(LibraryManager.library, {
                     return Promise.resolve(source);
                 },
 
-                // CrazyGames has no native audio-enabled signal; assume enabled
-                // (mirrors Core crazygames-session-strategy.isAudioEnabled).
+                // Inverse of CrazyGames game.settings.muteAudio; true if the
+                // getter is missing or throws (mirrors Core crazygames-session-strategy.isAudioEnabled).
                 isAudioEnabled: function() {
-                    return true;
+                    try {
+                        var sdk = window.Yes2SDK._sdk;
+                        var settings = sdk && sdk.game && sdk.game.settings;
+                        return !(settings && settings.muteAudio);
+                    } catch(e) {
+                        return true;
+                    }
                 },
 
                 // Detailed device info. CrazyGames has no TV class, so isTV is always false
