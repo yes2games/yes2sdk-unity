@@ -89,8 +89,8 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           projectPath: ci~/consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-android-3
+          unityVersion: 6000.3.28f1
+          customImage: unityci/editor:ubuntu-6000.3.28f1-android-3
           targetPlatform: Android
           buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildAndroid
           buildName: Yes2SDKProof
@@ -99,7 +99,7 @@ jobs:
 
       - name: Free the editor image before the emulator
         run: |
-          sudo docker image rm unityci/editor:ubuntu-6000.3.16f1-android-3 || true
+          sudo docker image rm unityci/editor:ubuntu-6000.3.28f1-android-3 || true
           ls -l build/Android
           df -h /
 

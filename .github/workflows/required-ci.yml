@@ -172,7 +172,7 @@ jobs:
   # consumed by the lanes rather than sitting unused beside them.
   #
   # The editor image is named explicitly rather than composed by the action from a
-  # default image-version suffix: only the `-3` variant exists for 6000.3.16f1, and
+  # default image-version suffix: the `-3` variant is the one pinned for 6000.3.28f1, and
   # a suffix the action picks is a dependency nothing in this file can see.
   unity-floor:
     name: Unity 2021.3.0f1 floor lane
@@ -235,7 +235,7 @@ jobs:
           and belongs to the change under review."
 
   unity-current:
-    name: Unity 6000.3.16f1 current lane + WebGL smoke
+    name: Unity 6000.3.28f1 current lane + WebGL smoke
     # Skipped, never faked, when this run cannot drive an editor. A lane that
     # exits 0 without starting Unity would be a green that means "we skipped the
     # hard part"; a skipped lane renders grey and claims nothing.
@@ -267,8 +267,8 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           projectPath: ci~/consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          unityVersion: 6000.3.28f1
+          customImage: unityci/editor:ubuntu-6000.3.28f1-webgl-3
           testMode: EditMode
           artifactsPath: current-test-results
 
@@ -290,8 +290,8 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           projectPath: ci~/consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          unityVersion: 6000.3.28f1
+          customImage: unityci/editor:ubuntu-6000.3.28f1-webgl-3
           targetPlatform: WebGL
           buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
           buildName: Yes2SDKSmoke
@@ -318,8 +318,8 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           projectPath: ci~/consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          unityVersion: 6000.3.28f1
+          customImage: unityci/editor:ubuntu-6000.3.28f1-webgl-3
           targetPlatform: WebGL
           buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.CompileWithoutControlPlane
           buildName: Yes2SDKNoControlPlane
@@ -666,7 +666,7 @@ jobs:
           fi
 
           git push --force origin "$CANDIDATE:refs/tags/edge"
-          echo "diagnostics: ref=edge sha=$CANDIDATE semver=$V channel=edge unity=6000.3.16f1"
+          echo "diagnostics: ref=edge sha=$CANDIDATE semver=$V channel=edge unity=6000.3.28f1"
 
       - name: Build a clean edge consumer
         run: node 'ci~/make-consumer.mjs' .edge-consumer 'https://github.com/yes2games/yes2sdk-unity.git#edge'
@@ -675,8 +675,8 @@ jobs:
         uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
         with:
           projectPath: .edge-consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          unityVersion: 6000.3.28f1
+          customImage: unityci/editor:ubuntu-6000.3.28f1-webgl-3
           testMode: EditMode
           artifactsPath: edge-test-results
 
@@ -687,8 +687,8 @@ jobs:
         uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
         with:
           projectPath: .edge-consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          unityVersion: 6000.3.28f1
+          customImage: unityci/editor:ubuntu-6000.3.28f1-webgl-3
           targetPlatform: WebGL
           buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
           buildName: Yes2SDKEdgeSmoke
@@ -832,7 +832,7 @@ jobs:
           # it would fail after the publish, the one step with no way back. What the
           # tag points at is asserted above from git itself, which needs no
           # attestation.
-          echo "diagnostics: ref=v$V sha=$CANDIDATE semver=$V channel=stable unity=6000.3.16f1"
+          echo "diagnostics: ref=v$V sha=$CANDIDATE semver=$V channel=stable unity=6000.3.28f1"
 
       - name: Build a clean exact-tag consumer
         if: steps.state.outputs.mode == 'stable'
@@ -845,8 +845,8 @@ jobs:
         uses: game-ci/unity-test-runner@fa6ced25861c16ef56187828c43f76d00df43a23 # v4.3.2
         with:
           projectPath: .stable-consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          unityVersion: 6000.3.28f1
+          customImage: unityci/editor:ubuntu-6000.3.28f1-webgl-3
           testMode: EditMode
           artifactsPath: stable-test-results
 
@@ -859,8 +859,8 @@ jobs:
         uses: game-ci/unity-builder@3b26780ddfe24a0ee2aebb0a65297ab69fc5bb4c # v4.5.0
         with:
           projectPath: .stable-consumer
-          unityVersion: 6000.3.16f1
-          customImage: unityci/editor:ubuntu-6000.3.16f1-webgl-3
+          unityVersion: 6000.3.28f1
+          customImage: unityci/editor:ubuntu-6000.3.28f1-webgl-3
           targetPlatform: WebGL
           buildMethod: Yes2Games.CI.Yes2SDKCiSmoke.BuildWebGL
           buildName: Yes2SDKStableSmoke
