@@ -172,7 +172,7 @@ jobs:
   # consumed by the lanes rather than sitting unused beside them.
   #
   # The editor image is named explicitly rather than composed by the action from a
-  # default image-version suffix: the `-3` variant is the one pinned for 6000.3.28f1, and
+  # default image-version suffix: the `-3` variant is named explicitly for 6000.3.28f1 (a `-4` series also exists), and
   # a suffix the action picks is a dependency nothing in this file can see.
   unity-floor:
     name: Unity 2021.3.0f1 floor lane
